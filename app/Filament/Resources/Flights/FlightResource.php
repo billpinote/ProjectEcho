@@ -9,11 +9,13 @@ use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Resources\Flights\Tables\FlightsTable;
 use App\Models\Flight;
 use BackedEnum;
+use Filament\Navigation\NavigationItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use function Filament\Support\original_request;
 
 class FlightResource extends Resource
 {
@@ -53,6 +55,11 @@ class FlightResource extends Resource
         return SchemaFacade::hasColumn((new Flight)->getTable(), 'status');
     }
 
+    protected static function hasReviewedAtColumn(): bool
+    {
+        return Flight::hasReviewedAtColumn();
+    }
+
     public static function getEloquentQuery(): Builder
     {
         if (! static::hasStatusColumn()) {
@@ -64,13 +71,9 @@ class FlightResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $query = static::getModel()::query();
+        $count = static::getPendingNavigationCounts()['new'];
 
-        $count = static::hasStatusColumn()
-            ? $query->pendingActive()->count()
-            : $query->whereNull('accepted_by_user_id')->count();
-
-        return $count > 0 ? (string) $count : null;
+        return $count > 0 ? "New {$count}" : null;
     }
 
     public static function getNavigationBadgeColor(): string|array|null
@@ -80,7 +83,55 @@ class FlightResource extends Resource
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'New flight plans awaiting ATC review';
+        return 'Unseen pending flight plans';
+    }
+
+    public static function getNavigationItems(): array
+    {
+        if (! static::hasPage('index')) {
+            return [];
+        }
+
+        $activeRoutePattern = static::getNavigationItemActiveRoutePattern();
+
+        return [
+            NavigationItem::make(static::getNavigationLabel())
+                ->group(static::getNavigationGroup())
+                ->parentItem(static::getNavigationParentItem())
+                ->icon(static::getNavigationIcon())
+                ->activeIcon(static::getActiveNavigationIcon())
+                ->isActiveWhen(fn (): bool => original_request()->routeIs($activeRoutePattern))
+                ->badge(static::getNavigationBadge(), color: static::getNavigationBadgeColor())
+                ->badgeTooltip(static::getNavigationBadgeTooltip())
+                ->extraAttributes(
+                    static::class === self::class
+                        ? ['class' => 'echo-pending-nav-item']
+                        : []
+                )
+                ->sort(static::getNavigationSort())
+                ->url(static::getNavigationUrl()),
+        ];
+    }
+
+    /**
+     * @return array{new: int, total: int}
+     */
+    protected static function getPendingNavigationCounts(): array
+    {
+        $query = static::getModel()::query();
+
+        $total = static::hasStatusColumn()
+            ? (clone $query)->pendingActive()->count()
+            : (clone $query)->whereNull('accepted_by_user_id')->count();
+
+        $new = static::hasReviewedAtColumn()
+            ? (clone $query)->pendingUnreviewed()->count()
+            : 0;
+
+        return [
+            'new' => $new,
+            'total' => $total,
+        ];
     }
 
     public static function getRelations(): array

@@ -218,4 +218,47 @@
     .fi-pagination-overview {
         color: var(--color-echo-text-secondary);
     }
+
+    .echo-pending-nav-item .fi-badge {
+        background: color-mix(in srgb, var(--color-echo-rejected) 88%, black 8%);
+        color: #fffdf7;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 0 4px rgba(239, 68, 68, 0.14);
+        animation: echo-sidebar-badge-pulse 1.8s ease-in-out infinite;
+    }
+
+    .echo-new-flight-row {
+        background: linear-gradient(90deg, rgba(239, 68, 68, 0.12) 0%, rgba(245, 165, 36, 0.1) 55%, rgba(255, 253, 247, 0.92) 100%);
+        box-shadow: inset 4px 0 0 var(--color-echo-rejected);
+        animation: echo-new-row-pulse 2.2s ease-in-out infinite;
+    }
+
+    .echo-new-flight-row .fi-ta-cell {
+        font-weight: 600;
+    }
+}
+
+@keyframes echo-sidebar-badge-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 0 0 rgba(239, 68, 68, 0.24);
+    }
+
+    50% {
+        transform: scale(1.04);
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 0 6px rgba(239, 68, 68, 0.08);
+    }
+}
+
+@keyframes echo-new-row-pulse {
+    0%,
+    100% {
+        background-position: 0 0;
+        box-shadow: inset 4px 0 0 var(--color-echo-rejected);
+    }
+
+    50% {
+        background-position: 12px 0;
+        box-shadow: inset 4px 0 0 var(--color-echo-rejected), inset 0 0 0 999px rgba(245, 165, 36, 0.04);
+    }
 }

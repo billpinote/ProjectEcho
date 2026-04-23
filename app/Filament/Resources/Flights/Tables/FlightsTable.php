@@ -169,10 +169,17 @@ class FlightsTable
         }
 
         return $table
+            ->when(
+                $resourceClass === \App\Filament\Resources\Flights\FlightResource::class,
+                fn (Table $table): Table => $table->poll('5s')
+            )
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
             )
+            ->recordClasses(fn (Flight $record): array => $resourceClass === \App\Filament\Resources\Flights\FlightResource::class && $record->reviewed_at === null
+                ? ['echo-new-flight-row']
+                : [])
             ->columns($columns)
             ->filters([
                 SelectFilter::make('flight_rules')

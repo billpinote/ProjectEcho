@@ -87,6 +87,10 @@ class FlightController extends Controller
     {
         $this->ensureReviewerAccess();
 
+        if ($flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
+            $flight->markAsReviewed();
+        }
+
         $backActionUrl = $this->resolveReviewBackUrl($request, $flight);
 
         return view('flightplan.pdf', [

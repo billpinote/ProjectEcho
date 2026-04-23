@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 class Flight extends Model
 {
@@ -30,6 +31,7 @@ class Flight extends Model
         'dinghies_enabled' => 'boolean',
         'authorized_representative_enabled' => 'boolean',
         'status' => FlightPlanStatus::class,
+        'reviewed_at' => 'datetime',
     ];
 
     protected $fillable = [
@@ -116,6 +118,7 @@ class Flight extends Model
         'rejected_by_wiresign',
         'rejection_reason',
         'status',
+        'reviewed_at',
     ];
 
     public function acceptedBy(): BelongsTo
@@ -151,6 +154,17 @@ class Flight extends Model
         return $query->where('status', FlightPlanStatus::Accepted);
     }
 
+    public function scopePendingUnreviewed(Builder $query): Builder
+    {
+        if (! static::hasReviewedAtColumn()) {
+            return $query->pendingActive();
+        }
+
+        return $query
+            ->pendingActive()
+            ->whereNull('reviewed_at');
+    }
+
     public function scopeRejected(Builder $query): Builder
     {
         return $query->where('status', FlightPlanStatus::Rejected);
@@ -181,6 +195,28 @@ class Flight extends Model
             'Date of Flight.',
             $dateOfFlight->format('Y-m-d')
         );
+    }
+
+    public function markAsReviewed(): void
+    {
+        if (! static::hasReviewedAtColumn()) {
+            return;
+        }
+
+        if ($this->reviewed_at !== null) {
+            return;
+        }
+
+        $this->forceFill([
+            'reviewed_at' => now(),
+        ])->saveQuietly();
+    }
+
+    public static function hasReviewedAtColumn(): bool
+    {
+        static $hasReviewedAtColumn;
+
+        return $hasReviewedAtColumn ??= Schema::hasColumn((new static)->getTable(), 'reviewed_at');
     }
 
     private function resolveDateOfFlight(): ?CarbonInterface

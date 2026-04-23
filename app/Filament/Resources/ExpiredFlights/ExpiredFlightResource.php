@@ -28,23 +28,7 @@ class ExpiredFlightResource extends FlightResource
 
     public static function getNavigationBadge(): ?string
     {
-        if (! static::hasStatusColumn()) {
-            return null;
-        }
-
-        $count = static::getModel()::query()->pendingExpired()->count();
-
-        return $count > 0 ? (string) $count : null;
-    }
-
-    public static function getNavigationBadgeColor(): string|array|null
-    {
-        return 'warning';
-    }
-
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'Pending flight plans whose departure time has already passed';
+        return null;
     }
 
     public static function getPages(): array
