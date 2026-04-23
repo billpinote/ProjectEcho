@@ -1,0 +1,181 @@
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.col-1 { grid-column: span 1; }
+.col-2 { grid-column: span 2; }
+.col-3 { grid-column: span 3; }
+.col-4 { grid-column: span 4; }
+.col-5 { grid-column: span 5; }
+.col-6 { grid-column: span 6; }
+.col-7 { grid-column: span 7; }
+.col-8 { grid-column: span 8; }
+
+/* Custom checkbox styling for inverted logic */
+input[type="checkbox"].inverted-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #d1d5db;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff;
+    transition: all 0.2s ease;
+}
+
+input[type="checkbox"].inverted-checkbox:hover {
+    border-color: #9ca3af;
+}
+
+input[type="checkbox"].inverted-checkbox:checked {
+    border-color: #dc2626;
+    background-color: #fee2e2;
+    content: "✕";
+}
+
+input[type="checkbox"].inverted-checkbox:checked::after {
+    content: "✕";
+    color: #dc2626;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+/* Truncate long labels with ellipsis */
+.label-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Capitalize all labels */
+label {
+    text-transform: uppercase;
+}
+
+/* Make form group labels more compact */
+.form-group label {
+    font-size: 0.7rem;
+    line-height: 1.2;
+}
+
+/* Capitalize all input fields */
+input[type="text"],
+input[type="date"],
+input[type="time"],
+textarea {
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    font-weight: normal !important;
+}
+
+/* Style select dropdowns like inputs */
+select {
+    text-transform: uppercase;
+    font-size: 0.9rem;
+    font-weight: normal !important;
+}
+
+/* Keep disabled controls visually distinct, including select fields. */
+input:disabled,
+select:disabled,
+textarea:disabled {
+    background-color: #f3f4f6;
+    color: #6b7280;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+/* Equipment separator */
+.equipment-separator {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    font-size: 1.3rem;
+    font-weight: normal;
+    color: #4b5563;
+    padding-bottom: 0.5rem;
+    padding: 0 0.2rem;
+}
+
+.collapsible-disabled {
+    opacity: 0.55;
+    background-color: #fff;
+}
+
+.dispatch-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.25rem;
+    background-color: #fff;
+    color: #374151;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+}
+
+.cert-signature-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr auto 1.2fr 1fr;
+    gap: 1rem;
+    align-items: end;
+    margin-top: 4.25rem;
+    margin-bottom: 2.25rem;
+}
+
+.cert-signature-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.cert-signature-line {
+    border-bottom: 2px solid #374151;
+    min-height: 1.8rem;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 0.2rem 0.2rem 0.2rem;
+    overflow: hidden;
+}
+
+.cert-signature-label {
+    font-size: 0.7rem;
+    color: #111827;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    text-align: center;
+}
+
+.cert-signature-or {
+    font-size: 1.1rem;
+    color: #111827;
+    font-weight: 500;
+    padding-bottom: 0.3rem;
+}
+
+.cert-signature-value {
+    width: 100%;
+    font-size: 0.82rem;
+    color: #111827;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    font-weight: bold;
+}

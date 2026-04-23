@@ -1,0 +1,221 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@500;600&display=swap');
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+@import '../../echo-theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+@layer base {
+    :root {
+        --echo-shadow-soft: 0 12px 32px rgba(10, 63, 50, 0.06);
+        --echo-shadow-strong: 0 16px 40px rgba(10, 63, 50, 0.12);
+    }
+
+    .fi-body {
+        background: var(--color-echo-background);
+        color: var(--color-echo-text-primary);
+        font-family: var(--font-sans);
+    }
+}
+
+@layer components {
+    .fi-main,
+    .fi-page,
+    .fi-simple-main {
+        background: var(--color-echo-background);
+    }
+
+    .fi-sidebar.fi-main-sidebar {
+        background: linear-gradient(180deg, var(--color-echo-primary-dark) 0%, #082e25 100%);
+        color: rgba(255, 253, 247, 0.9);
+        border-inline-end: 1px solid color-mix(in srgb, var(--color-echo-border) 25%, transparent);
+        box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .fi-sidebar-header,
+    .fi-sidebar-nav,
+    .fi-sidebar-footer {
+        background: transparent;
+    }
+
+    .fi-sidebar-item-btn,
+    .fi-sidebar-group-btn,
+    .fi-topbar-item-btn {
+        border-radius: 0.85rem;
+        transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+    }
+
+    .fi-sidebar-item-label,
+    .fi-sidebar-group-label,
+    .fi-sidebar-item-icon,
+    .fi-topbar-item-label,
+    .fi-topbar-item-icon {
+        color: inherit;
+    }
+
+    .fi-sidebar-item-btn:hover,
+    .fi-sidebar-group-btn:hover,
+    .fi-topbar-item-btn:hover {
+        background: color-mix(in srgb, var(--color-echo-accent) 18%, transparent);
+        color: #fffdf7;
+    }
+
+    .fi-sidebar-item-active > .fi-sidebar-item-btn,
+    .fi-sidebar-item-btn[aria-current='page'],
+    .fi-topbar-item-active > .fi-topbar-item-btn {
+        background: color-mix(in srgb, var(--color-echo-primary) 78%, black 10%);
+        color: #fffdf7;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    }
+
+    .fi-topbar {
+        background: color-mix(in srgb, var(--color-echo-card) 90%, white);
+        border: 1px solid var(--color-echo-border);
+        box-shadow: var(--echo-shadow-soft);
+        backdrop-filter: blur(10px);
+    }
+
+    .fi-page-header-main-ctn h1,
+    .fi-section-header-heading,
+    .fi-ta-header-heading,
+    .fi-modal-heading {
+        font-size: var(--text-echo-heading);
+        line-height: var(--text-echo-heading--line-height);
+        font-weight: 600;
+        color: var(--color-echo-text-primary);
+    }
+
+    .fi-page-header-main-ctn p,
+    .fi-section-header-description,
+    .fi-ta-header-description,
+    .fi-modal-description {
+        font-size: var(--text-echo-help);
+        line-height: var(--text-echo-help--line-height);
+        color: var(--color-echo-text-secondary);
+    }
+
+    .fi-section,
+    .fi-ta,
+    .fi-modal-window,
+    .fi-dropdown-panel,
+    .fi-wi-widget {
+        background: var(--color-echo-card);
+        border: 1px solid var(--color-echo-border);
+        box-shadow: var(--echo-shadow-soft);
+    }
+
+    .fi-section,
+    .fi-modal-window {
+        border-radius: 1rem;
+    }
+
+    .fi-input-wrp,
+    .fi-select-input,
+    .fi-textarea,
+    .fi-fo-checkbox-list-option-label,
+    .fi-checkbox-input,
+    .fi-radio-input {
+        border-color: var(--color-echo-border);
+    }
+
+    .fi-input,
+    .fi-select-input,
+    .fi-textarea {
+        color: var(--color-echo-text-primary);
+        font-size: var(--text-echo-body);
+        line-height: var(--text-echo-body--line-height);
+    }
+
+    .fi-input::placeholder,
+    .fi-textarea::placeholder {
+        color: color-mix(in srgb, var(--color-echo-text-secondary) 72%, white);
+    }
+
+    .fi-fo-field-label,
+    .fi-fo-field-label-content,
+    .fi-ta-header-cell-label {
+        font-size: var(--text-echo-label);
+        line-height: var(--text-echo-label--line-height);
+        font-weight: 600;
+        color: var(--color-echo-text-primary);
+    }
+
+    .fi-fo-field-helper-text {
+        font-size: var(--text-echo-help);
+        line-height: var(--text-echo-help--line-height);
+        color: var(--color-echo-text-secondary);
+    }
+
+    .fi-input:focus,
+    .fi-select-input:focus,
+    .fi-textarea:focus,
+    .fi-checkbox-input:focus,
+    .fi-radio-input:focus {
+        outline: none;
+        border-color: var(--color-echo-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-echo-primary) 20%, white);
+    }
+
+    .fi-btn {
+        border-radius: 0.85rem;
+        font-weight: 600;
+    }
+
+    .fi-btn-color-primary {
+        --c-400: var(--primary-400);
+        --c-500: var(--primary-500);
+        --c-600: var(--primary-600);
+        --c-700: var(--primary-700);
+    }
+
+    .fi-badge {
+        border-radius: 9999px;
+        font-size: var(--text-echo-badge);
+        line-height: var(--text-echo-badge--line-height);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .fi-ta-ctn,
+    .fi-ta-main,
+    .fi-ta-content,
+    .fi-ta-table,
+    .fi-ta-row,
+    .fi-ta-header-cell,
+    .fi-ta-cell {
+        background: transparent;
+    }
+
+    .fi-ta-header-cell {
+        color: var(--color-echo-text-secondary);
+        font-size: var(--text-echo-label);
+        line-height: var(--text-echo-label--line-height);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .fi-ta-cell {
+        color: var(--color-echo-text-primary);
+        font-size: var(--text-echo-table);
+        line-height: var(--text-echo-table--line-height);
+        font-weight: 500;
+        border-color: color-mix(in srgb, var(--color-echo-border) 85%, white);
+    }
+
+    .fi-ta-row:hover {
+        background: color-mix(in srgb, var(--color-echo-primary) 4%, white);
+    }
+
+    .fi-no-notification,
+    .fi-dropdown-list {
+        color: var(--color-echo-text-primary);
+    }
+
+    .fi-breadcrumbs,
+    .fi-tabs-item-label,
+    .fi-pagination-overview {
+        color: var(--color-echo-text-secondary);
+    }
+}

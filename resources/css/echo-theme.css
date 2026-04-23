@@ -1,0 +1,171 @@
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'Roboto Mono', ui-monospace, monospace;
+
+    --color-echo-primary: #0F5F4A;
+    --color-echo-primary-dark: #0A3F32;
+    --color-echo-accent: #2FAE7B;
+    --color-echo-background: #EEF3EE;
+    --color-echo-card: #FFFDF7;
+    --color-echo-text-primary: #162018;
+    --color-echo-text-secondary: #68726B;
+    --color-echo-border: #D9E2DA;
+    --color-echo-pending: #F5A524;
+    --color-echo-accepted: #22C55E;
+    --color-echo-active: #2563EB;
+    --color-echo-rejected: #EF4444;
+    --color-echo-completed: #6B7280;
+
+    --text-echo-display: 1.875rem;
+    --text-echo-display--line-height: 1.2;
+    --text-echo-heading: 1.25rem;
+    --text-echo-heading--line-height: 1.3;
+    --text-echo-title: 1rem;
+    --text-echo-title--line-height: 1.3;
+    --text-echo-body: 0.875rem;
+    --text-echo-body--line-height: 1.5;
+    --text-echo-label: 0.8125rem;
+    --text-echo-label--line-height: 1.3;
+    --text-echo-table: 0.8125rem;
+    --text-echo-table--line-height: 1.4;
+    --text-echo-help: 0.75rem;
+    --text-echo-help--line-height: 1.4;
+    --text-echo-badge: 0.75rem;
+    --text-echo-badge--line-height: 1;
+    --text-echo-mono: 0.8125rem;
+    --text-echo-mono--line-height: 1.35;
+}
+
+@layer base {
+    :root {
+        color-scheme: light;
+    }
+
+    body {
+        font-family: var(--font-sans);
+        color: var(--color-echo-text-primary);
+        background: var(--color-echo-background);
+    }
+}
+
+@layer components {
+    .echo-display {
+        font-size: var(--text-echo-display);
+        line-height: var(--text-echo-display--line-height);
+        font-weight: 700;
+        color: var(--color-echo-text-primary);
+    }
+
+    .echo-heading {
+        font-size: var(--text-echo-heading);
+        line-height: var(--text-echo-heading--line-height);
+        font-weight: 600;
+        color: var(--color-echo-text-primary);
+    }
+
+    .echo-title {
+        font-size: var(--text-echo-title);
+        line-height: var(--text-echo-title--line-height);
+        font-weight: 600;
+        color: var(--color-echo-text-primary);
+    }
+
+    .echo-body {
+        font-size: var(--text-echo-body);
+        line-height: var(--text-echo-body--line-height);
+        font-weight: 400;
+        color: var(--color-echo-text-primary);
+    }
+
+    .echo-label {
+        font-size: var(--text-echo-label);
+        line-height: var(--text-echo-label--line-height);
+        font-weight: 600;
+        color: var(--color-echo-text-primary);
+        letter-spacing: 0.02em;
+    }
+
+    .echo-table-text {
+        font-size: var(--text-echo-table);
+        line-height: var(--text-echo-table--line-height);
+        font-weight: 500;
+        color: var(--color-echo-text-primary);
+    }
+
+    .echo-help {
+        font-size: var(--text-echo-help);
+        line-height: var(--text-echo-help--line-height);
+        font-weight: 400;
+        color: var(--color-echo-text-secondary);
+    }
+
+    .echo-badge-text {
+        font-size: var(--text-echo-badge);
+        line-height: var(--text-echo-badge--line-height);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .echo-mono {
+        font-family: var(--font-mono);
+        font-size: var(--text-echo-mono);
+        line-height: var(--text-echo-mono--line-height);
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+
+    .echo-card {
+        border: 1px solid var(--color-echo-border);
+        border-radius: 1rem;
+        background: var(--color-echo-card);
+        box-shadow: 0 12px 32px rgba(10, 63, 50, 0.06);
+    }
+
+    .echo-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        border-radius: 9999px;
+        padding: 0.45rem 0.8rem;
+        font-size: var(--text-echo-badge);
+        line-height: var(--text-echo-badge--line-height);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .echo-status-badge::before {
+        content: '';
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 9999px;
+        background: currentColor;
+        opacity: 0.9;
+    }
+
+    .echo-status-pending {
+        color: var(--color-echo-pending);
+        background: color-mix(in srgb, var(--color-echo-pending) 14%, white);
+    }
+
+    .echo-status-accepted {
+        color: var(--color-echo-accepted);
+        background: color-mix(in srgb, var(--color-echo-accepted) 14%, white);
+    }
+
+    .echo-status-active {
+        color: var(--color-echo-active);
+        background: color-mix(in srgb, var(--color-echo-active) 14%, white);
+    }
+
+    .echo-status-rejected {
+        color: var(--color-echo-rejected);
+        background: color-mix(in srgb, var(--color-echo-rejected) 14%, white);
+    }
+
+    .echo-status-completed {
+        color: var(--color-echo-completed);
+        background: color-mix(in srgb, var(--color-echo-completed) 14%, white);
+    }
+}
