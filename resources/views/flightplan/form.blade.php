@@ -76,7 +76,7 @@
             <div class="form-grid">
                 <div class="form-group col-1">
                     <label class="block text-gray-700 font-medium mb-2 text-sm">Date of Filing</label>
-                    <input type="date" name="date_of_filing" value="{{ now('Asia/Manila')->format('Y-m-d') }}" class="w-[80%] md:w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                    <input type="date" name="date_of_filing" value="{{ now('UTC')->format('Y-m-d') }}" class="w-[80%] md:w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
                 </div>
                 <div class="form-group col-1">
                         <label class="block text-gray-700 font-medium mb-2 text-sm">Date of Flight</label>

@@ -63,7 +63,7 @@ class FlightForm
                                     ->extraAttributes(['class' => 'caap-flight-plan-grid'])
                                     ->schema([
                                         self::date('date_of_filing', 'Date of Filing', 1)
-                                            ->default(now('Asia/Manila')->toDateString())
+                                            ->default(now('UTC')->toDateString())
                                             ->readOnly(),
                                         self::date('date_of_flight', 'Date of Flight', 1)
                                             ->default(now('UTC')->toDateString())

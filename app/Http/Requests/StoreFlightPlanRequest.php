@@ -41,10 +41,11 @@ class StoreFlightPlanRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $otherInformation = (string) $this->input('other_information', '');
+        $dateOfFlightDof = $this->formatDateForDofTag($this->input('date_of_flight'));
 
         // Extract all tag values first
         $tagValues = [
-            'other_info_dof' => $this->extractOtherInfoTagValue('DOF', $otherInformation),
+            'other_info_dof' => $dateOfFlightDof ?? $this->extractOtherInfoTagValue('DOF', $otherInformation),
             'other_info_rmk' => $this->extractOtherInfoTagValue('RMK', $otherInformation),
             'other_info_typ' => $this->extractOtherInfoTagValue('TYP', $otherInformation),
             'other_info_dep' => $this->extractOtherInfoTagValue('DEP', $otherInformation),
@@ -259,6 +260,21 @@ class StoreFlightPlanRequest extends FormRequest
         }
 
         return implode(' ', $parts);
+    }
+
+    private function formatDateForDofTag(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D/', '', trim((string) $value));
+
+        if ($digits === null || strlen($digits) !== 8) {
+            return null;
+        }
+
+        return $digits;
     }
 
     private function extractOtherInfoTagValue(string $tag, string $text): ?string

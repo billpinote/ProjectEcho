@@ -1,15 +1,10 @@
-// Get today's date in UTC timezone (midnight) to match server date format
-const todayUtc = new Date();
-todayUtc.setUTCHours(0, 0, 0, 0);
-// Convert to ISO string format (YYYY-MM-DD) for better cross-platform compatibility
-const minDateString = todayUtc.toISOString().split('T')[0];
-
 // Initialize flatpickr for all date inputs
 document.querySelectorAll('input[type="date"]').forEach(input => {
     flatpickr(input, {
         dateFormat: "Y-m-d",
         allowInput: true,
-        minDate: minDateString
+        defaultDate: input.value || null,
+        minDate: input.min || null
     });
 });
 
@@ -205,11 +200,8 @@ const updateDofTag = () => {
         return;
     }
 
-    // Format date as YYYYMMDD for DOF tag
-    const date = new Date(dateValue);
-    const formattedDate = date.getFullYear() +
-                         String(date.getMonth() + 1).padStart(2, '0') +
-                         String(date.getDate()).padStart(2, '0');
+    // Use the raw picker value so the DOF tag matches the selected UTC date exactly.
+    const formattedDate = dateValue.replace(/-/g, '');
 
     const dofTag = 'DOF/' + formattedDate;
     const currentValue = otherInformationField.value || '';

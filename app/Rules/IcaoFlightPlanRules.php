@@ -52,7 +52,12 @@ namespace App\Rules;
  *    - Examples: KJFK, LFPG, EGLL, RJTT
  *    - Rule: IcaoAerodrome
  *
- * 7. CRUISING SPEED (Field 15a)
+ * 7. DATE/TIME STANDARD (ICAO Doc 4444)
+ *    - All flight plan dates and times must be expressed in UTC.
+ *    - This includes date of filing, date of flight (DOF/), proposed off-block/departure time, and ATC receipt/processing timestamps.
+ *    - Local workstation, browser, or operating system timezone must not be used to calculate ICAO flight plan values.
+ *
+ * 8. CRUISING SPEED (Field 15a)
  *    - Format: [Unit][Speed]
  *    - N: Knots (nautical miles)
  *    - M: Mach number (e.g., M0.80)
@@ -60,16 +65,16 @@ namespace App\Rules;
  *    - Examples: N450, M0.80, K900
  *    - Rule: IcaoCruisingSpeed
  *
- * 8. FLIGHT LEVEL/ALTITUDE (Field 15b)
+ * 9. FLIGHT LEVEL/ALTITUDE (Field 15b)
  *    - Format: FL[level] for flight levels
  *    - Examples: FL250, FL100, F10000 (feet), S5000 (meters)
  *    - Rule: IcaoFlightLevel
  *
- * 9. DESTINATION AERODROME (Field 16)
+ * 10. DESTINATION AERODROME (Field 16)
  *    - Format: 4-character ICAO code or ZZZZ
  *    - Rule: IcaoAerodrome
  *
- * 10. ALTERNATE AERODROMES (Field 17)
+ * 11. ALTERNATE AERODROMES (Field 17)
  *     - Format: 4-character ICAO codes or ZZZZ
  *     - At least one alternate required for IFR flights
  *     - Rule: IcaoAerodrome
@@ -129,6 +134,14 @@ class IcaoFlightPlanRules
                 'format' => '4-character ICAO code or ZZZZ',
                 'examples' => ['KJFK', 'LFPG', 'EGLL'],
                 'description' => 'ICAO code of aerodrome of departure',
+            ],
+            'date_time_standard' => [
+                'field' => 'general',
+                'name' => 'Date and Time Standard',
+                'rule' => 'ICAO Doc 4444',
+                'format' => 'UTC only',
+                'examples' => ['DATE OF FILING: 2026-04-23', 'DOF/20260423', 'PROPOSED TIME: 1345'],
+                'description' => 'All operational flight plan dates and times must be recorded and interpreted in UTC, never local device time.',
             ],
             'cruising_speed' => [
                 'field' => '15a',
