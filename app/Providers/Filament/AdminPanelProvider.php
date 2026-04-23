@@ -2,15 +2,23 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\ImportScanQr;
+use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
+use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
+use App\Filament\Resources\Flights\FlightResource;
+use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use Filament\Support\Facades\FilamentView;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationBuilder;
+use Filament\Navigation\NavigationItem;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\HtmlString;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
@@ -21,6 +29,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use function Filament\Support\original_request;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -45,6 +54,25 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
+            ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
+                return $builder->items([
+                    NavigationItem::make(Dashboard::getNavigationLabel())
+                        ->icon(Dashboard::getNavigationIcon())
+                        ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.pages.dashboard'))
+                        ->sort(-2)
+                        ->url(fn (): string => Dashboard::getUrl()),
+                    NavigationItem::make('Flight Plan')
+                        ->icon(Heroicon::OutlinedPaperAirplane)
+                        ->sort(10)
+                        ->childItems([
+                            ...FlightResource::getNavigationItems(),
+                            ...AcceptedFlightResource::getNavigationItems(),
+                            ...RejectedFlightResource::getNavigationItems(),
+                            ...ExpiredFlightResource::getNavigationItems(),
+                            ...ImportScanQr::getNavigationItems(),
+                        ]),
+                ]);
+            })
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 AccountWidget::class,
