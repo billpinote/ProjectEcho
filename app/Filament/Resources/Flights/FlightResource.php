@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use function Filament\Support\original_request;
 
@@ -21,7 +22,7 @@ class FlightResource extends Resource
 {
     protected static ?string $model = Flight::class;
 
-    protected static string|BackedEnum|null $navigationIcon = null;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
     protected static ?string $recordTitleAttribute = 'aircraft_identification';
 
@@ -92,7 +93,12 @@ class FlightResource extends Resource
             return [];
         }
 
-        $activeRoutePattern = static::getNavigationItemActiveRoutePattern();
+        $activeRoutePatterns = static::class === self::class
+            ? [
+                static::getRouteBaseName().'.index',
+                static::getRouteBaseName().'.edit',
+            ]
+            : static::getNavigationItemActiveRoutePattern();
 
         return [
             NavigationItem::make(static::getNavigationLabel())
@@ -100,7 +106,7 @@ class FlightResource extends Resource
                 ->parentItem(static::getNavigationParentItem())
                 ->icon(static::getNavigationIcon())
                 ->activeIcon(static::getActiveNavigationIcon())
-                ->isActiveWhen(fn (): bool => original_request()->routeIs($activeRoutePattern))
+                ->isActiveWhen(fn (): bool => original_request()->routeIs($activeRoutePatterns))
                 ->badge(static::getNavigationBadge(), color: static::getNavigationBadgeColor())
                 ->badgeTooltip(static::getNavigationBadgeTooltip())
                 ->extraAttributes(

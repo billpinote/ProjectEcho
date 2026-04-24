@@ -6,9 +6,12 @@ use App\Filament\Resources\AcceptedFlights\Pages\EditAcceptedFlight;
 use App\Filament\Resources\AcceptedFlights\Pages\ListAcceptedFlights;
 use App\Filament\Resources\Flights\FlightResource;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Support\Icons\Heroicon;
 
 class AcceptedFlightResource extends FlightResource
 {
+    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCheckCircle;
+
     protected static ?string $navigationLabel = 'Accepted';
 
     protected static ?string $modelLabel = 'accepted flight plan';

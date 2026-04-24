@@ -64,7 +64,9 @@ class FlightForm
                                     ->schema([
                                         self::date('date_of_filing', 'Date of Filing', 1)
                                             ->default(now('UTC')->toDateString())
-                                            ->readOnly(),
+                                            ->extraAttributes(['class' => 'caap-field caap-readonly-date-field'])
+                                            ->readOnly()
+                                            ->extraInputAttributes(['class' => 'caap-control caap-readonly-control'], merge: true),
                                         self::date('date_of_flight', 'Date of Flight', 1)
                                             ->default(now('UTC')->toDateString())
                                             ->minDate(now('UTC')->toDateString())
@@ -73,7 +75,8 @@ class FlightForm
                                             ->afterStateUpdated(fn (Get $get, Set $set, mixed $state): mixed => self::syncDofTag($get, $set, $state))
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('originator', 'Originator', 1)
-                                            ->readOnly(),
+                                            ->readOnly()
+                                            ->extraInputAttributes(['class' => 'caap-control caap-readonly-control'], merge: true),
                                         self::spacer(5),
 
                                         self::separator(),
@@ -135,11 +138,11 @@ class FlightForm
                                             ->live()
                                             ->afterStateUpdated(fn (Get $get, Set $set): mixed => self::syncRequiredOtherInfoTags($get, $set)),
                                         self::timeText('total_eet', 'Total EET', 1),
-                                        self::text('altn_aerodrome_1', 'Alternate Aerodrome 1', 2)
+                                        self::text('altn_aerodrome_1', 'Alternate Aerodrome', 2)
                                             ->rule(new IcaoAerodrome)
                                             ->live()
                                             ->afterStateUpdated(fn (Get $get, Set $set): mixed => self::syncRequiredOtherInfoTags($get, $set)),
-                                        self::text('altn_aerodrome_2', 'Alternate Aerodrome 2', 2)
+                                        self::text('altn_aerodrome_2', '2nd Alternate Aerodrome', 2)
                                             ->rule(new IcaoAerodrome)
                                             ->live()
                                             ->afterStateUpdated(fn (Get $get, Set $set): mixed => self::syncRequiredOtherInfoTags($get, $set)),
@@ -175,7 +178,7 @@ class FlightForm
                                         self::spacer(1),
                                         self::checkboxCluster('Jackets', [
                                             self::unavailableCheckbox('jackets_light', 'Light'),
-                                            self::unavailableCheckbox('jackets_fluores', 'Fluorescent'),
+                                            self::unavailableCheckbox('jackets_fluores', 'Fluores'),
                                             self::unavailableCheckbox('jackets_uhf', 'UHF'),
                                             self::unavailableCheckbox('jackets_vhf', 'VHF'),
                                         ], 3),
@@ -704,7 +707,6 @@ class FlightForm
                     outline: none !important;
                 }
 
-                .caap-flight-plan-shell input[readonly],
                 .caap-flight-plan-shell input:disabled,
                 .caap-flight-plan-shell select:disabled,
                 .caap-flight-plan-shell textarea:disabled {
@@ -712,6 +714,25 @@ class FlightForm
                     color: var(--color-echo-text-secondary);
                     cursor: not-allowed;
                     opacity: 1;
+                }
+
+                .caap-flight-plan-shell .caap-readonly-control[readonly] {
+                    background-color: color-mix(in srgb, var(--color-echo-background) 84%, white);
+                    color: var(--color-echo-text-secondary);
+                    cursor: not-allowed;
+                    opacity: 1;
+                }
+
+                .caap-flight-plan-shell .caap-readonly-date-field .fi-fo-date-time-picker-trigger {
+                    background-color: color-mix(in srgb, var(--color-echo-background) 84%, white);
+                    border-radius: 0.85rem !important;
+                    cursor: not-allowed;
+                }
+
+                .caap-flight-plan-shell .caap-readonly-date-field .fi-fo-date-time-picker-display-text-input {
+                    background-color: transparent;
+                    color: var(--color-echo-text-secondary);
+                    cursor: not-allowed;
                 }
 
                 .caap-row-separator {

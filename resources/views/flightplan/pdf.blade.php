@@ -156,18 +156,11 @@
 
     @if(isset($isPreview))
         @if(!(($showPreviewActions ?? true)))
-            <div style="width: 794px; margin: 0 auto 10px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                <a
-                    href="{{ $backActionUrl ?? url()->previous() }}"
-                    style="display:inline-flex; align-items:center; justify-content:center; padding: 6px 10px; border: 1px solid #767676; background: #f3f3f3; color: #000; text-decoration: none; font-size: 13px; line-height: 1.2;"
-                >
-                    &lArr;&nbsp;BACK TO LIST
-                </a>
-
+            <div style="width: 794px; margin: 0 auto 10px;">
                 @if(session('review_status'))
                     <div
                         id="review-status-banner"
-                        style="flex: 1; padding: 10px 12px; border: 1px solid #166534; background: #f0fdf4; color: #166534; font-weight: bold; font-size: 12px;"
+                        style="padding: 10px 12px; border: 1px solid #166534; background: #f0fdf4; color: #166534; font-weight: bold; font-size: 12px;"
                     >
                         {{ session('review_status') }}
                     </div>
@@ -181,6 +174,25 @@
                         {{ $flight->expiration_reason }}
                     </div>
                 @endif
+            </div>
+        @endif
+
+        @if(($flight->status ?? null) === \App\Enums\FlightPlanStatus::Rejected)
+            <div style="width: 794px; margin: 0 auto 12px;">
+                <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; background: #fff;">
+                    <tr>
+                        <th style="width: 22%; border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 10px;">Rejected by</th>
+                        <th style="width: 78%; border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 10px;">REASON</th>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 11px; font-weight: bold;">
+                            {{ $flight->rejected_by_wiresign ?? '' }}
+                        </td>
+                        <td style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 11px;">
+                            {{ $flight->rejection_reason ?? '' }}
+                        </td>
+                    </tr>
+                </table>
             </div>
         @endif
 
@@ -934,25 +946,6 @@
     </table>    
 
     @if(isset($isPreview))
-    </div>
-    @endif
-
-    @if(isset($isPreview) && (($flight->status ?? null) === \App\Enums\FlightPlanStatus::Rejected))
-    <div style="width: 794px; margin: 12px auto 0;">
-        <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; background: #fff;">
-            <tr>
-                <th style="width: 22%; border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 10px;">ATMO</th>
-                <th style="width: 78%; border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 10px;">REASON</th>
-            </tr>
-            <tr>
-                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 11px; font-weight: bold;">
-                    {{ $flight->rejected_by_wiresign ?? '' }}
-                </td>
-                <td style="border: 1px solid #000; padding: 8px; text-align: center; font-size: 11px;">
-                    {{ $flight->rejection_reason ?? '' }}
-                </td>
-            </tr>
-        </table>
     </div>
     @endif
 

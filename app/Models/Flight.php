@@ -188,12 +188,12 @@ class Flight extends Model
         $dateOfFlight = $this->resolveDateOfFlight();
 
         if (! $dateOfFlight instanceof CarbonInterface) {
-            return 'Expired because the date of flight has passed.';
+            return 'Expired due to date of flight.';
         }
 
         return sprintf(
-            'Date of Flight.',
-            $dateOfFlight->format('Y-m-d')
+            'Expired due to DOF/%s.',
+            $dateOfFlight->format('Ymd')
         );
     }
 

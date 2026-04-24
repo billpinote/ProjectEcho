@@ -19,7 +19,10 @@ class ListFlights extends ListRecords
                 ->label('Import / Scan QR')
                 ->icon('heroicon-o-qr-code')
                 ->url(ImportScanQr::getUrl()),
-            CreateAction::make(),
+            CreateAction::make()
+                ->label('New Flight Plan')
+                ->icon('heroicon-o-plus')
+                ->url(fn (): string => FlightResource::getUrl('create')),
         ];
     }
 }

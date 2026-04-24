@@ -222,6 +222,10 @@
             background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--color-echo-background) 72%, white) 100%);
         }
 
+        .echo-input-card {
+            background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--color-echo-background) 72%, white) 100%);
+        }
+
         #qr-reader {
             margin-top: 1rem;
             min-height: 280px;
@@ -268,13 +272,6 @@
                         Scan a live QR code from a device camera or upload an image file, then load the matching Echo flight plan record for review.
                     </p>
                 </div>
-
-                <div class="echo-payload-card">
-                    <div class="echo-label" style="text-transform: uppercase; color: var(--color-echo-text-secondary);">Expected Payload</div>
-                    <div class="echo-mono" style="margin-top: 0.75rem; font-size: 0.95rem; word-break: break-all; color: var(--color-echo-text-primary);">
-                        ECHOFPL|1|DB|123
-                    </div>
-                </div>
             </div>
         </section>
 
@@ -288,20 +285,7 @@
                 </div>
 
                 <form wire:submit="submit" class="echo-import-stack" style="margin-top: 1.25rem;">
-                    <div class="echo-input-card">
-                        <label for="qr-image-upload" class="echo-field-label echo-title">Upload QR Image</label>
-                        <input
-                            id="qr-image-upload"
-                            class="echo-file-input"
-                            type="file"
-                            accept=".png,image/png,image/jpeg,image/jpg,image/webp"
-                        >
-                        <p class="echo-help" style="margin: 0.75rem 0 0;">
-                            Upload a PNG, JPG, or WEBP image that contains the Echo QR code.
-                        </p>
-                        <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
-                    </div>
-
+                    
                     <div class="echo-camera-card">
                         <div class="echo-camera-header">
                             <div>
@@ -333,6 +317,20 @@
 
                         <div id="qr-reader"></div>
                     </div>
+
+                    <div class="echo-input-card">
+                        <label for="qr-image-upload" class="echo-field-label echo-title">Upload QR Image</label>
+                        <input
+                            id="qr-image-upload"
+                            class="echo-file-input"
+                            type="file"
+                            accept=".png,image/png,image/jpeg,image/jpg,image/webp"
+                        >
+                        <p class="echo-help" style="margin: 0.75rem 0 0;">
+                            Upload a PNG, JPG, or WEBP image that contains the Echo QR code.
+                        </p>
+                        <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
+                    </div>                    
 
                     <div>
                         <label for="payload" class="echo-field-label echo-title">QR Payload</label>
@@ -377,28 +375,7 @@
                 </form>
             </section>
 
-            <div class="echo-import-stack">
-                <section class="echo-import-panel">
-                    <h3 class="echo-heading" style="margin: 0;">How It Works</h3>
-
-                    <div class="echo-workflow">
-                        <div class="echo-workflow-step">
-                            <div class="echo-label">1. Capture the QR</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">Use the webcam or upload a saved QR image from a device.</div>
-                        </div>
-
-                        <div class="echo-workflow-step">
-                            <div class="echo-label">2. Load the Echo record</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">The page validates the payload format and locates the matching flight plan by database ID.</div>
-                        </div>
-
-                        <div class="echo-workflow-step">
-                            <div class="echo-label">3. Open for review</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">Jump directly into the saved flight plan for acceptance, rejection, or review.</div>
-                        </div>
-                    </div>
-                </section>
-
+            <div class="echo-import-stack">                
                 @if($matchedFlight)
                     <section class="echo-import-summary">
                         <div class="echo-summary-header">
@@ -413,14 +390,6 @@
                         </div>
 
                         <div class="echo-summary-grid">
-                            <div>
-                                <div class="echo-label" style="text-transform: uppercase; color: var(--color-echo-text-secondary);">Flight ID</div>
-                                <div class="echo-mono" style="margin-top: 0.35rem;">{{ $matchedFlight['id'] }}</div>
-                            </div>
-                            <div>
-                                <div class="echo-label" style="text-transform: uppercase; color: var(--color-echo-text-secondary);">Status</div>
-                                <div class="echo-table-text" style="margin-top: 0.35rem;">{{ $matchedFlight['status_label'] }}</div>
-                            </div>
                             <div>
                                 <div class="echo-label" style="text-transform: uppercase; color: var(--color-echo-text-secondary);">DOF</div>
                                 <div class="echo-mono" style="margin-top: 0.35rem;">{{ $matchedFlight['date_of_flight'] }}</div>
@@ -455,6 +424,27 @@
                         </div>
                     </section>
                 @endif
+
+                <section class="echo-import-panel">
+                    <h3 class="echo-heading" style="margin: 0;">How It Works</h3>
+
+                    <div class="echo-workflow">
+                        <div class="echo-workflow-step">
+                            <div class="echo-label">1. Capture the QR</div>
+                            <div class="echo-help" style="margin-top: 0.3rem;">Use the webcam or upload a saved QR image from a device.</div>
+                        </div>
+
+                        <div class="echo-workflow-step">
+                            <div class="echo-label">2. Load the Echo record</div>
+                            <div class="echo-help" style="margin-top: 0.3rem;">The page validates the payload format and locates the matching flight plan by database ID.</div>
+                        </div>
+
+                        <div class="echo-workflow-step">
+                            <div class="echo-label">3. Open for review</div>
+                            <div class="echo-help" style="margin-top: 0.3rem;">Jump directly into the saved flight plan for acceptance, rejection, or review.</div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </div>

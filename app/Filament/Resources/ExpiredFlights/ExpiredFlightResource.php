@@ -6,9 +6,12 @@ use App\Filament\Resources\ExpiredFlights\Pages\EditExpiredFlight;
 use App\Filament\Resources\ExpiredFlights\Pages\ListExpiredFlights;
 use App\Filament\Resources\Flights\FlightResource;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Support\Icons\Heroicon;
 
 class ExpiredFlightResource extends FlightResource
 {
+    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
+
     protected static ?string $navigationLabel = 'Expired';
 
     protected static ?string $modelLabel = 'expired flight plan';

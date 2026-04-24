@@ -6,9 +6,12 @@ use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\RejectedFlights\Pages\EditRejectedFlight;
 use App\Filament\Resources\RejectedFlights\Pages\ListRejectedFlights;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Support\Icons\Heroicon;
 
 class RejectedFlightResource extends FlightResource
 {
+    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedXCircle;
+
     protected static ?string $navigationLabel = 'Rejected';
 
     protected static ?string $modelLabel = 'rejected flight plan';

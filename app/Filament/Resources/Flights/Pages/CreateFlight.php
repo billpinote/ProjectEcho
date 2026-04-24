@@ -20,6 +20,11 @@ class CreateFlight extends CreateRecord
 
     public static string|Alignment $formActionsAlignment = Alignment::End;
 
+    public function getTitle(): string
+    {
+        return 'Create New Flight Plan';
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         return FlightResource::normalizeFormData($data);

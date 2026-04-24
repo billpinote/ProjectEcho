@@ -173,6 +173,12 @@ class FlightsTable
                 $resourceClass === \App\Filament\Resources\Flights\FlightResource::class,
                 fn (Table $table): Table => $table->poll('5s')
             )
+            ->when(
+                filled($resourceClass),
+                fn (Table $table): Table => $table
+                    ->recordUrl(fn (Flight $record): string => route('flights.view', $record))
+                    ->openRecordUrlInNewTab()
+            )
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')

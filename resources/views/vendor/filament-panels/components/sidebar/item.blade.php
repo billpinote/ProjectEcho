@@ -65,13 +65,15 @@
     >
         @if (filled($icon) && ((! $subGrouped) || ($sidebarCollapsible && (! $subNavigation))))
             {{
-                \Filament\Support\generate_icon_html(($active && $activeIcon) ? $activeIcon : $icon, attributes: (new \Illuminate\View\ComponentAttributeBag([
-                    'x-show' => ($subGrouped && $sidebarCollapsible) ? '! $store.sidebar.isOpen' : false,
-                ]))->class(['fi-sidebar-item-icon']), size: \Filament\Support\Enums\IconSize::Large)
+                \Filament\Support\generate_icon_html(
+                    ($active && $activeIcon) ? $activeIcon : $icon,
+                    attributes: (new \Illuminate\View\ComponentAttributeBag())->class(['fi-sidebar-item-icon']),
+                    size: \Filament\Support\Enums\IconSize::Large,
+                )
             }}
         @endif
 
-        @if ((blank($icon) && $grouped) || $subGrouped)
+        @if ((blank($icon) && $grouped) || ($subGrouped && blank($icon)))
             <div
                 @if (filled($icon) && $subGrouped && $sidebarCollapsible && (! $subNavigation))
                     x-show="$store.sidebar.isOpen"

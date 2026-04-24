@@ -6,6 +6,7 @@ use App\Filament\Pages\ImportScanQr;
 use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Resources\Flights\FlightResource;
+use App\Filament\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use Filament\Support\Facades\FilamentView;
 use Filament\Http\Middleware\Authenticate;
@@ -65,11 +66,15 @@ class AdminPanelProvider extends PanelProvider
                         ->icon(Heroicon::OutlinedPaperAirplane)
                         ->sort(10)
                         ->childItems([
+                            ...ImportScanQr::getNavigationItems(),
+                            NavigationItem::make('New Flight Plan')
+                                ->icon(Heroicon::OutlinedPlusCircle)
+                                ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.resources.flights.create'))
+                                ->url(fn (): string => CreateFlight::getUrl()),
                             ...FlightResource::getNavigationItems(),
                             ...AcceptedFlightResource::getNavigationItems(),
                             ...RejectedFlightResource::getNavigationItems(),
                             ...ExpiredFlightResource::getNavigationItems(),
-                            ...ImportScanQr::getNavigationItems(),
                         ]),
                 ]);
             })
