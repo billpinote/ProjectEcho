@@ -3,14 +3,16 @@
 namespace App\Filament\Resources\Flights\Tables;
 
 use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
+use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
+use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
+use App\Filament\Resources\CompletedFlights\CompletedFlightResource;
 use App\Enums\FlightPlanStatus;
 use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
+use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Models\Flight;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -22,6 +24,16 @@ class FlightsTable
 {
     public static function configure(Table $table, ?string $resourceClass = null): Table
     {
+        $operationalFlightResources = [
+            AcceptedFlightResource::class,
+            ActiveFlightResource::class,
+            AirborneFlightResource::class,
+            LandedFlightResource::class,
+            CompletedFlightResource::class,
+        ];
+
+        $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
+
         $columns = [
             TextColumn::make('date_of_flight')
                 ->label('DOF')
@@ -143,13 +155,11 @@ class FlightsTable
                 ->toggleable(isToggledHiddenByDefault: true),
         ];
 
-        if ($resourceClass === AcceptedFlightResource::class) {
-            $columns[] = TextColumn::make('accepted_by_wiresign')
-                ->label('ATMO')
-                ->alignCenter()
-                ->extraHeaderAttributes(['class' => 'text-center'])
-                ->width('10px')
-                ->searchable();
+        if ($isOperationalFlightTable) {
+            $columns = array_values(array_filter(
+                $columns,
+                fn (TextColumn|IconColumn $column): bool => ! in_array($column->getName(), ['date_of_flight', 'accepted_by_wiresign'], true),
+            ));
         }
 
         if ($resourceClass === RejectedFlightResource::class) {
@@ -179,9 +189,17 @@ class FlightsTable
                     ->recordUrl(fn (Flight $record): string => route('flights.view', $record))
                     ->openRecordUrlInNewTab()
             )
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query
-                ->orderByDesc('created_at')
-                ->orderByDesc('id')
+            ->modifyQueryUsing(
+                fn (Builder $query): Builder => $isOperationalFlightTable
+                    ? $query
+                        ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
+                        ->orderBy('date_of_flight')
+                        ->orderByRaw('case when proposed_time is null then 1 else 0 end')
+                        ->orderBy('proposed_time')
+                        ->orderBy('id')
+                    : $query
+                        ->orderByDesc('created_at')
+                        ->orderByDesc('id')
             )
             ->recordClasses(fn (Flight $record): array => $resourceClass === \App\Filament\Resources\Flights\FlightResource::class && $record->reviewed_at === null
                 ? ['echo-new-flight-row']
@@ -209,7 +227,7 @@ class FlightsTable
                     ->searchable()
                     ->preload(),
             ])
-            ->recordActions([
+            ->recordActions($isOperationalFlightTable ? [] : [
                 Action::make('qr')
                     ->label('QR')
                     ->url(fn (Flight $record): string => route('flights.qr', $record))
@@ -223,11 +241,6 @@ class FlightsTable
                     ->url(fn (Flight $record): string => route('flights.pdf.download', $record))
                     ->openUrlInNewTab(),
                 EditAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
             ]);
     }
 }

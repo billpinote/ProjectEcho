@@ -154,6 +154,81 @@ class Flight extends Model
         return $query->where('status', FlightPlanStatus::Accepted);
     }
 
+    public function scopeReady(Builder $query): Builder
+    {
+        return $query
+            ->accepted()
+            ->whereNull('time_start_up')
+            ->whereNull('time_block_off')
+            ->whereNull('time_airborne')
+            ->whereNull('time_touchdown')
+            ->whereNull('time_block_on')
+            ->whereNull('time_shutdown');
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query
+            ->accepted()
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNotNull('time_start_up')
+                    ->orWhereNotNull('time_block_off');
+            })
+            ->whereNull('time_airborne')
+            ->whereNull('time_touchdown')
+            ->whereNull('time_block_on')
+            ->whereNull('time_shutdown');
+    }
+
+    public function scopeAirborne(Builder $query): Builder
+    {
+        return $query
+            ->accepted()
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNotNull('time_start_up')
+                    ->orWhereNotNull('time_block_off');
+            })
+            ->whereNotNull('time_airborne')
+            ->whereNull('time_touchdown')
+            ->whereNull('time_block_on')
+            ->whereNull('time_shutdown');
+    }
+
+    public function scopeLanded(Builder $query): Builder
+    {
+        return $query
+            ->accepted()
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNotNull('time_start_up')
+                    ->orWhereNotNull('time_block_off');
+            })
+            ->whereNotNull('time_airborne')
+            ->whereNotNull('time_touchdown')
+            ->whereNull('time_block_on')
+            ->whereNull('time_shutdown');
+    }
+
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query
+            ->accepted()
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNotNull('time_start_up')
+                    ->orWhereNotNull('time_block_off');
+            })
+            ->whereNotNull('time_airborne')
+            ->whereNotNull('time_touchdown')
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNotNull('time_block_on')
+                    ->orWhereNotNull('time_shutdown');
+            });
+    }
+
     public function scopePendingUnreviewed(Builder $query): Builder
     {
         if (! static::hasReviewedAtColumn()) {

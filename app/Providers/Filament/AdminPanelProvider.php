@@ -4,9 +4,13 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\ImportScanQr;
 use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
+use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
+use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
+use App\Filament\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\Flights\Pages\CreateFlight;
+use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use Filament\Support\Facades\FilamentView;
 use Filament\Http\Middleware\Authenticate;
@@ -72,9 +76,18 @@ class AdminPanelProvider extends PanelProvider
                                 ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.resources.flights.create'))
                                 ->url(fn (): string => CreateFlight::getUrl()),
                             ...FlightResource::getNavigationItems(),
-                            ...AcceptedFlightResource::getNavigationItems(),
                             ...RejectedFlightResource::getNavigationItems(),
                             ...ExpiredFlightResource::getNavigationItems(),
+                        ]),
+                    NavigationItem::make('Flights')
+                        ->icon(Heroicon::OutlinedGlobeAlt)
+                        ->sort(11)
+                        ->childItems([
+                            ...AcceptedFlightResource::getNavigationItems(),
+                            ...ActiveFlightResource::getNavigationItems(),
+                            ...AirborneFlightResource::getNavigationItems(),
+                            ...LandedFlightResource::getNavigationItems(),
+                            ...CompletedFlightResource::getNavigationItems(),
                         ]),
                 ]);
             })
