@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Flights\Schemas;
 
+use App\Rules\FlightScheduleNotInPast;
 use App\Rules\IcaoAerodrome;
 use App\Rules\IcaoAircraftIdentification;
 use App\Rules\IcaoCruisingSpeed;
@@ -17,7 +18,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Html;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
@@ -71,6 +71,7 @@ class FlightForm
                                             ->default(now('UTC')->toDateString())
                                             ->minDate(now('UTC')->toDateString())
                                             ->required()
+                                            ->rule(new FlightScheduleNotInPast)
                                             ->live()
                                             ->afterStateUpdated(fn (Get $get, Set $set, mixed $state): mixed => self::syncDofTag($get, $set, $state))
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
@@ -235,7 +236,7 @@ class FlightForm
                                         self::date('license_expiry_date', 'Expiry Date', 1)
                                             ->live()
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
-                                        
+
                                         Checkbox::make('authorized_representative_enabled')
                                             ->label('Filed by Dispatch / Authorized Representative')
                                             ->inline()
@@ -274,7 +275,6 @@ class FlightForm
                                             ->columnSpan(8),
                                     ]),
 
-                                
                             ]),
                     ]),
             ]);

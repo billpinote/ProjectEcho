@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Flight;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -19,6 +20,42 @@ class FlightPlanPreviewActionsTest extends TestCase
             ->assertRedirect(route('flightplan.preview'))
             ->assertSessionHas('flight_plan_preview.aircraft_identification', 'N12345')
             ->assertSessionHas('flight_plan_preview.proposed_time', '14:30');
+
+        $this->assertDatabaseCount('flights', 0);
+    }
+
+    public function test_store_rejects_flight_plan_when_proposed_utc_time_has_passed(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-04-25 12:00:00', 'UTC'));
+
+        $response = $this->post(route('flightplan.store'), $this->validFlightPlanData([
+            'date_of_flight' => '2026-04-25',
+            'proposed_time' => '1130',
+            'other_information' => 'DOF/20260425',
+        ]));
+
+        $response
+            ->assertRedirect()
+            ->assertSessionHasErrors([
+                'date_of_flight' => 'The date of flight and proposed time must be in the future.',
+            ]);
+
+        $this->assertDatabaseCount('flights', 0);
+    }
+
+    public function test_store_allows_flight_plan_when_proposed_utc_time_is_still_future(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-04-25 12:00:00', 'UTC'));
+
+        $response = $this->post(route('flightplan.store'), $this->validFlightPlanData([
+            'date_of_flight' => '2026-04-25',
+            'proposed_time' => '1230',
+            'other_information' => 'DOF/20260425',
+        ]));
+
+        $response
+            ->assertRedirect(route('flightplan.preview'))
+            ->assertSessionHas('flight_plan_preview.proposed_time', '12:30');
 
         $this->assertDatabaseCount('flights', 0);
     }

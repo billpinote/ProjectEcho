@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\FlightScheduleNotInPast;
 use App\Rules\IcaoAerodrome;
 use App\Rules\IcaoAircraftIdentification;
 use App\Rules\IcaoCruisingSpeed;
@@ -9,6 +10,7 @@ use App\Rules\IcaoFlightLevel;
 use App\Rules\IcaoFlightRules;
 use App\Rules\IcaoTypeOfFlight;
 use App\Rules\IcaoWakeTurbulenceCategory;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -90,31 +92,31 @@ class StoreFlightPlanRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
             'originator' => ['nullable', 'string', 'max:255'],
             'date_of_filing' => ['nullable', 'date'],
-            'date_of_flight' => ['required', 'date'],
-            'aircraft_identification' => ['nullable', new IcaoAircraftIdentification()],
-            'flight_rules' => ['nullable', new IcaoFlightRules()],
-            'type_of_flight' => ['nullable', new IcaoTypeOfFlight()],
+            'date_of_flight' => ['required', 'date', new FlightScheduleNotInPast],
+            'aircraft_identification' => ['nullable', new IcaoAircraftIdentification],
+            'flight_rules' => ['nullable', new IcaoFlightRules],
+            'type_of_flight' => ['nullable', new IcaoTypeOfFlight],
             'number' => ['nullable', 'string', 'max:50'],
             'type_of_aircraft' => ['nullable', 'string', 'max:255'],
-            'wake_turbulence_cat' => ['nullable', new IcaoWakeTurbulenceCategory()],
+            'wake_turbulence_cat' => ['nullable', new IcaoWakeTurbulenceCategory],
             'equipment_10a' => ['nullable', 'string', 'max:255'],
             'equipment_10b' => ['nullable', 'string', 'max:255'],
-            'departure_aerodrome' => ['nullable', new IcaoAerodrome()],
+            'departure_aerodrome' => ['nullable', new IcaoAerodrome],
             'proposed_time' => ['nullable', 'date_format:H:i'],
-            'cruising_speed' => ['nullable', new IcaoCruisingSpeed()],
-            'level' => ['nullable', new IcaoFlightLevel()],
+            'cruising_speed' => ['nullable', new IcaoCruisingSpeed],
+            'level' => ['nullable', new IcaoFlightLevel],
             'route' => ['nullable', 'string'],
-            'destination_aerodrome' => ['nullable', new IcaoAerodrome()],
+            'destination_aerodrome' => ['nullable', new IcaoAerodrome],
             'total_eet' => ['nullable', 'date_format:H:i'],
-            'altn_aerodrome_1' => ['nullable', new IcaoAerodrome()],
-            'altn_aerodrome_2' => ['nullable', new IcaoAerodrome()],
+            'altn_aerodrome_1' => ['nullable', new IcaoAerodrome],
+            'altn_aerodrome_2' => ['nullable', new IcaoAerodrome],
             'other_information' => ['nullable', 'string'],
             'other_info_dep' => ['nullable', 'string', 'max:255'],
             'other_info_dest' => ['nullable', 'string', 'max:255'],
@@ -230,7 +232,7 @@ class StoreFlightPlanRequest extends FormRequest
             return trim((string) $value);
         }
 
-        return substr($digits, 0, 2) . ':' . substr($digits, 2, 2);
+        return substr($digits, 0, 2).':'.substr($digits, 2, 2);
     }
 
     private function reorganizeTagsHierarchy(array $tagValues): string
@@ -255,7 +257,7 @@ class StoreFlightPlanRequest extends FormRequest
         foreach ($hierarchy as $tag => $key) {
             $value = $tagValues[$key] ?? null;
             if ($value !== null) {
-                $parts[] = $tag . '/' . $value;
+                $parts[] = $tag.'/'.$value;
             }
         }
 
@@ -284,7 +286,7 @@ class StoreFlightPlanRequest extends FormRequest
         }
 
         // Find the position of our tag
-        $tagWithSlash = $tag . '/';
+        $tagWithSlash = $tag.'/';
         $tagPos = stripos($text, $tagWithSlash);
 
         if ($tagPos === false) {
@@ -293,10 +295,10 @@ class StoreFlightPlanRequest extends FormRequest
 
         // Start collecting from after the tag and slash
         $startPos = $tagPos + strlen($tagWithSlash);
-        
+
         // Find the next tag pattern in the remaining text
         $remainingText = substr($text, $startPos);
-        
+
         // Pattern to find the next tag: 2-5 capital letters/numbers followed by /
         if (preg_match('/\s+[A-Z0-9]{2,5}\//i', $remainingText, $matches, PREG_OFFSET_CAPTURE)) {
             // Extract value from start to where the next tag begins
@@ -307,6 +309,7 @@ class StoreFlightPlanRequest extends FormRequest
         }
 
         $value = trim($value);
+
         return $value === '' ? null : $value;
     }
 }
