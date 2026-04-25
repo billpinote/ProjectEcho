@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\FlightPlanStatus;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
+use App\Rules\UtcFourDigitTime;
 use App\Services\FlightPlanICAOFormatter;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
@@ -24,6 +25,11 @@ class FlightController extends Controller
     public function store(StoreFlightPlanRequest $request)
     {
         $validated = $request->validated();
+        foreach (['proposed_time', 'total_eet', 'endurance'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $validated[$field] = UtcFourDigitTime::normalizeForStorage($validated[$field]);
+            }
+        }
         $validated['date_of_filing'] = $validated['date_of_filing'] ?? now('UTC')->toDateString();
         $validated = $this->uppercaseStringFlightFields($validated);
         $validated = $this->normalizeNumericFlightFields($validated);
@@ -200,11 +206,11 @@ class FlightController extends Controller
     {
         $flightData = $request->session()->get('flight_plan_preview');
 
-        if (!$flightData) {
+        if (! $flightData) {
             return redirect()->route('flightplan');
         }
 
-    // Convert array → model (important!)
+        // Convert array → model (important!)
         $flight = new Flight($flightData);
 
         return view('flightplan.pdf', [
@@ -221,7 +227,7 @@ class FlightController extends Controller
     {
         $flightData = $request->session()->get('flight_plan_preview');
 
-        if (!$flightData) {
+        if (! $flightData) {
             return redirect()->route('flightplan');
         }
 
@@ -250,7 +256,7 @@ class FlightController extends Controller
     {
         $flightData = $request->session()->get('flight_plan_preview');
 
-        if (!$flightData) {
+        if (! $flightData) {
             return redirect()->route('flightplan');
         }
 
@@ -353,7 +359,7 @@ class FlightController extends Controller
         $icaoMessage = FlightPlanICAOFormatter::toICAOMessage($flight);
         $qrCodeSvg = QrCode::size($size)->margin($margin)->format('svg')->generate($icaoMessage);
 
-        return 'data:image/svg+xml;base64,' . base64_encode($qrCodeSvg);
+        return 'data:image/svg+xml;base64,'.base64_encode($qrCodeSvg);
     }
 
     /**
@@ -481,6 +487,7 @@ class FlightController extends Controller
 
         if ($fontPath && function_exists('imagettftext')) {
             imagettftext($image, $size, 0, $x, $baselineY, $color, $fontPath, $text);
+
             return;
         }
 
@@ -686,7 +693,7 @@ class FlightController extends Controller
     {
         $requestedFile = $request->query('file');
 
-        if (!is_string($requestedFile) || $requestedFile === '') {
+        if (! is_string($requestedFile) || $requestedFile === '') {
             return null;
         }
 
@@ -710,11 +717,11 @@ class FlightController extends Controller
         }
 
         $directory = 'flight-plans/'.$folderName;
-        
+
         for ($suffix = 0; $suffix <= 99; $suffix++) {
             $candidate = $baseName.sprintf('%02d', $suffix).'.pdf';
 
-            if (!Storage::disk('public')->exists($directory.'/'.$candidate)) {
+            if (! Storage::disk('public')->exists($directory.'/'.$candidate)) {
                 return $candidate;
             }
         }

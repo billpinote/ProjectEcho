@@ -10,6 +10,7 @@ use App\Rules\IcaoFlightLevel;
 use App\Rules\IcaoFlightRules;
 use App\Rules\IcaoTypeOfFlight;
 use App\Rules\IcaoWakeTurbulenceCategory;
+use App\Rules\UtcFourDigitTime;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -72,12 +73,21 @@ class StoreFlightPlanRequest extends FormRequest
             'persons_on_board' => $this->normalizeNumericField($this->input('persons_on_board')),
             'dinghies_number' => $this->normalizeNumericField($this->input('dinghies_number')),
             'dinghies_capacity' => $this->normalizeNumericField($this->input('dinghies_capacity')),
-            'proposed_time' => $this->normalizeTimeField($this->input('proposed_time')),
-            'total_eet' => $this->normalizeTimeField($this->input('total_eet')),
-            'endurance' => $this->normalizeTimeField($this->input('endurance')),
+            'proposed_time' => $this->prepareTimeField($this->input('proposed_time')),
+            'total_eet' => $this->prepareTimeField($this->input('total_eet')),
+            'endurance' => $this->prepareTimeField($this->input('endurance')),
             'other_information' => $reorganizedInformation,
             ...$booleanCheckboxValues,
             ...$tagValues,
+        ]);
+    }
+
+    protected function passedValidation(): void
+    {
+        $this->merge([
+            'proposed_time' => $this->normalizeTimeField($this->input('proposed_time')),
+            'total_eet' => $this->normalizeTimeField($this->input('total_eet')),
+            'endurance' => $this->normalizeTimeField($this->input('endurance')),
         ]);
     }
 
@@ -109,12 +119,12 @@ class StoreFlightPlanRequest extends FormRequest
             'equipment_10a' => ['nullable', 'string', 'max:255'],
             'equipment_10b' => ['nullable', 'string', 'max:255'],
             'departure_aerodrome' => ['nullable', new IcaoAerodrome],
-            'proposed_time' => ['nullable', 'date_format:H:i'],
+            'proposed_time' => ['nullable', new UtcFourDigitTime],
             'cruising_speed' => ['nullable', new IcaoCruisingSpeed],
             'level' => ['nullable', new IcaoFlightLevel],
             'route' => ['nullable', 'string'],
             'destination_aerodrome' => ['nullable', new IcaoAerodrome],
-            'total_eet' => ['nullable', 'date_format:H:i'],
+            'total_eet' => ['nullable', new UtcFourDigitTime],
             'altn_aerodrome_1' => ['nullable', new IcaoAerodrome],
             'altn_aerodrome_2' => ['nullable', new IcaoAerodrome],
             'other_information' => ['nullable', 'string'],
@@ -129,7 +139,7 @@ class StoreFlightPlanRequest extends FormRequest
             'other_info_altn_2' => ['nullable', 'string', 'max:255'],
             'other_info_opr' => ['nullable', 'string', 'max:255'],
             'other_info_dof' => ['nullable', 'string', 'max:255'],
-            'endurance' => ['nullable', 'date_format:H:i'],
+            'endurance' => ['nullable', new UtcFourDigitTime],
             'persons_on_board' => ['nullable', 'regex:/^\d{1,3}$/'],
             'emergency_radio_uhf' => ['nullable', 'boolean'],
             'emergency_radio_vhf' => ['nullable', 'boolean'],
@@ -222,17 +232,24 @@ class StoreFlightPlanRequest extends FormRequest
             return null;
         }
 
-        $digits = preg_replace('/\D/', '', trim((string) $value));
+        $time = trim((string) $value);
 
-        if ($digits === '') {
+        if ($time === '') {
             return null;
         }
 
-        if (strlen($digits) !== 4) {
-            return trim((string) $value);
+        return UtcFourDigitTime::normalizeForStorage($time);
+    }
+
+    private function prepareTimeField(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
         }
 
-        return substr($digits, 0, 2).':'.substr($digits, 2, 2);
+        $time = trim((string) $value);
+
+        return $time === '' ? null : $time;
     }
 
     private function reorganizeTagsHierarchy(array $tagValues): string

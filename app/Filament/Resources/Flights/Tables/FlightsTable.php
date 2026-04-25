@@ -12,6 +12,7 @@ use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Models\Flight;
+use App\Rules\UtcFourDigitTime;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Support\Enums\FontFamily;
@@ -168,10 +169,10 @@ class FlightsTable
             $readyColumns = [
                 TextInputColumn::make('time_start_up')
                     ->label('START UP TIME')
-                    ->rules(['nullable', 'regex:/^\d{4}$|^\d{2}:\d{2}(:\d{2})?$/'])
+                    ->rules(['nullable', new UtcFourDigitTime])
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
                     ->updateStateUsing(function (Flight $record, mixed $state): ?string {
-                        $normalizedState = FlightForm::normalizeTimeForStorage($state);
+                        $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
 
                         $record->forceFill([
                             'time_start_up' => $normalizedState,

@@ -20,6 +20,7 @@
 
 @layer components {
     .fi-main,
+    .fi-main-ctn,
     .fi-page,
     .fi-simple-main {
         background: var(--color-echo-background);

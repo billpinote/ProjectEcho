@@ -10,6 +10,7 @@ use App\Rules\IcaoFlightLevel;
 use App\Rules\IcaoFlightRules;
 use App\Rules\IcaoTypeOfFlight;
 use App\Rules\IcaoWakeTurbulenceCategory;
+use App\Rules\UtcFourDigitTime;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -294,7 +295,7 @@ class FlightForm
     {
         return self::text($name, $label, $span)
             ->maxLength(4)
-            ->rules(['nullable', 'regex:/^\d{4}$|^\d{2}:\d{2}(:\d{2})?$/'])
+            ->rules(['nullable', new UtcFourDigitTime])
             ->formatStateUsing(fn (mixed $state): ?string => self::formatTimeForForm($state))
             ->dehydrateStateUsing(fn (mixed $state): ?string => self::normalizeTimeForStorage($state))
             ->extraInputAttributes([
@@ -500,17 +501,7 @@ class FlightForm
             return null;
         }
 
-        $digits = preg_replace('/\D/', '', trim((string) $value));
-
-        if ($digits === null || $digits === '') {
-            return null;
-        }
-
-        if (strlen($digits) !== 4) {
-            return trim((string) $value);
-        }
-
-        return substr($digits, 0, 2).':'.substr($digits, 2, 2);
+        return UtcFourDigitTime::normalizeForStorage($value);
     }
 
     private static function certification(Get $get): string
