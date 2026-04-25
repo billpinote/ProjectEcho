@@ -11,7 +11,7 @@
             <button
                 id="echo-ui-modal-cancel"
                 type="button"
-                class="fi-btn fi-btn-color-gray fi-color-custom fi-size-md fi-btn-size-md"
+                class="fi-btn fi-size-md fi-btn-size-md echo-ui-modal__button echo-ui-modal__button--gray"
                 hidden
             >
                 Cancel
@@ -19,7 +19,7 @@
             <button
                 id="echo-ui-modal-confirm"
                 type="button"
-                class="fi-btn fi-color-custom fi-size-md fi-btn-size-md"
+                class="fi-btn fi-size-md fi-btn-size-md echo-ui-modal__button echo-ui-modal__button--primary"
             >
                 Close
             </button>
@@ -64,12 +64,13 @@ document.addEventListener('DOMContentLoaded', () => {
         'echo-ui-modal--warning',
     ];
 
-    const toneButtonClasses = [
-        'fi-btn-color-danger',
-        'fi-btn-color-success',
-        'fi-btn-color-info',
-        'fi-btn-color-warning',
-        'fi-btn-color-primary',
+    const modalButtonToneClasses = [
+        'echo-ui-modal__button--danger',
+        'echo-ui-modal__button--success',
+        'echo-ui-modal__button--info',
+        'echo-ui-modal__button--warning',
+        'echo-ui-modal__button--primary',
+        'echo-ui-modal__button--gray',
     ];
 
     let activeResolver = null;
@@ -94,6 +95,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const buttonLabel = detail.buttonLabel || detail.confirmLabel || 'Close';
         const cancelLabel = detail.cancelLabel || 'Cancel';
         const isConfirm = Boolean(detail.confirm);
+        const confirmTone = detail.confirmTone || (tone === 'danger' ? 'danger' : 'primary');
+        const cancelTone = detail.cancelTone || 'gray';
 
         heading.textContent = detail.heading || 'Notice';
         message.innerHTML = detail.messageHtml || '';
@@ -113,8 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
             dialog.classList.add(`echo-ui-modal--${tone}`);
         }
 
-        confirmButton.classList.remove(...toneButtonClasses);
-        confirmButton.classList.add(tone === 'danger' ? 'fi-btn-color-danger' : 'fi-btn-color-primary');
+        confirmButton.classList.remove(...modalButtonToneClasses);
+        confirmButton.classList.add(`echo-ui-modal__button--${confirmTone}`);
+
+        cancelButton.classList.remove(...modalButtonToneClasses);
+        cancelButton.classList.add(`echo-ui-modal__button--${cancelTone}`);
 
         if (! dialog.open) {
             dialog.showModal();
@@ -233,10 +239,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const confirmed = await window.EchoUiModal.confirm({
                 heading: 'Confirm Start Up Time',
-                messageHtml: `Is <strong>${value}Z</strong> the correct Start Up Time for <strong>${callsign}</strong>?`,
+                messageHtml: `for <strong>${callsign}</strong>, Start Up Time is <strong>${value}Z</strong>?`,
                 tone: 'primary',
-                confirmLabel: 'Yes',
-                cancelLabel: 'Cancel',
+                confirmLabel: 'Affirm',
+                cancelLabel: 'Negative',
+                confirmTone: 'success',
+                cancelTone: 'danger',
             });
 
             if (confirmed) {
@@ -247,7 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.focus();
                 input.select();
             }
-        }, 3000);
+        }, 0);
 
         startUpTimeTimers.set(input, timer);
     };
@@ -305,10 +313,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const utcNow = formatUtcNow();
         const confirmed = await window.EchoUiModal.confirm({
             heading: 'Confirm Start Up Time',
-            messageHtml: `Is <strong>${utcNow}Z</strong> the correct Start Up Time for <strong>${callsign}</strong>?`,
+            messageHtml: `for <strong>${callsign}</strong>, Start Up Time is <strong>${utcNow}Z</strong>?`,
             tone: 'primary',
-            confirmLabel: 'Yes',
-            cancelLabel: 'Cancel',
+            confirmLabel: 'Affirm',
+            cancelLabel: 'Negative',
+            confirmTone: 'success',
+            cancelTone: 'danger',
         });
 
         if (! confirmed) {

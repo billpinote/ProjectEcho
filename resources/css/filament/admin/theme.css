@@ -526,6 +526,134 @@
     .echo-ui-modal__actions {
         display: flex;
         justify-content: flex-end;
+        gap: 0.75rem;
+    }
+
+    .echo-ui-modal__button {
+        border: 1px solid transparent;
+        box-shadow: none;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--primary {
+        background: var(--color-echo-primary) !important;
+        border-color: var(--color-echo-primary) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--primary.fi-force-enabled,
+    .echo-ui-modal__button.echo-ui-modal__button--primary:not(.fi-disabled):not([disabled]) {
+        background: color-mix(in srgb, var(--color-echo-primary) 90%, black) !important;
+        border-color: color-mix(in srgb, var(--color-echo-primary) 90%, black) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--success {
+        background: var(--color-echo-accepted) !important;
+        border-color: var(--color-echo-accepted) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--success.fi-force-enabled,
+    .echo-ui-modal__button.echo-ui-modal__button--success:not(.fi-disabled):not([disabled]) {
+        background: color-mix(in srgb, var(--color-echo-accepted) 90%, black) !important;
+        border-color: color-mix(in srgb, var(--color-echo-accepted) 90%, black) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--danger {
+        background: var(--color-echo-rejected) !important;
+        border-color: var(--color-echo-rejected) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--danger.fi-force-enabled,
+    .echo-ui-modal__button.echo-ui-modal__button--danger:not(.fi-disabled):not([disabled]) {
+        background: color-mix(in srgb, var(--color-echo-rejected) 90%, black) !important;
+        border-color: color-mix(in srgb, var(--color-echo-rejected) 90%, black) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--warning {
+        background: var(--color-echo-pending) !important;
+        border-color: var(--color-echo-pending) !important;
+        color: #162018 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--warning.fi-force-enabled,
+    .echo-ui-modal__button.echo-ui-modal__button--warning:not(.fi-disabled):not([disabled]) {
+        background: color-mix(in srgb, var(--color-echo-pending) 88%, black) !important;
+        border-color: color-mix(in srgb, var(--color-echo-pending) 88%, black) !important;
+        color: #162018 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--info {
+        background: var(--color-echo-active) !important;
+        border-color: var(--color-echo-active) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--info.fi-force-enabled,
+    .echo-ui-modal__button.echo-ui-modal__button--info:not(.fi-disabled):not([disabled]) {
+        background: color-mix(in srgb, var(--color-echo-active) 90%, black) !important;
+        border-color: color-mix(in srgb, var(--color-echo-active) 90%, black) !important;
+        color: #fffdf7 !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--gray {
+        background: color-mix(in srgb, var(--color-echo-text-secondary) 14%, white) !important;
+        border-color: color-mix(in srgb, var(--color-echo-text-secondary) 24%, white) !important;
+        color: var(--color-echo-text-primary) !important;
+    }
+
+    .echo-ui-modal__button.echo-ui-modal__button--gray.fi-force-enabled,
+    .echo-ui-modal__button.echo-ui-modal__button--gray:not(.fi-disabled):not([disabled]) {
+        background: color-mix(in srgb, var(--color-echo-text-secondary) 20%, white) !important;
+        border-color: color-mix(in srgb, var(--color-echo-text-secondary) 28%, white) !important;
+        color: var(--color-echo-text-primary) !important;
+    }
+
+    @media (hover: hover) {
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--primary:hover,
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--primary:focus-visible {
+            background: color-mix(in srgb, var(--color-echo-primary) 90%, black) !important;
+            border-color: color-mix(in srgb, var(--color-echo-primary) 90%, black) !important;
+            color: #fffdf7 !important;
+        }
+
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--success:hover,
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--success:focus-visible {
+            background: color-mix(in srgb, var(--color-echo-accepted) 90%, black) !important;
+            border-color: color-mix(in srgb, var(--color-echo-accepted) 90%, black) !important;
+            color: #fffdf7 !important;
+        }
+
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--danger:hover,
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--danger:focus-visible {
+            background: color-mix(in srgb, var(--color-echo-rejected) 90%, black) !important;
+            border-color: color-mix(in srgb, var(--color-echo-rejected) 90%, black) !important;
+            color: #fffdf7 !important;
+        }
+
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--warning:hover,
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--warning:focus-visible {
+            background: color-mix(in srgb, var(--color-echo-pending) 88%, black) !important;
+            border-color: color-mix(in srgb, var(--color-echo-pending) 88%, black) !important;
+            color: #162018 !important;
+        }
+
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--info:hover,
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--info:focus-visible {
+            background: color-mix(in srgb, var(--color-echo-active) 90%, black) !important;
+            border-color: color-mix(in srgb, var(--color-echo-active) 90%, black) !important;
+            color: #fffdf7 !important;
+        }
+
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--gray:hover,
+        .echo-ui-modal__actions .echo-ui-modal__button.echo-ui-modal__button--gray:focus-visible {
+            background: color-mix(in srgb, var(--color-echo-text-secondary) 20%, white) !important;
+            border-color: color-mix(in srgb, var(--color-echo-text-secondary) 28%, white) !important;
+            color: var(--color-echo-text-primary) !important;
+        }
     }
 }
 
