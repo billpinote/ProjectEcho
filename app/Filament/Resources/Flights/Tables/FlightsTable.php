@@ -22,6 +22,7 @@ use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Component as LivewireComponent;
 
 class FlightsTable
 {
@@ -169,9 +170,20 @@ class FlightsTable
             $readyColumns = [
                 TextInputColumn::make('time_start_up')
                     ->label('START UP TIME')
-                    ->rules(['nullable', new UtcFourDigitTime])
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
-                    ->updateStateUsing(function (Flight $record, mixed $state): ?string {
+                    ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
+                            $livewire->dispatch(
+                                'echo-modal:open',
+                                heading: 'Invalid UTC Time',
+                                message: UtcFourDigitTime::message('start up time'),
+                                tone: 'danger',
+                                buttonLabel: 'Cancel',
+                            );
+
+                            return FlightForm::formatTimeForForm($record->time_start_up);
+                        }
+
                         $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
 
                         $record->forceFill([
@@ -181,9 +193,11 @@ class FlightsTable
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
                     ->inputMode('numeric')
-                    ->extraInputAttributes([
+                    ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
                         'class' => 'echo-ready-start-input',
+                        'data-confirm-startup-time' => 'true',
+                        'data-callsign' => (string) $record->aircraft_identification,
                     ])
                     ->alignCenter()
                     ->extraHeaderAttributes(['class' => 'text-center echo-ready-start-header echo-ready-start-header-main'])
@@ -195,11 +209,13 @@ class FlightsTable
                     ->badge()
                     ->color('warning')
                     ->alignCenter()
-                    ->action(function (Flight $record): void {
-                        $record->forceFill([
-                            'time_start_up' => now('UTC')->format('H:i'),
-                        ])->save();
-                    })
+                    ->extraAttributes(fn (Flight $record): array => [
+                        'class' => 'echo-ready-start-now-trigger',
+                        'role' => 'button',
+                        'tabindex' => 0,
+                        'data-record-id' => (string) $record->getKey(),
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('3px'),

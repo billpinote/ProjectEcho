@@ -4,9 +4,19 @@ namespace App\Rules;
 
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Support\Str;
 
 class UtcFourDigitTime implements ValidationRule
 {
+    public static function message(string $attribute = ':attribute'): string
+    {
+        $attribute = $attribute === ':attribute'
+            ? $attribute
+            : Str::headline(str_replace('_', ' ', $attribute));
+
+        return "The {$attribute} must be a valid UTC time in 4-digit HHMM format between 0000 and 2359.";
+    }
+
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if (blank($value)) {
@@ -14,7 +24,7 @@ class UtcFourDigitTime implements ValidationRule
         }
 
         if (! self::isValid($value)) {
-            $fail('The :attribute must be a valid UTC time in 4-digit HHMM format between 0000 and 2359.');
+            $fail(self::message($attribute));
         }
     }
 

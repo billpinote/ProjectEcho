@@ -24,7 +24,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\HtmlString;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Filament\View\PanelsRenderHook;
@@ -116,26 +115,7 @@ class AdminPanelProvider extends PanelProvider
             ->darkMode(false)
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn (): HtmlString => new HtmlString(<<<'HTML'
-<script>
-document.addEventListener('livewire:init', () => {
-    const refreshSidebar = () => {
-        if (document.visibilityState !== 'visible') {
-            return;
-        }
-
-        Livewire.dispatch('refresh-sidebar');
-    };
-
-    refreshSidebar();
-
-    window.setInterval(refreshSidebar, 5000);
-
-    document.addEventListener('visibilitychange', refreshSidebar);
-    window.addEventListener('focus', refreshSidebar);
-});
-</script>
-HTML),
+                fn (): string => view('filament.components.echo-modal-root')->render(),
             );
     }
 }
