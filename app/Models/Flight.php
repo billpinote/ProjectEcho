@@ -3,17 +3,32 @@
 namespace App\Models;
 
 use App\Enums\FlightPlanStatus;
+use App\Rules\UtcFourDigitTime;
 use Carbon\CarbonInterface;
 use Database\Factories\FlightFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 class Flight extends Model
 {
     private const OPERATIONS_TIMEZONE = 'Asia/Manila';
+
+    private const MINUTE_PRECISION_TIME_FIELDS = [
+        'proposed_time',
+        'total_eet',
+        'endurance',
+        'time_start_up',
+        'time_shutdown',
+        'time_block_off',
+        'time_block_on',
+        'time_airborne',
+        'time_touchdown',
+        'received_time',
+    ];
 
     /** @use HasFactory<FlightFactory> */
     use HasFactory;
@@ -122,6 +137,13 @@ class Flight extends Model
         'status',
         'reviewed_at',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $flight): void {
+            $flight->normalizeMinutePrecisionTimes();
+        });
+    }
 
     public function acceptedBy(): BelongsTo
     {
@@ -302,7 +324,7 @@ class Flight extends Model
             return null;
         }
 
-        return \Illuminate\Support\Carbon::parse($this->date_of_flight, self::OPERATIONS_TIMEZONE)->startOfDay();
+        return Carbon::parse($this->date_of_flight, self::OPERATIONS_TIMEZONE)->startOfDay();
     }
 
     private function operationsToday(): CarbonInterface
@@ -313,5 +335,16 @@ class Flight extends Model
     private function currentOperationsDate(): string
     {
         return now(self::OPERATIONS_TIMEZONE)->toDateString();
+    }
+
+    private function normalizeMinutePrecisionTimes(): void
+    {
+        foreach (self::MINUTE_PRECISION_TIME_FIELDS as $field) {
+            if (! array_key_exists($field, $this->attributes)) {
+                continue;
+            }
+
+            $this->attributes[$field] = UtcFourDigitTime::normalizeDatabaseTime($this->attributes[$field]);
+        }
     }
 }

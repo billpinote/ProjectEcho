@@ -135,7 +135,7 @@ class FlightController extends Controller
             'rejection_reason' => null,
             'received_by' => $this->resolveAtcWiresign(),
             'received_date' => $nowUtc->toDateString(),
-            'received_time' => $nowUtc->format('H:i:s'),
+            'received_time' => $nowUtc->format('H:i'),
             'received_facility' => (string) (Auth::user()?->station ?? ''),
         ])->save();
 

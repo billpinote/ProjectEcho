@@ -46,4 +46,29 @@ class UtcFourDigitTime implements ValidationRule
 
         return substr($time, 0, 2).':'.substr($time, 2, 2);
     }
+
+    public static function normalizeDatabaseTime(mixed $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        $time = trim((string) $value);
+
+        if (self::isValid($time)) {
+            return self::normalizeForStorage($time);
+        }
+
+        if (preg_match('/^\d{2}:\d{2}(?::\d{2})?$/', $time) !== 1) {
+            return $time;
+        }
+
+        [$hours, $minutes] = array_map('intval', explode(':', substr($time, 0, 5)));
+
+        if ($hours > 23 || $minutes > 59) {
+            return $time;
+        }
+
+        return sprintf('%02d:%02d', $hours, $minutes);
+    }
 }
