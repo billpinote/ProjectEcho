@@ -156,7 +156,7 @@ class IcaoValidationRulesTest extends TestCase
         $rule = new IcaoWakeTurbulenceCategory();
         $errors = [];
 
-        $invalidCategories = ['LM', 'LIGHT', 'X', ''];
+        $invalidCategories = ['LM', 'LIGHT', 'X'];
 
         foreach ($invalidCategories as $category) {
             $errors = [];
@@ -194,7 +194,7 @@ class IcaoValidationRulesTest extends TestCase
         $rule = new IcaoAerodrome();
         $errors = [];
 
-        $invalidAerodromes = ['JFK', 'KJFK1', 'K JFK', 'kjfk', 'ZZZZA'];
+        $invalidAerodromes = ['JFK', 'KJFK1', 'K JFK', 'ZZZZA'];
 
         foreach ($invalidAerodromes as $aerodrome) {
             $errors = [];

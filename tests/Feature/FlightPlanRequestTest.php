@@ -58,9 +58,9 @@ class FlightPlanRequestTest extends TestCase
     }
 
     /**
-     * Test that missing tags return null.
+     * Test that missing optional tags return null while DOF is derived from the flight date.
      */
-    public function test_missing_tags_return_null(): void
+    public function test_missing_optional_tags_return_null_and_dof_uses_flight_date(): void
     {
         $data = [
             'other_information' => 'RMK/Only remark here',
@@ -79,7 +79,7 @@ class FlightPlanRequestTest extends TestCase
         $this->assertNull($request->input('other_info_altn_1'));
         $this->assertNull($request->input('other_info_altn_2'));
         $this->assertNull($request->input('other_info_opr'));
-        $this->assertNull($request->input('other_info_dof'));
+        $this->assertEquals('20240408', $request->input('other_info_dof'));
     }
 
     /**

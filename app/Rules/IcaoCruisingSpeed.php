@@ -33,9 +33,8 @@ class IcaoCruisingSpeed implements ValidationRule
 
         $value = strtoupper(trim($value));
 
-        // Pattern: One letter (N, M, or K) followed by digits (and optional decimal for Mach)
-        // Examples: N450, M0.80, K900, N0500
-        $pattern = '/^(N|M|K)\d{3,4}(\.\d{1,2})?$/';
+        // Knots/kph use 3-4 digits; Mach uses decimal notation such as M0.80.
+        $pattern = '/^(?:[NK]\d{3,4}|M\d{1,2}\.\d{1,2})$/';
 
         if (!preg_match($pattern, $value)) {
             $fail('The :attribute must be in ICAO format: N[speed in knots], M[Mach number], or K[speed in km/h]. Examples: N450, M0.80, K900.');

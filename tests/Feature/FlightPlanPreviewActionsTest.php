@@ -99,10 +99,12 @@ class FlightPlanPreviewActionsTest extends TestCase
 
         Storage::disk('public')->put($storedPdfPath, 'pdf');
 
-        $response = $this->get(route('flights.qr', [
-            'flight' => $flight,
-            'file' => basename($storedPdfPath),
-        ]));
+        $response = $this
+            ->withSession(['public_flight_access' => [$flight->getKey()]])
+            ->get(route('flights.qr', [
+                'flight' => $flight,
+                'file' => basename($storedPdfPath),
+            ]));
 
         $response
             ->assertOk()
@@ -126,7 +128,9 @@ class FlightPlanPreviewActionsTest extends TestCase
             'proposed_time' => '01:05',
         ]));
 
-        $response = $this->get(route('flights.qr.download', ['flight' => $flight]));
+        $response = $this
+            ->withSession(['public_flight_access' => [$flight->getKey()]])
+            ->get(route('flights.qr.download', ['flight' => $flight]));
 
         $response
             ->assertOk()
