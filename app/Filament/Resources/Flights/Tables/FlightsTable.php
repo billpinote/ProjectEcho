@@ -6,19 +6,21 @@ use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
 use App\Filament\Resources\CompletedFlights\CompletedFlightResource;
-use App\Enums\FlightPlanStatus;
 use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
+use App\Filament\Resources\Flights\FlightResource;
+use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Models\Flight;
-use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Support\Enums\FontFamily;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Filament\Support\Enums\FontFamily;
+use Illuminate\Database\Eloquent\Builder;
 
 class FlightsTable
 {
@@ -60,7 +62,7 @@ class FlightsTable
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->width('14px')
                 ->weight('bold'),
-            
+
             TextColumn::make('departure_aerodrome')
                 ->label('From')
                 ->width('14px')
@@ -162,6 +164,95 @@ class FlightsTable
             ));
         }
 
+        if ($resourceClass === AcceptedFlightResource::class) {
+            $readyColumns = [
+                TextInputColumn::make('time_start_up')
+                    ->label('START UP TIME')
+                    ->rules(['nullable', 'regex:/^\d{4}$|^\d{2}:\d{2}(:\d{2})?$/'])
+                    ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
+                    ->updateStateUsing(function (Flight $record, mixed $state): ?string {
+                        $normalizedState = FlightForm::normalizeTimeForStorage($state);
+
+                        $record->forceFill([
+                            'time_start_up' => $normalizedState,
+                        ])->save();
+
+                        return FlightForm::formatTimeForForm($normalizedState);
+                    })
+                    ->inputMode('numeric')
+                    ->extraInputAttributes([
+                        'maxlength' => 4,
+                        'class' => 'echo-ready-start-input',
+                    ])
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center echo-ready-start-header echo-ready-start-header-main'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-main'])
+                    ->width('10px'),
+                TextColumn::make('time_start_up_now')
+                    ->label(' ')
+                    ->state('NOW')
+                    ->badge()
+                    ->color('warning')
+                    ->alignCenter()
+                    ->action(function (Flight $record): void {
+                        $record->forceFill([
+                            'time_start_up' => now('UTC')->format('H:i'),
+                        ])->save();
+                    })
+                    ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
+                    ->width('3px'),
+                ...self::pickColumns($columns, [
+                    'aircraft_identification',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                ]),
+                ...self::remainingColumns($columns, [
+                    'aircraft_identification',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                ]),
+            ];
+
+            $columns = $readyColumns;
+        }
+
+        if ($resourceClass === ActiveFlightResource::class) {
+            array_splice($columns, 2, 0, [
+                TextColumn::make('time_start_up')
+                    ->label('Start')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('12px'),
+            ]);
+
+            $activeColumns = [
+                ...self::pickColumns($columns, [
+                    'aircraft_identification',
+                    'time_start_up',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                ]),
+                ...self::remainingColumns($columns, [
+                    'aircraft_identification',
+                    'time_start_up',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                ]),
+            ];
+
+            $columns = $activeColumns;
+        }
+
         if ($resourceClass === RejectedFlightResource::class) {
             $columns[] = TextColumn::make('rejected_by_wiresign')
                 ->label('ATMO')
@@ -180,7 +271,7 @@ class FlightsTable
 
         return $table
             ->when(
-                $resourceClass === \App\Filament\Resources\Flights\FlightResource::class,
+                $resourceClass === FlightResource::class,
                 fn (Table $table): Table => $table->poll('5s')
             )
             ->when(
@@ -190,7 +281,7 @@ class FlightsTable
                     ->openRecordUrlInNewTab()
             )
             ->modifyQueryUsing(
-                fn (Builder $query): Builder => $isOperationalFlightTable || $resourceClass === \App\Filament\Resources\Flights\FlightResource::class
+                fn (Builder $query): Builder => $isOperationalFlightTable || $resourceClass === FlightResource::class
                     ? $query
                         ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
                         ->orderBy('date_of_flight')
@@ -201,7 +292,7 @@ class FlightsTable
                         ->orderByDesc('created_at')
                         ->orderByDesc('id')
             )
-            ->recordClasses(fn (Flight $record): array => $resourceClass === \App\Filament\Resources\Flights\FlightResource::class && $record->reviewed_at === null
+            ->recordClasses(fn (Flight $record): array => $resourceClass === FlightResource::class && $record->reviewed_at === null
                 ? ['echo-new-flight-row']
                 : [])
             ->columns($columns)
@@ -242,5 +333,42 @@ class FlightsTable
                     ->openUrlInNewTab(),
                 EditAction::make(),
             ]);
+    }
+
+    /**
+     * @param  array<int, TextColumn|TextInputColumn|IconColumn>  $columns
+     * @param  array<int, string>  $orderedNames
+     * @return array<int, TextColumn|TextInputColumn|IconColumn>
+     */
+    private static function pickColumns(array $columns, array $orderedNames): array
+    {
+        $columnsByName = [];
+
+        foreach ($columns as $column) {
+            $columnsByName[$column->getName()] = $column;
+        }
+
+        $orderedColumns = [];
+
+        foreach ($orderedNames as $name) {
+            if (array_key_exists($name, $columnsByName)) {
+                $orderedColumns[] = $columnsByName[$name];
+            }
+        }
+
+        return $orderedColumns;
+    }
+
+    /**
+     * @param  array<int, TextColumn|TextInputColumn|IconColumn>  $columns
+     * @param  array<int, string>  $excludedNames
+     * @return array<int, TextColumn|TextInputColumn|IconColumn>
+     */
+    private static function remainingColumns(array $columns, array $excludedNames): array
+    {
+        return array_values(array_filter(
+            $columns,
+            fn (TextColumn|TextInputColumn|IconColumn $column): bool => ! in_array($column->getName(), $excludedNames, true),
+        ));
     }
 }

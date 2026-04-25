@@ -297,6 +297,96 @@
     .echo-new-flight-row .fi-ta-cell {
         font-weight: 600;
     }
+
+    .echo-ready-start-header {
+        background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--color-echo-pending) 16%, white) 0%,
+            color-mix(in srgb, var(--color-echo-pending) 11%, white) 100%
+        );
+        vertical-align: middle;
+    }
+
+    .echo-ready-start-header-main {
+        border-top-left-radius: 0.9rem;
+        padding-inline-end: 0.35rem;
+    }
+
+    .echo-ready-start-header-main .fi-ta-header-cell-label {
+        max-width: 7rem;
+        margin-inline: auto;
+        text-align: center;
+        line-height: 1.2;
+        white-space: normal;
+    }
+
+    .echo-ready-start-header-now {
+        border-top-right-radius: 0.9rem;
+        width: 1%;
+        padding-inline-start: 0.15rem;
+        padding-inline-end: 0.25rem;
+    }
+
+    .echo-ready-start-header-now .fi-ta-header-cell-label {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .echo-ready-start-cell {
+        background: linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--color-echo-pending) 10%, white) 0%,
+            color-mix(in srgb, var(--color-echo-pending) 5%, white) 100%
+        );
+    }
+
+    .echo-ready-start-cell-main {
+        box-shadow: inset 4px 0 0 color-mix(in srgb, var(--color-echo-pending) 72%, #8a5f00);
+        padding-inline-end: 0.35rem;
+        width: 1%;
+    }
+
+    .echo-ready-start-cell-now {
+        width: 1%;
+        padding-inline-start: 0.15rem;
+        padding-inline-end: 0.25rem;
+    }
+
+    .echo-ready-start-cell-main .fi-input-wrp {
+        width: min(100%, 10rem);
+        min-width: 10rem;
+        margin-inline: auto;
+        border-color: color-mix(in srgb, var(--color-echo-pending) 44%, var(--color-echo-border));
+        background: rgba(255, 253, 247, 0.94);
+        box-shadow: 0 8px 18px rgba(140, 93, 18, 0.08);
+    }
+
+    .echo-ready-start-input {
+        text-align: center;
+        font-family: 'Roboto Mono', monospace;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+
+    .echo-ready-start-cell-now .fi-ta-text-item {
+        justify-content: center;
+    }
+
+    .echo-ready-start-cell-now .fi-badge {
+        min-width: 2.45rem;
+        justify-content: center;
+        padding-inline: 0.4rem;
+        border: 1px solid color-mix(in srgb, var(--color-echo-pending) 34%, white);
+        background: color-mix(in srgb, var(--color-echo-pending) 88%, #6f4e00);
+        color: #fffdf7;
+        box-shadow: 0 8px 18px rgba(140, 93, 18, 0.14);
+        cursor: pointer;
+    }
+
+    .echo-ready-start-cell-now:hover .fi-badge {
+        background: color-mix(in srgb, var(--color-echo-pending) 78%, #5f4200);
+        transform: translateY(-1px);
+    }
 }
 
 @keyframes echo-sidebar-badge-pulse {
