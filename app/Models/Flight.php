@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Schema;
 
 class Flight extends Model
 {
+    private const OPERATIONS_TIMEZONE = 'Asia/Manila';
+
     /** @use HasFactory<FlightFactory> */
     use HasFactory;
 
@@ -128,7 +130,7 @@ class Flight extends Model
 
     public function scopePendingActive(Builder $query): Builder
     {
-        $today = now()->toDateString();
+        $today = $this->currentOperationsDate();
 
         return $query
             ->where('status', FlightPlanStatus::Pending)
@@ -141,7 +143,7 @@ class Flight extends Model
 
     public function scopePendingExpired(Builder $query): Builder
     {
-        $today = now()->toDateString();
+        $today = $this->currentOperationsDate();
 
         return $query
             ->where('status', FlightPlanStatus::Pending)
@@ -251,7 +253,7 @@ class Flight extends Model
             return false;
         }
 
-        return $this->resolveDateOfFlight()?->isBefore(today()) ?? false;
+        return $this->resolveDateOfFlight()?->isBefore($this->operationsToday()) ?? false;
     }
 
     public function getExpirationReasonAttribute(): ?string
@@ -300,6 +302,16 @@ class Flight extends Model
             return null;
         }
 
-        return \Illuminate\Support\Carbon::parse($this->date_of_flight);
+        return \Illuminate\Support\Carbon::parse($this->date_of_flight, self::OPERATIONS_TIMEZONE)->startOfDay();
+    }
+
+    private function operationsToday(): CarbonInterface
+    {
+        return now(self::OPERATIONS_TIMEZONE)->startOfDay();
+    }
+
+    private function currentOperationsDate(): string
+    {
+        return now(self::OPERATIONS_TIMEZONE)->toDateString();
     }
 }

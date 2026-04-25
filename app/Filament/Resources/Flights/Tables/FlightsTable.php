@@ -190,7 +190,7 @@ class FlightsTable
                     ->openRecordUrlInNewTab()
             )
             ->modifyQueryUsing(
-                fn (Builder $query): Builder => $isOperationalFlightTable
+                fn (Builder $query): Builder => $isOperationalFlightTable || $resourceClass === \App\Filament\Resources\Flights\FlightResource::class
                     ? $query
                         ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
                         ->orderBy('date_of_flight')
