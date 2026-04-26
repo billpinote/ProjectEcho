@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\FlightPlanStatus;
 use App\Models\Flight;
+use App\Rules\UtcFourDigitTime;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -132,7 +133,7 @@ class ImportScanQr extends Page
             'id' => $flight->getKey(),
             'aircraft_identification' => (string) ($flight->aircraft_identification ?? 'N/A'),
             'date_of_flight' => $this->formatFlightDate($flight->date_of_flight),
-            'proposed_time' => (string) ($flight->proposed_time ?? 'N/A'),
+            'proposed_time' => UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? 'N/A',
             'departure_aerodrome' => (string) ($flight->departure_aerodrome ?? 'N/A'),
             'destination_aerodrome' => (string) ($flight->destination_aerodrome ?? 'N/A'),
             'status' => $status?->value ?? (string) ($flight->status ?? 'unknown'),

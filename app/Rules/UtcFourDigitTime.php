@@ -81,4 +81,19 @@ class UtcFourDigitTime implements ValidationRule
 
         return sprintf('%02d:%02d', $hours, $minutes);
     }
+
+    public static function formatForDisplay(mixed $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D/', '', (string) $value);
+
+        if ($digits === null || strlen($digits) < 4) {
+            return trim((string) $value);
+        }
+
+        return substr($digits, 0, 4);
+    }
 }

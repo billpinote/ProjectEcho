@@ -210,7 +210,7 @@
                 </div>
                 <div class="qr-meta-item">
                     <span class="qr-meta-label">PTD</span>
-                    <span class="qr-meta-value">{{ $flight->proposed_time ?? 'N/A' }}&nbsp; Z</span>
+                    <span class="qr-meta-value">{{ \App\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? 'N/A' }}&nbsp; Z</span>
                 </div>
             </div>
 

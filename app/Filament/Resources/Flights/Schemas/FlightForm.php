@@ -482,17 +482,7 @@ class FlightForm
 
     public static function formatTimeForForm(mixed $value): ?string
     {
-        if (blank($value)) {
-            return null;
-        }
-
-        $digits = preg_replace('/\D/', '', (string) $value);
-
-        if ($digits === null || strlen($digits) < 4) {
-            return trim((string) $value);
-        }
-
-        return substr($digits, 0, 4);
+        return UtcFourDigitTime::formatForDisplay($value);
     }
 
     public static function normalizeTimeForStorage(mixed $value): ?string

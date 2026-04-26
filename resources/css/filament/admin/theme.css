@@ -50,7 +50,7 @@
         pointer-events: none;
         background-image:
             linear-gradient(180deg, rgba(6, 28, 23, 0.02) 0%, rgba(6, 28, 23, 0.14) 100%),
-            url('/storage/img/bg-sidebar.png');
+            url('/img/bg-sidebar.png');
         background-repeat: no-repeat;
         background-position: center center;
         background-size: auto, cover;

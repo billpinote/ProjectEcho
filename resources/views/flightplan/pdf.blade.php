@@ -399,7 +399,7 @@
                             <span class="field-label">TIME</span>
                             <div style="padding: 4px; text-align: left;">
                                 @php
-                                    $time = str_replace(':', '', $flight->proposed_time ?? '');
+                                    $time = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? '';
                                 @endphp
                                 @foreach(str_split(substr($time, 0, 4)) as $char)
                                     <span class="char-box">{{ $char }}</span>
@@ -477,7 +477,7 @@
                             <span class="field-label">TOTAL EET</span>
                             <div style="padding: 4px; text-align: left;">
                                 @php
-                                    $eet = str_replace(':', '', $flight->total_eet ?? '');
+                                    $eet = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->total_eet) ?? '';
                                 @endphp
                                 @foreach(str_split(substr($eet, 0, 4)) as $char)
                                     <span class="char-box">{{ $char }}</span>
@@ -572,7 +572,7 @@
                             <div style="padding: 4px; text-align: center;">
                                 <div style="text-align: left;">
                                     @php
-                                        $endur = str_replace(':', '', $flight->endurance ?? '');
+                                        $endur = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->endurance) ?? '';
                                     @endphp
                                     <span class="char-box" style="border: 0">E</span>
                                     <span class="char-box" style="border: 0">/</span>
@@ -927,7 +927,7 @@
                                 @if($receivedDate || $receivedTime)
                                     {{ trim(collect([
                                         $receivedDate,
-                                        $receivedTime ? substr((string) $receivedTime, 0, 5).' Z' : null,
+                                        $receivedTime ? (\App\Rules\UtcFourDigitTime::formatForDisplay($receivedTime) ?? trim((string) $receivedTime)).' Z' : null,
                                     ])->filter()->implode(' ')) }}
                                 @endif
                             </div>

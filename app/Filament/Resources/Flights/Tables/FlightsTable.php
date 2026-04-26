@@ -51,7 +51,7 @@ class FlightsTable
                 ->sortable(),
             TextColumn::make('proposed_time')
                 ->label('PTD')
-                ->time('H:i')
+                ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->proposed_time))
                 ->fontFamily(FontFamily::Mono)
                 ->alignCenter()
                 ->extraHeaderAttributes(['class' => 'text-center'])
@@ -148,13 +148,13 @@ class FlightsTable
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('created_at')
-                ->dateTime()
+                ->dateTime('M j, Y H:i:s')
                 ->sortable()
                 ->alignCenter()
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('updated_at')
-                ->dateTime()
+                ->dateTime('M j, Y H:i:s')
                 ->sortable()
                 ->alignCenter()
                 ->extraHeaderAttributes(['class' => 'text-center'])
@@ -279,6 +279,7 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'text-center'])
                     ->searchable()
                     ->limit(30)
+                    ->width('14px')
                     ->tooltip(fn (Flight $record): ?string => filled($record->route) ? $record->route : null),
                 TextColumn::make('time_start_up')
                     ->label('Start Up')
