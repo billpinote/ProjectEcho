@@ -49,12 +49,12 @@
         z-index: 0;
         pointer-events: none;
         background-image:
-            linear-gradient(180deg, rgba(6, 28, 23, 0.04) 0%, rgba(6, 28, 23, 0.22) 100%),
+            linear-gradient(180deg, rgba(6, 28, 23, 0.02) 0%, rgba(6, 28, 23, 0.14) 100%),
             url('/storage/img/bg-sidebar.png');
         background-repeat: no-repeat;
-        background-position: center bottom;
+        background-position: center center;
         background-size: auto, cover;
-        opacity: 0.2;
+        opacity: 0.38;
     }
 
     .fi-sidebar-header,
