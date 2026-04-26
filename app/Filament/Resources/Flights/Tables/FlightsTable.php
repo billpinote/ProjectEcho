@@ -11,6 +11,7 @@ use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
+use App\Filament\Resources\Reports\ActiveFlightDataResource;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
 use Filament\Actions\Action;
@@ -34,6 +35,7 @@ class FlightsTable
             AirborneFlightResource::class,
             LandedFlightResource::class,
             CompletedFlightResource::class,
+            ActiveFlightDataResource::class,
         ];
 
         $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
@@ -238,6 +240,72 @@ class FlightsTable
             $columns = $readyColumns;
         }
 
+        if ($resourceClass === ActiveFlightDataResource::class) {
+            $reportColumns = [
+                TextColumn::make('aircraft_identification')
+                    ->label('Callsign')
+                    ->fontFamily(FontFamily::Mono)
+                    ->searchable()
+                    ->sortable()
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px')
+                    ->weight('bold'),
+                TextColumn::make('type_of_aircraft')
+                    ->label('Type')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('departure_aerodrome')
+                    ->label('From')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('destination_aerodrome')
+                    ->label('To')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('route')
+                    ->label('Route')
+                    ->fontFamily(FontFamily::Mono)
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->searchable()
+                    ->limit(30)
+                    ->tooltip(fn (Flight $record): ?string => filled($record->route) ? $record->route : null),
+                TextColumn::make('time_start_up')
+                    ->label('Start Up')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+                TextColumn::make('time_airborne')
+                    ->label('Airborne')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+                TextColumn::make('time_touchdown')
+                    ->label('Touchdown')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+                TextColumn::make('time_shutdown')
+                    ->label('Shutdown')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_shutdown))
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+            ];
+
+            $columns = $reportColumns;
+        }
+
         if ($resourceClass === ActiveFlightResource::class) {
             array_splice($columns, 2, 0, [
                 TextColumn::make('time_start_up')
@@ -292,10 +360,14 @@ class FlightsTable
                 fn (Table $table): Table => $table->poll('5s')
             )
             ->when(
-                filled($resourceClass),
+                filled($resourceClass) && $resourceClass !== ActiveFlightDataResource::class,
                 fn (Table $table): Table => $table
                     ->recordUrl(fn (Flight $record): string => route('flights.view', $record))
                     ->openRecordUrlInNewTab()
+            )
+            ->when(
+                $resourceClass === ActiveFlightDataResource::class,
+                fn (Table $table): Table => $table->poll('5s')
             )
             ->modifyQueryUsing(
                 fn (Builder $query): Builder => $isOperationalFlightTable || $resourceClass === FlightResource::class

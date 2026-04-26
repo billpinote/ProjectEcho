@@ -12,6 +12,7 @@ use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
+use App\Filament\Resources\Reports\ActiveFlightDataResource;
 use Filament\Support\Facades\FilamentView;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -87,6 +88,12 @@ class AdminPanelProvider extends PanelProvider
                             ...AirborneFlightResource::getNavigationItems(),
                             ...LandedFlightResource::getNavigationItems(),
                             ...CompletedFlightResource::getNavigationItems(),
+                        ]),
+                    NavigationItem::make('Reports')
+                        ->icon(Heroicon::OutlinedDocumentChartBar)
+                        ->sort(12)
+                        ->childItems([
+                            ...ActiveFlightDataResource::getNavigationItems(),
                         ]),
                 ]);
             })

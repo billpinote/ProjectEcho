@@ -116,6 +116,15 @@
         background: color-mix(in srgb, var(--color-echo-primary-dark) 20%, transparent);
     }
 
+    .echo-sidebar-submenu > .fi-sidebar-item.fi-active > .fi-sidebar-item-btn,
+    .echo-sidebar-submenu > .fi-sidebar-item > .fi-sidebar-item-btn[aria-current='page'] {
+        background: color-mix(in srgb, var(--color-echo-primary-dark) 34%, transparent);
+        color: #fffdf7;
+        box-shadow:
+            inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+            inset 3px 0 0 color-mix(in srgb, var(--color-echo-accent) 72%, white);
+    }
+
     .fi-sidebar-item-btn:hover,
     .fi-sidebar-group-btn:hover,
     .fi-topbar-item-btn:hover {
