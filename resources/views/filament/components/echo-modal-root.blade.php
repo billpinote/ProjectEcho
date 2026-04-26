@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelButton.addEventListener('click', () => settleModal(false));
     confirmButton.addEventListener('click', () => settleModal(true));
 
-    const startUpTimeTimers = new WeakMap();
+    const statusTimeTimers = new WeakMap();
 
     const formatUtcNow = () => {
         const now = new Date();
@@ -184,11 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const clearTimer = (input) => {
-        const timer = startUpTimeTimers.get(input);
+        const timer = statusTimeTimers.get(input);
 
         if (timer) {
             window.clearTimeout(timer);
-            startUpTimeTimers.delete(input);
+            statusTimeTimers.delete(input);
         }
     };
 
@@ -203,10 +203,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return hours <= 23 && minutes <= 59;
     };
 
-    const scheduleStartUpConfirmation = (input) => {
+    const scheduleStatusTimeConfirmation = (input) => {
         clearTimer(input);
 
         const value = input.value.trim();
+        const timeLabel = input.dataset.timeLabel || 'UTC Time';
+        const confirmHeading = input.dataset.confirmHeading || `Confirm ${timeLabel}`;
 
         if (! /^\d{4}$/.test(value) || input.dataset.echoConfirmedValue === value) {
             return;
@@ -226,7 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (! isValidUtcTime(value)) {
                 window.EchoUiModal.open({
                     heading: 'Invalid UTC Time',
-                    message: 'The Start Up Time must be a valid UTC time in 4-digit HHMM format between 0000 and 2359.',
+                    message: `The ${timeLabel} must be a valid UTC time in 4-digit HHMM format between 0000 and 2359.`,
                     tone: 'danger',
                     buttonLabel: 'Cancel',
                 });
@@ -238,8 +240,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const confirmed = await window.EchoUiModal.confirm({
-                heading: 'Confirm Start Up Time',
-                messageHtml: `for <strong>${callsign}</strong>, Start Up Time is <strong>${value}Z</strong>?`,
+                heading: confirmHeading,
+                messageHtml: `for <strong>${callsign}</strong>, ${timeLabel} is <strong>${value}Z</strong>?`,
                 tone: 'primary',
                 confirmLabel: 'Affirm',
                 cancelLabel: 'Negative',
@@ -257,11 +259,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 0);
 
-        startUpTimeTimers.set(input, timer);
+        statusTimeTimers.set(input, timer);
     };
 
     document.addEventListener('input', (event) => {
-        const input = event.target.closest('.echo-ready-start-input[data-confirm-startup-time]');
+        const input = event.target.closest('.echo-status-time-input[data-confirm-status-time]');
 
         if (! input) {
             return;
@@ -271,11 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
             delete input.dataset.echoConfirmedValue;
         }
 
-        scheduleStartUpConfirmation(input);
+        scheduleStatusTimeConfirmation(input);
     });
 
     document.addEventListener('change', (event) => {
-        const input = event.target.closest('.echo-ready-start-input[data-confirm-startup-time]');
+        const input = event.target.closest('.echo-status-time-input[data-confirm-status-time]');
 
         if (! input) {
             return;
@@ -290,11 +292,11 @@ document.addEventListener('DOMContentLoaded', () => {
         event.stopImmediatePropagation();
         event.stopPropagation();
         input.focus();
-        scheduleStartUpConfirmation(input);
+        scheduleStatusTimeConfirmation(input);
     }, true);
 
     document.addEventListener('click', async (event) => {
-        const trigger = event.target.closest('.echo-ready-start-now-trigger[data-record-id]');
+        const trigger = event.target.closest('.echo-status-time-now-trigger[data-record-id]');
 
         if (! trigger) {
             return;
@@ -310,10 +312,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const callsign = trigger.dataset.callsign || 'this flight';
+        const timeLabel = trigger.dataset.timeLabel || 'UTC Time';
+        const confirmHeading = trigger.dataset.confirmHeading || `Confirm ${timeLabel}`;
+        const confirmMethod = trigger.dataset.confirmMethod;
         const utcNow = formatUtcNow();
+
+        if (! confirmMethod) {
+            return;
+        }
+
         const confirmed = await window.EchoUiModal.confirm({
-            heading: 'Confirm Start Up Time',
-            messageHtml: `for <strong>${callsign}</strong>, Start Up Time is <strong>${utcNow}Z</strong>?`,
+            heading: confirmHeading,
+            messageHtml: `for <strong>${callsign}</strong>, ${timeLabel} is <strong>${utcNow}Z</strong>?`,
             tone: 'primary',
             confirmLabel: 'Affirm',
             cancelLabel: 'Negative',
@@ -325,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        await livewire.call('confirmStartUpNow', trigger.dataset.recordId);
+        await livewire.call(confirmMethod, trigger.dataset.recordId);
     });
 });
 </script>

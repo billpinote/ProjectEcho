@@ -197,8 +197,10 @@ class FlightsTable
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
-                        'class' => 'echo-ready-start-input',
-                        'data-confirm-startup-time' => 'true',
+                        'class' => 'echo-status-time-input',
+                        'data-confirm-status-time' => 'true',
+                        'data-time-label' => 'Start Up Time',
+                        'data-confirm-heading' => 'Confirm Start Up Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
                     ->alignCenter()
@@ -212,10 +214,13 @@ class FlightsTable
                     ->color('warning')
                     ->alignCenter()
                     ->extraAttributes(fn (Flight $record): array => [
-                        'class' => 'echo-ready-start-now-trigger',
+                        'class' => 'echo-status-time-now-trigger',
                         'role' => 'button',
                         'tabindex' => 0,
                         'data-record-id' => (string) $record->getKey(),
+                        'data-confirm-method' => 'confirmStartUpNow',
+                        'data-time-label' => 'Start Up Time',
+                        'data-confirm-heading' => 'Confirm Start Up Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
@@ -312,26 +317,78 @@ class FlightsTable
 
         if ($resourceClass === ActiveFlightResource::class) {
             array_splice($columns, 2, 0, [
-                TextColumn::make('time_start_up')
-                    ->label('Start')
-                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
+                TextInputColumn::make('time_airborne')
+                    ->label('TAKE-OFF TIME')
+                    ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
+                    ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
+                            $livewire->dispatch(
+                                'echo-modal:open',
+                                heading: 'Invalid UTC Time',
+                                message: UtcFourDigitTime::message('take-off time'),
+                                tone: 'danger',
+                                buttonLabel: 'Cancel',
+                            );
+
+                            return FlightForm::formatTimeForForm($record->time_airborne);
+                        }
+
+                        $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+
+                        $record->forceFill([
+                            'time_airborne' => $normalizedState,
+                        ])->save();
+
+                        return FlightForm::formatTimeForForm($normalizedState);
+                    })
+                    ->inputMode('numeric')
+                    ->extraInputAttributes(fn (Flight $record): array => [
+                        'maxlength' => 4,
+                        'class' => 'echo-status-time-input',
+                        'data-confirm-status-time' => 'true',
+                        'data-time-label' => 'Take-Off Time',
+                        'data-confirm-heading' => 'Confirm Take-Off Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
                     ->alignCenter()
-                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->extraHeaderAttributes(['class' => 'text-center echo-ready-start-header echo-ready-start-header-main'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-main'])
                     ->width('12px'),
+                TextColumn::make('time_airborne_now')
+                    ->label(' ')
+                    ->state('AIRBORNE')
+                    ->badge()
+                    ->color('warning')
+                    ->alignCenter()
+                    ->extraAttributes(fn (Flight $record): array => [
+                        'class' => 'echo-status-time-now-trigger',
+                        'role' => 'button',
+                        'tabindex' => 0,
+                        'data-record-id' => (string) $record->getKey(),
+                        'data-confirm-method' => 'confirmAirborneNow',
+                        'data-time-label' => 'Take-Off Time',
+                        'data-confirm-heading' => 'Confirm Airborne Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
+                    ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
+                    ->width('5px'),
             ]);
 
             $activeColumns = [
                 ...self::pickColumns($columns, [
-                    'aircraft_identification',
-                    'time_start_up',
+                    'time_airborne',
+                    'time_airborne_now',
+                    'aircraft_identification',                    
                     'proposed_time',
                     'departure_aerodrome',
                     'destination_aerodrome',
                     'route',
                 ]),
                 ...self::remainingColumns($columns, [
+                    'time_airborne',
+                    'time_airborne_now',
                     'aircraft_identification',
-                    'time_start_up',
                     'proposed_time',
                     'departure_aerodrome',
                     'destination_aerodrome',
@@ -340,6 +397,180 @@ class FlightsTable
             ];
 
             $columns = $activeColumns;
+        }
+
+        if ($resourceClass === AirborneFlightResource::class) {
+            array_splice($columns, 2, 0, [
+                TextInputColumn::make('time_touchdown')
+                    ->label('TOUCHDOWN TIME')
+                    ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
+                    ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
+                            $livewire->dispatch(
+                                'echo-modal:open',
+                                heading: 'Invalid UTC Time',
+                                message: UtcFourDigitTime::message('touchdown time'),
+                                tone: 'danger',
+                                buttonLabel: 'Cancel',
+                            );
+
+                            return FlightForm::formatTimeForForm($record->time_touchdown);
+                        }
+
+                        $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+
+                        $record->forceFill([
+                            'time_touchdown' => $normalizedState,
+                        ])->save();
+
+                        return FlightForm::formatTimeForForm($normalizedState);
+                    })
+                    ->inputMode('numeric')
+                    ->extraInputAttributes(fn (Flight $record): array => [
+                        'maxlength' => 4,
+                        'class' => 'echo-status-time-input',
+                        'data-confirm-status-time' => 'true',
+                        'data-time-label' => 'Touchdown Time',
+                        'data-confirm-heading' => 'Confirm Touchdown Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center echo-ready-start-header echo-ready-start-header-main'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-main'])
+                    ->width('12px'),
+                TextColumn::make('time_touchdown_now')
+                    ->label(' ')
+                    ->state('LANDED')
+                    ->badge()
+                    ->color('warning')
+                    ->alignCenter()
+                    ->extraAttributes(fn (Flight $record): array => [
+                        'class' => 'echo-status-time-now-trigger',
+                        'role' => 'button',
+                        'tabindex' => 0,
+                        'data-record-id' => (string) $record->getKey(),
+                        'data-confirm-method' => 'confirmTouchdownNow',
+                        'data-time-label' => 'Touchdown Time',
+                        'data-confirm-heading' => 'Confirm Touchdown Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
+                    ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
+                    ->width('5px'),
+            ]);
+
+            $airborneColumns = [
+                ...self::pickColumns($columns, [
+                    'time_touchdown',
+                    'time_touchdown_now',
+                    'aircraft_identification',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                    'time_airborne',
+                ]),
+                ...self::remainingColumns($columns, [
+                    'time_touchdown',
+                    'time_touchdown_now',
+                    'aircraft_identification',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                    'time_airborne',
+                ]),
+            ];
+
+            $columns = $airborneColumns;
+        }
+
+        if ($resourceClass === LandedFlightResource::class) {
+            array_splice($columns, 2, 0, [
+                TextInputColumn::make('time_shutdown')
+                    ->label('SHUTDOWN TIME')
+                    ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_shutdown))
+                    ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
+                            $livewire->dispatch(
+                                'echo-modal:open',
+                                heading: 'Invalid UTC Time',
+                                message: UtcFourDigitTime::message('shutdown time'),
+                                tone: 'danger',
+                                buttonLabel: 'Cancel',
+                            );
+
+                            return FlightForm::formatTimeForForm($record->time_shutdown);
+                        }
+
+                        $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+
+                        $record->forceFill([
+                            'time_shutdown' => $normalizedState,
+                        ])->save();
+
+                        return FlightForm::formatTimeForForm($normalizedState);
+                    })
+                    ->inputMode('numeric')
+                    ->extraInputAttributes(fn (Flight $record): array => [
+                        'maxlength' => 4,
+                        'class' => 'echo-status-time-input',
+                        'data-confirm-status-time' => 'true',
+                        'data-time-label' => 'Shutdown Time',
+                        'data-confirm-heading' => 'Confirm Shutdown Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center echo-ready-start-header echo-ready-start-header-main'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-main'])
+                    ->width('12px'),
+                TextColumn::make('time_shutdown_now')
+                    ->label(' ')
+                    ->state('ENGINE OFF')
+                    ->badge()
+                    ->color('warning')
+                    ->alignCenter()
+                    ->extraAttributes(fn (Flight $record): array => [
+                        'class' => 'echo-status-time-now-trigger',
+                        'role' => 'button',
+                        'tabindex' => 0,
+                        'data-record-id' => (string) $record->getKey(),
+                        'data-confirm-method' => 'confirmShutdownNow',
+                        'data-time-label' => 'Shutdown Time',
+                        'data-confirm-heading' => 'Confirm Shutdown Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
+                    ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
+                    ->width('6px'),
+            ]);
+
+            $landedColumns = [
+                ...self::pickColumns($columns, [
+                    'time_shutdown',
+                    'time_shutdown_now',
+                    'aircraft_identification',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                    'time_airborne',
+                    'time_touchdown',
+                ]),
+                ...self::remainingColumns($columns, [
+                    'time_shutdown',
+                    'time_shutdown_now',
+                    'aircraft_identification',
+                    'proposed_time',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                    'time_airborne',
+                    'time_touchdown',
+                ]),
+            ];
+
+            $columns = $landedColumns;
         }
 
         if ($resourceClass === RejectedFlightResource::class) {
@@ -360,7 +591,7 @@ class FlightsTable
 
         return $table
             ->when(
-                $resourceClass === FlightResource::class,
+                $isOperationalFlightTable || $resourceClass === FlightResource::class,
                 fn (Table $table): Table => $table->poll('5s')
             )
             ->when(
@@ -368,10 +599,6 @@ class FlightsTable
                 fn (Table $table): Table => $table
                     ->recordUrl(fn (Flight $record): string => route('flights.view', $record))
                     ->openRecordUrlInNewTab()
-            )
-            ->when(
-                $resourceClass === ActiveFlightDataResource::class,
-                fn (Table $table): Table => $table->poll('5s')
             )
             ->modifyQueryUsing(
                 fn (Builder $query): Builder => $isOperationalFlightTable || $resourceClass === FlightResource::class
