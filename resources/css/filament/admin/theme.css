@@ -274,6 +274,28 @@
         line-height: var(--text-echo-table--line-height);
         font-weight: 500;
         border-color: color-mix(in srgb, var(--color-echo-border) 85%, white);
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+
+    .fi-ta-cell .fi-ta-text-item,
+    .fi-ta-cell .fi-ta-placeholder,
+    .fi-ta-cell .fi-badge,
+    .fi-ta-cell .fi-input {
+        font-size: var(--text-echo-table) !important;
+        line-height: var(--text-echo-table--line-height) !important;
+    }
+
+    .fi-ta-cell .fi-ta-text {
+        padding-top: 0.55rem !important;
+        padding-bottom: 0.55rem !important;
+    }
+
+    .fi-ta-cell:has(.fi-ta-actions),
+    .fi-ta-cell.fi-ta-selection-cell,
+    .fi-ta-cell.fi-ta-group-selection-cell {
+        padding-top: 0.55rem !important;
+        padding-bottom: 0.55rem !important;
     }
 
     .fi-ta-row:hover {
