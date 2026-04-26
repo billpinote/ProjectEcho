@@ -249,24 +249,27 @@ class FlightsTable
                     ->sortable()
                     ->alignCenter()
                     ->extraHeaderAttributes(['class' => 'text-center'])
-                    ->width('10px')
+                    ->width('8px')
                     ->weight('bold'),
                 TextColumn::make('type_of_aircraft')
                     ->label('Type')
                     ->alignCenter()
                     ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('5px')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('departure_aerodrome')
                     ->label('From')
                     ->alignCenter()
                     ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('5px')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('destination_aerodrome')
                     ->label('To')
                     ->alignCenter()
                     ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('5px')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('route')

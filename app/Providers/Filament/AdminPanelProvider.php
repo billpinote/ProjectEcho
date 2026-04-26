@@ -13,6 +13,7 @@ use App\Filament\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Filament\Resources\Reports\ActiveFlightDataResource;
+use App\Filament\Widgets\ActiveFlightDataWidget;
 use Filament\Support\Facades\FilamentView;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -100,6 +101,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 AccountWidget::class,
+                ActiveFlightDataWidget::class,
                 FilamentInfoWidget::class,
             ])
             ->middleware([
