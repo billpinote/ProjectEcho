@@ -72,6 +72,7 @@ class FlightsTable
             $filters = [
                 SelectFilter::make('date_of_flight')
                     ->label('Date of Flight')
+                    ->default(now('UTC')->toDateString())
                     ->options(fn (): array => AbbreviatedFlightReportResource::getEloquentQuery()
                         ->whereNotNull('date_of_flight')
                         ->orderByDesc('date_of_flight')
