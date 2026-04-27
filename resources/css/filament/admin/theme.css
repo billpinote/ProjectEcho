@@ -291,7 +291,7 @@
         color: var(--color-echo-text-secondary);
     }
 
-    .fi-ta-filters-above-content-ctn > .fi-ta-filters > .fi-ta-filters-header {
+    .fi-ta-filters-above-content-ctn .fi-ta-filters-header {
         display: none !important;
     }
 

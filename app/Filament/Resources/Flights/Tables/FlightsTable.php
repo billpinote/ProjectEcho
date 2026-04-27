@@ -22,6 +22,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Enums\FiltersResetActionPosition;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Carbon;
@@ -751,6 +752,7 @@ class FlightsTable
                 $resourceClass === AbbreviatedFlightReportResource::class,
                 fn (Table $table): Table => $table
                     ->deferFilters(false)
+                    ->filtersResetActionPosition(FiltersResetActionPosition::Footer)
                     ->hiddenFilterIndicators()
             )
             ->recordActions($isOperationalFlightTable ? [] : [
