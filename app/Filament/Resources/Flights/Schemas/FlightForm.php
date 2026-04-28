@@ -287,7 +287,7 @@ class FlightForm
             ->label($label)
             ->maxLength(255)
             ->columnSpan($span)
-            ->extraAttributes(['class' => 'caap-field'])
+            ->extraFieldWrapperAttributes(['class' => 'caap-field'])
             ->extraInputAttributes(['class' => 'caap-control']);
     }
 
@@ -311,7 +311,7 @@ class FlightForm
             ->label($label)
             ->native(false)
             ->columnSpan($span)
-            ->extraAttributes(['class' => 'caap-field'])
+            ->extraFieldWrapperAttributes(['class' => 'caap-field'])
             ->extraInputAttributes(['class' => 'caap-control']);
     }
 
@@ -326,7 +326,7 @@ class FlightForm
             ->options($options)
             ->native()
             ->columnSpan($span)
-            ->extraAttributes(['class' => 'caap-field'])
+            ->extraFieldWrapperAttributes(['class' => 'caap-field'])
             ->extraInputAttributes(['class' => 'caap-control']);
     }
 
@@ -336,7 +336,7 @@ class FlightForm
             ->label($label)
             ->rows($rows)
             ->columnSpan($span)
-            ->extraAttributes(['class' => 'caap-field'])
+            ->extraFieldWrapperAttributes(['class' => 'caap-field'])
             ->extraInputAttributes(['class' => 'caap-control']);
     }
 
@@ -641,6 +641,7 @@ class FlightForm
                     display: flex;
                     min-width: 0;
                     max-width: 100%;
+                    width: 100%;
                     flex-wrap: nowrap;
                     align-items: center;
                     gap: 0.15rem;
@@ -648,7 +649,9 @@ class FlightForm
 
                 .caap-field .fi-fo-field-label-content {
                     display: block;
+                    flex: 1 1 auto;
                     min-width: 0;
+                    max-width: 100%;
                     overflow: hidden;
                     text-overflow: ellipsis;
                     text-transform: uppercase !important;
