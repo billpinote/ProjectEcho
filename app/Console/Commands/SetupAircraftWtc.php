@@ -552,6 +552,7 @@ class SetupAircraftWtc extends Command
             ['manufacturer'=>'PILATUS','model'=>'PC-7 Turbo Trainer','icao_type_designator'=>'PC7','icao_legacy_wtc'=>'L','recat_eu_wtc'=>'CAT-F'],
             ['manufacturer'=>'PILATUS','model'=>'PC-9','icao_type_designator'=>'PC9','icao_legacy_wtc'=>'L','recat_eu_wtc'=>'CAT-F'],
             ['manufacturer'=>'PILATUS','model'=>'PC-21','icao_type_designator'=>'PC21','icao_legacy_wtc'=>'L','recat_eu_wtc'=>'CAT-F'],
+            ['manufacturer'=>'TECNAM','model'=>'P-2002 Sierra','icao_type_designator'=>'SIRA','icao_legacy_wtc'=>'L','recat_eu_wtc'=>'CAT-F'],
             ['manufacturer'=>'SOCATA','model'=>'TBM-700','icao_type_designator'=>'TBM7','icao_legacy_wtc'=>'L','recat_eu_wtc'=>'CAT-F'],
             ['manufacturer'=>'SOCATA','model'=>'TBM-850','icao_type_designator'=>'TBM8','icao_legacy_wtc'=>'L','recat_eu_wtc'=>'CAT-F'],
             ['manufacturer'=>'SOCATA','model'=>'TBM-900','icao_type_designator'=>'TBM9','icao_legacy_wtc'=>'L','recat_eu_wtc'=>'CAT-F'],

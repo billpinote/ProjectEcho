@@ -183,11 +183,35 @@ dinghiesCheckbox.dispatchEvent(new Event("change", { bubbles: true }));
 const departureAerodromeInput = form.querySelector('input[name="departure_aerodrome"]');
 const destinationAerodromeInput = form.querySelector('input[name="destination_aerodrome"]');
 const typOfAircraftInput = form.querySelector('input[name="type_of_aircraft"]');
+const wakeTurbulenceCatInput = form.querySelector('input[name="wake_turbulence_cat"]');
 const altnInput = form.querySelector('input[name="altn_aerodrome_1"]');
 const altn2Input = form.querySelector('input[name="altn_aerodrome_2"]');
 const dateOfFlightInput = form.querySelector('input[name="date_of_flight"]');
 const otherInformationField = form.querySelector('textarea[name="other_information"]');
 const otherInfoHint = document.getElementById('other-info-hint');
+const aircraftWtcMap = window.flightplanAircraftWtcMap ?? {};
+
+const syncWakeTurbulenceCategory = () => {
+    if (!typOfAircraftInput || !wakeTurbulenceCatInput) {
+        return;
+    }
+
+    const designator = typOfAircraftInput.value.trim().toUpperCase();
+
+    if (!designator || designator === 'ZZZZ') {
+        return;
+    }
+
+    const wakeTurbulenceCategory = aircraftWtcMap[designator];
+
+    if (!wakeTurbulenceCategory) {
+        return;
+    }
+
+    wakeTurbulenceCatInput.value = wakeTurbulenceCategory;
+    wakeTurbulenceCatInput.dispatchEvent(new Event('input', { bubbles: true }));
+    wakeTurbulenceCatInput.dispatchEvent(new Event('change', { bubbles: true }));
+};
 
 // Auto-insert DOF/ tag with date_of_flight value
 const updateDofTag = () => {
@@ -372,6 +396,9 @@ if (departureAerodromeInput && destinationAerodromeInput && otherInformationFiel
         validateOtherInformationTags();
     });
 
+    typOfAircraftInput?.addEventListener('blur', syncWakeTurbulenceCategory);
+    typOfAircraftInput?.addEventListener('change', syncWakeTurbulenceCategory);
+
     altnInput?.addEventListener('input', () => {
         updateOtherInformationRequirements();
         validateOtherInformationTags();
@@ -385,6 +412,7 @@ if (departureAerodromeInput && destinationAerodromeInput && otherInformationFiel
     otherInformationField.addEventListener('input', validateOtherInformationTags);
 
     updateOtherInformationRequirements();
+    syncWakeTurbulenceCategory();
 }
 
 // Handle Authorized Representative collapsible section

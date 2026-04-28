@@ -13,6 +13,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -45,7 +46,18 @@ class FlightController extends Controller
      */
     public function flightplan()
     {
-        return view('flightplan.form');
+        $aircraftWtcMap = DB::table('aircraft_types_wtc')
+            ->whereNotNull('icao_legacy_wtc')
+            ->whereNotNull('icao_type_designator')
+            ->pluck('icao_legacy_wtc', 'icao_type_designator')
+            ->mapWithKeys(fn (mixed $wtc, mixed $designator): array => [
+                strtoupper(trim((string) $designator)) => strtoupper(trim((string) $wtc)),
+            ])
+            ->all();
+
+        return view('flightplan.form', [
+            'aircraftWtcMap' => $aircraftWtcMap,
+        ]);
     }
 
     /**

@@ -22,6 +22,7 @@ use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\DB;
 
 class FlightForm
 {
@@ -110,9 +111,9 @@ class FlightForm
                                         self::text('number', 'Number', 1)
                                             ->maxLength(50),
                                         self::text('type_of_aircraft', 'Type of Aircraft', 2)
-                                            ->live()
-                                            ->afterStateUpdated(fn (Get $get, Set $set): mixed => self::syncRequiredOtherInfoTags($get, $set)),
-                                        self::text('wake_turbulence_cat', 'WTC', 1)
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(fn (Get $get, Set $set, mixed $state): mixed => self::syncAircraftTypeRelatedFields($get, $set, $state)),
+                                        self::text('wake_turbulence_cat', 'Wake Turbulence Cat.', 1)
                                             ->rule(new IcaoWakeTurbulenceCategory),
                                         self::text('equipment_10a', 'COM/NAV/Approach Equipment', 2),
                                         self::text('equipment_10b', 'Surveillance Equipment', 2),
@@ -400,6 +401,31 @@ class FlightForm
         $set('other_information', trim((string) $updatedValue));
 
         return null;
+    }
+
+    private static function syncAircraftTypeRelatedFields(Get $get, Set $set, mixed $state): null
+    {
+        self::syncWakeTurbulenceCategoryFromAircraftType($set, $state);
+        self::syncRequiredOtherInfoTags($get, $set);
+
+        return null;
+    }
+
+    private static function syncWakeTurbulenceCategoryFromAircraftType(Set $set, mixed $state): void
+    {
+        $designator = strtoupper(trim((string) $state));
+
+        if ($designator === '' || $designator === 'ZZZZ') {
+            return;
+        }
+
+        $wakeTurbulenceCategory = DB::table('aircraft_types_wtc')
+            ->whereRaw('UPPER(icao_type_designator) = ?', [$designator])
+            ->value('icao_legacy_wtc');
+
+        if (filled($wakeTurbulenceCategory)) {
+            $set('wake_turbulence_cat', strtoupper(trim((string) $wakeTurbulenceCategory)));
+        }
     }
 
     private static function syncRequiredOtherInfoTags(Get $get, Set $set): null
