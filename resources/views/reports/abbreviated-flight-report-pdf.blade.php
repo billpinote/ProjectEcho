@@ -52,7 +52,7 @@
 
         .header-logo {
             width: 100px;
-            padding: 6px;
+            padding: 6px 6px 0px 0px;
             /*border: 1.5px solid #000;*/
         }
 
@@ -65,7 +65,7 @@
         }
 
         .header-copy {
-            padding: 2px 15px 2px 0px;
+            padding: 2px 0px 0px 10px;
         }
 
         .agency-line,
@@ -150,7 +150,7 @@
         .report-table tbody td {
             border: 1px solid #000;
             /*height: 18px;*/
-            padding: 3px 4px;
+            padding: 1px 1px;
             vertical-align: middle;
             word-wrap: break-word;
         }
@@ -186,7 +186,7 @@
 </head>
 <body>
     @php
-        $rowsPerPage = 25;
+        $rowsPerPage = 30;
         $reportDate = isset($selectedDate) && filled($selectedDate)
             ? \Carbon\Carbon::parse($selectedDate)->format('d M Y')
             : $generatedAt->format('d M Y');
@@ -223,13 +223,8 @@
                     </td>
                 </tr>
                 <tr>
-                    <td colspan="2" style="width: 100%; text-align: right;">
+                    <td colspan="2" style="width: 100%; text-align: right; padding-bottom: 5px;">
                         <b>Date: <u>&nbsp;&nbsp; {{ $reportDate }} &nbsp;&nbsp;</u></b>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        &nbsp;
                     </td>
                 </tr>
             </table>
