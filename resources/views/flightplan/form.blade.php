@@ -12,8 +12,22 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="{{ asset('css/flightplan.css') }}">
 </head>
-<body class="bg-gray-100 py-8">
-    <div class="bg-white rounded-lg shadow-lg mx-8 p-8" style="display: inline-block; min-width: 1400px;">
+<body class="bg-gray-100">
+    @include('flightplan.partials.navbar', ['activeNav' => 'flight-plan'])
+
+    <div class="flightplan-zoom-controls" aria-label="Form zoom controls">
+        <button type="button" class="flightplan-zoom-button" data-flightplan-zoom-in aria-label="Zoom in">
+            +
+        </button>
+        <div class="flightplan-zoom-readout" data-flightplan-zoom-readout>100%</div>
+        <button type="button" class="flightplan-zoom-button" data-flightplan-zoom-out aria-label="Zoom out">
+            -
+        </button>
+    </div>
+
+    <div class="flightplan-card-scroll">
+        <div class="flightplan-zoom-stage" data-flightplan-zoom-stage>
+            <div class="flightplan-card bg-white rounded-lg shadow-lg mx-8 p-8" style="min-width: 1400px;">
         <p class="text-sm mb-2 text-gray-800">CAAP Form ATS 2019-1</p>
         <p class="text-md text-gray-700 text-center mb-0 max-w-5xl mx-auto" style="text-transform: none;">
             Republic of the Philippines
@@ -478,6 +492,8 @@
                 </div>
             </div>
         </form>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>

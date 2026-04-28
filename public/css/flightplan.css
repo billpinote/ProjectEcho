@@ -179,3 +179,342 @@ textarea:disabled {
     text-align: center;
     font-weight: bold;
 }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+body {
+    background:
+        radial-gradient(circle at top, rgba(47, 174, 123, 0.06), transparent 28%),
+        #eef3ee !important;
+    color: #162018;
+}
+
+.flightplan-card {
+    display: block;
+    width: max-content;
+    overflow-x: visible;
+    background: #fffdf7 !important;
+    border: 1px solid #d9e2da;
+    box-shadow: 0 18px 38px rgba(10, 63, 50, 0.08) !important;
+}
+
+.flightplan-card .text-gray-800 {
+    color: #162018 !important;
+}
+
+.flightplan-card .text-gray-700 {
+    color: #68726b !important;
+}
+
+.flightplan-card .text-gray-500 {
+    color: #68726b !important;
+}
+
+.flightplan-card .border-gray-300 {
+    border-color: #d9e2da !important;
+}
+
+.flightplan-card input[type="text"],
+.flightplan-card input[type="date"],
+.flightplan-card input[type="time"],
+.flightplan-card textarea,
+.flightplan-card select {
+    border-color: #d9e2da !important;
+    background: #fffdf7;
+    color: #162018 !important;
+}
+
+.flightplan-card input[type="text"]:focus,
+.flightplan-card input[type="date"]:focus,
+.flightplan-card input[type="time"]:focus,
+.flightplan-card textarea:focus,
+.flightplan-card select:focus {
+    border-color: #0f5f4a !important;
+    box-shadow: 0 0 0 3px rgba(15, 95, 74, 0.16) !important;
+}
+
+.flightplan-card input:disabled,
+.flightplan-card select:disabled,
+.flightplan-card textarea:disabled {
+    background-color: #f4f7f3;
+    color: #68726b !important;
+}
+
+.flightplan-card button[type="submit"] {
+    background: linear-gradient(135deg, #0f5f4a 0%, #0a3f32 100%) !important;
+    color: #fffdf7 !important;
+    box-shadow: 0 10px 22px rgba(15, 95, 74, 0.18);
+}
+
+.flightplan-card button[type="submit"]:hover {
+    background: linear-gradient(135deg, #0c523f 0%, #08372b 100%) !important;
+}
+
+.flightplan-card .flightplan-alert-close {
+    box-shadow: none !important;
+}
+
+.flightplan-shell {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.flightplan-zoom-controls {
+    position: fixed;
+    left: 0.85rem;
+    top: 50vh;
+    z-index: 45;
+    display: grid;
+    gap: 0.45rem;
+    transform: translateY(-50%);
+}
+
+.flightplan-zoom-button,
+.flightplan-zoom-readout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    min-height: 3rem;
+    border: 1px solid #d9e2da;
+    border-radius: 1rem;
+    background: rgba(255, 253, 247, 0.94);
+    color: #0f5f4a;
+    box-shadow: 0 12px 28px rgba(10, 63, 50, 0.12);
+    backdrop-filter: blur(8px);
+}
+
+.flightplan-zoom-button {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.flightplan-zoom-button:hover,
+.flightplan-zoom-button:focus-visible {
+    background: rgba(15, 95, 74, 0.08);
+    border-color: rgba(15, 95, 74, 0.24);
+    color: #0a3f32;
+    transform: translateY(-1px);
+}
+
+.flightplan-zoom-readout {
+    width: 3.5rem;
+    min-height: 2.4rem;
+    margin-inline-start: -0.25rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #162018;
+}
+
+.flightplan-card-scroll {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 1.5rem;
+}
+
+.flightplan-zoom-stage {
+    width: max-content;
+    transform-origin: top left;
+}
+
+.flightplan-nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    width: 100%;
+    margin: 0 0 1.5rem;
+}
+
+.flightplan-nav__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1.25rem;
+    border: 0;
+    border-bottom: 1px solid #d9e2da;
+    border-radius: 0;
+    background:
+        radial-gradient(circle at top right, rgba(47, 174, 123, 0.14), transparent 32%),
+        linear-gradient(180deg, rgba(255, 253, 247, 0.98) 0%, rgba(238, 243, 238, 0.96) 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.flightplan-nav__brand {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.flightplan-nav__eyebrow {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #0f5f4a;
+    text-transform: uppercase;
+}
+
+.flightplan-nav__title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #162018;
+    text-transform: none;
+}
+
+.flightplan-nav__menu,
+.flightplan-nav__mobile {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.flightplan-nav__mobile {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    margin-top: 0;
+    padding: 0.85rem 1.25rem 1rem;
+    border: 0;
+    border-bottom: 1px solid #d9e2da;
+    border-radius: 0;
+    background: rgba(255, 253, 247, 0.98);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.flightplan-nav__link,
+.flightplan-nav__button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 0.9rem;
+    background: transparent;
+    color: #162018;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.flightplan-nav__link:hover,
+.flightplan-nav__link:focus-visible,
+.flightplan-nav__button:hover,
+.flightplan-nav__button:focus-visible {
+    background: rgba(15, 95, 74, 0.08);
+    border-color: rgba(15, 95, 74, 0.18);
+    color: #0a3f32;
+    transform: translateY(-1px);
+}
+
+.flightplan-nav__link.is-active,
+.flightplan-nav__button.is-active {
+    background: rgba(15, 95, 74, 0.08);
+    border-color: rgba(15, 95, 74, 0.18);
+    color: #0a3f32;
+    box-shadow:
+        inset 12px 0 18px -12px rgba(47, 174, 123, 0.95),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.35),
+        0 8px 18px rgba(15, 95, 74, 0.1);
+}
+
+.flightplan-nav__link.is-active::before,
+.flightplan-nav__button.is-active::before {
+    content: none;
+}
+
+.flightplan-nav__link.is-disabled,
+.flightplan-nav__button.is-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.flightplan-nav__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    flex-shrink: 0;
+}
+
+.flightplan-nav__icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.flightplan-nav__toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 2.9rem;
+    height: 2.9rem;
+    border: 1px solid #d9e2da;
+    border-radius: 0.9rem;
+    background: rgba(255, 253, 247, 0.96);
+    color: #0f5f4a;
+}
+
+.flightplan-nav__toggle svg {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+@media (max-width: 900px) {
+    .flightplan-zoom-controls {
+        left: 0.6rem;
+        top: auto;
+        bottom: 1rem;
+        transform: none;
+    }
+
+    .flightplan-zoom-button,
+    .flightplan-zoom-readout {
+        width: 2.8rem;
+        min-height: 2.8rem;
+        border-radius: 0.9rem;
+    }
+
+    .flightplan-zoom-readout {
+        width: 3.25rem;
+    }
+
+    .flightplan-nav__menu {
+        display: none;
+    }
+
+    .flightplan-nav__toggle {
+        display: inline-flex;
+    }
+
+    .flightplan-nav__mobile.is-open {
+        display: flex;
+    }
+
+    .flightplan-nav__mobile .flightplan-nav__link,
+    .flightplan-nav__mobile .flightplan-nav__button {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
