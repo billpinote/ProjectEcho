@@ -185,80 +185,117 @@
     </style>
 </head>
 <body>
-    <div class="sheet">
-        <table class="header">
-            <tr>
-                <td class="header-logo">
-                    <img src="{{ storage_path('app/public/img/logo-caap.jpg') }}" alt="CAAP Logo">
-                </td>
-                <td class="header-copy">
-                    <p class="agency-line agency-line--republic">Republic of the Philippines</p>
-                    <p class="agency-line agency-line--caap">Civil Aviation Authority of the Philippines</p>
-                    <p class="agency-office">San Fernando Flight Service Station</p>                                                        
-                </td>
-            </tr>
-        </table>
+    @php
+        $rowsPerPage = 25;
+        $reportDate = isset($selectedDate) && filled($selectedDate)
+            ? \Carbon\Carbon::parse($selectedDate)->format('d M Y')
+            : $generatedAt->format('d M Y');
+        $flightPages = $flights->values()->chunk($rowsPerPage);
 
-        <table width="100%">
-            <tr>
-                <td>
-                    <p class="report-title">Abbreviated Flight Plans for Air Carriers, General Aviation & Military Aircraft</p>
-                </td>
-            </tr>
-        </table>
+        if ($flightPages->isEmpty()) {
+            $flightPages = collect([collect()]);
+        }
 
-        <table class="header-meta">            
-            <tr>
-                <td>
-                    Date: <u>&nbsp;&nbsp; {{ $generatedAt->format('d M Y') }} &nbsp;&nbsp;</u>
-                </td>
-            </tr>
-        </table>
+        $totalPages = $flightPages->count();
+    @endphp
 
-        <table class="report-table">
-            <thead>
+    @foreach ($flightPages as $pageIndex => $pageFlights)
+        @php
+            $pageNumber = $pageIndex + 1;
+            $blankRows = max(0, $rowsPerPage - $pageFlights->count() - ($pageFlights->isEmpty() ? 1 : 0));
+        @endphp
+
+        <div class="sheet" style="{{ $pageNumber > 1 ? 'page-break-before: always;' : '' }}">
+            <table class="header">
                 <tr>
-                    <th style="width: 9%;">Call Sign</th>
-                    <th style="width: 6%;">Type</th>
-                    <th style="width: 8%;">Origin</th>
-                    <th style="width: 8%;">Destination</th>
-                    <th style="width: 6%;">PTD</th>
-                    <th style="width: 6%;">ATD</th>
-                    <th style="width: 23%;">Route of Flight</th>
-                    <th style="width: 6%;">ETE</th>
-                    <th style="width: 6%;">FOB</th>
-                    <th style="width: 6%;">POB</th>
-                    <th style="width: 14%;">Pilot In Command</th>
-                    <th style="width: 12%;">Remarks</th>
+                    <td class="header-logo">
+                        <img src="{{ storage_path('app/public/img/logo-caap.jpg') }}" alt="CAAP Logo">
+                    </td>
+                    <td class="header-copy">
+                        <p class="agency-line agency-line--republic">Republic of the Philippines</p>
+                        <p class="agency-line agency-line--caap">Civil Aviation Authority of the Philippines</p>
+                        <p class="agency-office">San Fernando Flight Service Station</p>
+                    </td>
                 </tr>
-            </thead>
-            <tbody>
-                @forelse ($flights as $flight)
-                    <tr>
-                        <td class="mono center">{{ $flight->aircraft_identification }}</td>
-                        <td class="center small">{{ $flight->type_of_aircraft }}</td>
-                        <td class="center">{{ $flight->departure_aerodrome }}</td>
-                        <td class="center">{{ $flight->destination_aerodrome }}</td>
-                        <td class="mono center">{{ $formatTime($flight->proposed_time) }}</td>
-                        <td class="mono center">{{ $formatTime($flight->time_airborne) }}</td>
-                        <td class="mono small">{{ $flight->route }}</td>
-                        <td class="mono center">{{ $formatTime($flight->total_eet) }}</td>
-                        <td class="mono center">{{ $formatTime($flight->endurance) }}</td>
-                        <td class="center">{{ $flight->persons_on_board }}</td>
-                        <td class="small">{{ $flight->pilot_in_command }}</td>
-                        <td class="remarks-cell"></td>
-                    </tr>
-                @empty
-                    <tr class="empty-state">
-                        <td colspan="12">No abbreviated RPUS flight records available.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
+                <tr>
+                    <td colspan="2">
+                        <p class="report-title">Abbreviated Flight Plans for Air Carriers, General Aviation & Military Aircraft</p>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="width: 100%; text-align: right;">
+                        <b>Date: <u>&nbsp;&nbsp; {{ $reportDate }} &nbsp;&nbsp;</u></b>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        &nbsp;
+                    </td>
+                </tr>
+            </table>
 
-        <div class="footer">
-            Generated from Project Echo abbreviated report export
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th style="width: 9%;">Call Sign</th>
+                        <th style="width: 5%;">Type</th>
+                        <th style="width: 8%;">Origin</th>
+                        <th style="width: 8%;">Destination</th>
+                        <th style="width: 5%;">PTD</th>
+                        <th style="width: 5%;">ATD</th>
+                        <th style="width: 28%;">Route of Flight</th>
+                        <th style="width: 5%;">ETE</th>
+                        <th style="width: 5%;">FOB</th>
+                        <th style="width: 5%;">POB</th>
+                        <th style="width: 19%;">Pilot In Command</th>
+                        <th style="width: 8%;">Remarks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($pageFlights as $flight)
+                        <tr>
+                            <td class="mono center">{{ $flight->aircraft_identification }}</td>
+                            <td class="center small">{{ $flight->type_of_aircraft }}</td>
+                            <td class="center">{{ $flight->departure_aerodrome }}</td>
+                            <td class="center">{{ $flight->destination_aerodrome }}</td>
+                            <td class="mono center">{{ $formatTime($flight->proposed_time) }}</td>
+                            <td class="mono center">{{ $formatTime($flight->time_airborne) }}</td>
+                            <td class="mono small">{{ $flight->route }}</td>
+                            <td class="mono center">{{ $formatTime($flight->total_eet) }}</td>
+                            <td class="mono center">{{ $formatTime($flight->endurance) }}</td>
+                            <td class="center">{{ $flight->persons_on_board }}</td>
+                            <td class="small">{{ $flight->pilot_in_command }}</td>
+                            <td class="remarks-cell"></td>
+                        </tr>
+                    @empty
+                        <tr class="empty-state">
+                            <td colspan="12">No abbreviated RPUS flight records available.</td>
+                        </tr>
+                    @endforelse
+
+                    @for ($row = 0; $row < $blankRows; $row++)
+                        <tr>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                            <td>&nbsp;</td>
+                        </tr>
+                    @endfor
+                </tbody>
+            </table>
+
+            <div class="footer">
+                Generated from Project Echo abbreviated report export | Page {{ $pageNumber }} of {{ $totalPages }}
+            </div>
         </div>
-    </div>
+    @endforeach
 </body>
 </html>
