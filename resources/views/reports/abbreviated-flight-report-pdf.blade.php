@@ -95,7 +95,6 @@
         .agency-subline,
         .agency-office {
             font-size: 9px;
-            text-transform: uppercase;
         }
 
         .report-title {

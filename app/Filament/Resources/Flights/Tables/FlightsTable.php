@@ -18,8 +18,6 @@ use App\Rules\UtcFourDigitTime;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Actions as SchemaActions;
-use Filament\Schemas\Components\Flex;
 use Filament\Support\Enums\FontFamily;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -87,38 +85,15 @@ class FlightsTable
             $filters = [
                 Filter::make('date_of_flight')
                     ->schema([
-                        Flex::make([
-                            Select::make('value')
-                                ->label('Date of Flight')
-                                ->default(now('UTC')->toDateString())
-                                ->options($abbreviatedReportDateOptions)
-                                ->native(false)
-                                ->selectablePlaceholder()
-                                ->grow(false)
-                                ->extraFieldWrapperAttributes([
-                                    'class' => 'echo-abbreviated-date-filter',
-                                ]),
-                            SchemaActions::make([
-                                Action::make('test')
-                                    ->label('Test')
-                                    ->color('gray')
-                                    ->url(route('reports.abbreviated.pdf'))
-                                    ->openUrlInNewTab()
-                                    ->visible(static function (): bool {
-                                        $user = Auth::user();
-
-                                        return $user !== null
-                                            && (bool) $user->is_active
-                                            && in_array(strtolower((string) $user->role), ['admin', 'atc'], true);
-                                    }),
-                            ])
-                                ->grow(false)
-                                ->extraAttributes([
-                                    'class' => 'echo-abbreviated-date-filter-actions',
-                                ]),
-                        ])
-                            ->extraAttributes([
-                                'class' => 'echo-abbreviated-date-filter-row',
+                        Select::make('value')
+                            ->label('Date of Flight')
+                            ->default(now('UTC')->toDateString())
+                            ->options($abbreviatedReportDateOptions)
+                            ->native(false)
+                            ->selectablePlaceholder()
+                            ->grow(false)
+                            ->extraFieldWrapperAttributes([
+                                'class' => 'echo-abbreviated-date-filter',
                             ]),
                     ])
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
@@ -788,12 +763,23 @@ class FlightsTable
             ->filters(
                 $filters,
                 layout: $resourceClass === AbbreviatedFlightReportResource::class
-                    ? FiltersLayout::AboveContent
+                    ? FiltersLayout::Hidden
                     : null,
             )
             ->when(
                 $resourceClass === AbbreviatedFlightReportResource::class,
                 fn (Table $table): Table => $table
+                    ->header(view('filament.tables.headers.abbreviated-flight-report-header', [
+                        'dateOptions' => $abbreviatedReportDateOptions(),
+                        'reportUrl' => route('reports.abbreviated.pdf'),
+                        'showTestAction' => (static function (): bool {
+                            $user = Auth::user();
+
+                            return $user !== null
+                                && (bool) $user->is_active
+                                && in_array(strtolower((string) $user->role), ['admin', 'atc'], true);
+                        })(),
+                    ]))
                     ->deferFilters(false)
                     ->filtersResetActionPosition(FiltersResetActionPosition::Footer)
                     ->hiddenFilterIndicators()
