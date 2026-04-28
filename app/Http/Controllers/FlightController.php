@@ -117,12 +117,14 @@ class FlightController extends Controller
     /**
      * Stream the abbreviated RPUS report as an inline A4 landscape PDF.
      */
-    public function downloadAbbreviatedReportPdf()
+    public function downloadAbbreviatedReportPdf(Request $request)
     {
         $this->ensureReviewerAccess();
 
         $generatedAt = now('UTC');
+        $selectedDate = (string) ($request->query('date') ?: now('UTC')->toDateString());
         $flights = AbbreviatedFlightReportResource::getEloquentQuery()
+            ->whereDate('date_of_flight', $selectedDate)
             ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
             ->orderBy('date_of_flight')
             ->orderByRaw('case when proposed_time is null then 1 else 0 end')
@@ -133,6 +135,7 @@ class FlightController extends Controller
         $pdf = Pdf::loadView('reports.abbreviated-flight-report-pdf', [
             'flights' => $flights,
             'generatedAt' => $generatedAt,
+            'selectedDate' => $selectedDate,
             'generatedBy' => $this->resolveAtcWiresign(),
             'formatTime' => static fn (?string $time): ?string => FlightForm::formatTimeForForm($time),
         ])->setPaper('a4', 'landscape');
