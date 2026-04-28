@@ -352,6 +352,29 @@
         display: none !important;
     }
 
+    .fi-ta-filters-above-content-ctn .echo-abbreviated-date-filter-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+        flex-wrap: nowrap;
+    }
+
+    .fi-ta-filters-above-content-ctn .echo-abbreviated-date-filter-row > div:first-child {
+        min-width: 0;
+    }
+
+    .fi-ta-filters-above-content-ctn .echo-abbreviated-date-filter-actions {
+        display: flex;
+        align-items: center;
+        flex: 0 0 auto;
+    }
+
+    .fi-ta-filters-above-content-ctn .echo-abbreviated-date-filter-actions .fi-ac {
+        justify-content: flex-end;
+    }
+
     .echo-pending-nav-item .fi-badge {
         background: color-mix(in srgb, var(--color-echo-rejected) 88%, black 8%);
         color: #fffdf7;
