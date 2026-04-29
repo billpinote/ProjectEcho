@@ -163,6 +163,12 @@
     height: 1.25rem;
 }
 
+.flightplan-card {
+    display: block;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
 .sr-only {
     position: absolute;
     width: 1px;

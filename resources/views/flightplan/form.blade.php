@@ -15,7 +15,7 @@
 <body class="bg-gray-100">
     @include('flightplan.partials.navbar', ['activeNav' => 'flight-plan'])
 
-    <div class="bg-white rounded-lg shadow-lg mx-8 p-8" style="display: inline-block; min-width: 1400px;">
+    <div class="flightplan-card bg-white rounded-lg shadow-lg mx-8 p-8" style="display: inline-block; min-width: 1400px;">
         <p class="text-sm mb-2 text-gray-800">CAAP Form ATS 2019-1</p>
         <p class="text-md text-gray-700 text-center mb-0 max-w-5xl mx-auto" style="text-transform: none;">
             Republic of the Philippines
