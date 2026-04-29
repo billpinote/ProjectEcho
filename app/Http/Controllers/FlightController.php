@@ -6,7 +6,7 @@ use App\Enums\FlightPlanStatus;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
-use App\Services\FlightPlanICAOFormatter;
+use App\Services\FlightPlanQrPayloadService;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -57,6 +57,47 @@ class FlightController extends Controller
 
         return view('flightplan.form', [
             'aircraftWtcMap' => $aircraftWtcMap,
+        ]);
+    }
+
+    /**
+     * Show the public QR scan/upload page.
+     */
+    public function scanQr()
+    {
+        return view('flightplan.scan-qr', [
+            'payload' => old('payload', ''),
+            'matchedFlight' => null,
+        ]);
+    }
+
+    /**
+     * Resolve a QR payload from the public scan/upload page.
+     */
+    public function lookupScanQr(Request $request)
+    {
+        $validated = $request->validate([
+            'payload' => ['required', 'string', 'max:20000'],
+        ], [
+            'payload.required' => 'Paste or scan a QR payload first.',
+        ]);
+
+        $matchedFlight = $this->buildMatchedFlightFromPayload(
+            $request,
+            (string) $validated['payload'],
+        );
+
+        if ($matchedFlight === null) {
+            return back()
+                ->withErrors([
+                    'payload' => 'Expected a valid Echo QR payload. V2 signed offline payloads and legacy V1 database payloads are supported.',
+                ])
+                ->withInput();
+        }
+
+        return view('flightplan.scan-qr', [
+            'payload' => trim((string) $validated['payload']),
+            'matchedFlight' => $matchedFlight,
         ]);
     }
 
@@ -233,6 +274,32 @@ class FlightController extends Controller
     }
 
     /**
+     * Show a read-only preview reconstructed from a scanned signed QR payload.
+     */
+    public function previewScannedFlightPlan(Request $request, string $token)
+    {
+        $preview = $request->session()->get('scanned_flight_plan_previews.'.$token);
+
+        if (! is_array($preview) || ! isset($preview['snapshot']) || ! is_array($preview['snapshot'])) {
+            return redirect()
+                ->route('flightplan.scan-qr')
+                ->withErrors(['payload' => 'That scanned flight-plan preview is no longer available in this browser session.']);
+        }
+
+        $flight = new Flight($preview['snapshot']);
+
+        return view('flightplan.pdf', [
+            'flight' => $flight,
+            'qrCodeBase64' => isset($preview['payload']) && is_string($preview['payload'])
+                ? $this->generateQrCodeBase64FromPayload($preview['payload'])
+                : null,
+            'isPreview' => true,
+            'showPreviewActions' => false,
+            'showReviewActions' => false,
+        ]);
+    }
+
+    /**
      * Approve the flight plan and generate PDF with QR code.
      */
     public function approveFlightPlan(Request $request)
@@ -364,12 +431,16 @@ class FlightController extends Controller
      */
     private function generateFlightPlanQrCodeBase64(Flight $flight, int $size = 250, int $margin = 2): ?string
     {
-        if (! $flight->exists || $flight->getKey() === null) {
-            return null;
-        }
+        $payload = $this->qrPayloads()->buildPayload($flight);
 
-        $icaoMessage = FlightPlanICAOFormatter::toICAOMessage($flight);
-        $qrCodeSvg = QrCode::size($size)->margin($margin)->format('svg')->generate($icaoMessage);
+        return $payload !== null
+            ? $this->generateQrCodeBase64FromPayload($payload, $size, $margin)
+            : null;
+    }
+
+    private function generateQrCodeBase64FromPayload(string $payload, int $size = 250, int $margin = 2): string
+    {
+        $qrCodeSvg = QrCode::size($size)->margin($margin)->format('svg')->generate($payload);
 
         return 'data:image/svg+xml;base64,'.base64_encode($qrCodeSvg);
     }
@@ -379,6 +450,12 @@ class FlightController extends Controller
      */
     private function generateFlightPlanQrCardPng(Flight $flight): string
     {
+        $payload = $this->qrPayloads()->buildPayload($flight);
+
+        if ($payload === null) {
+            abort(404, 'QR payload is not available for this flight plan.');
+        }
+
         $width = 1080;
         $height = 1680;
         $image = imagecreatetruecolor($width, $height);
@@ -408,7 +485,7 @@ class FlightController extends Controller
         $qrOuterSize = 880;
         $this->drawRoundedRectangle($image, $qrOuterX, $qrOuterY, $qrOuterX + $qrOuterSize, $qrOuterY + $qrOuterSize, 34, $soft);
         imagefilledrectangle($image, $qrOuterX + 42, $qrOuterY + 42, $qrOuterX + $qrOuterSize - 42, $qrOuterY + $qrOuterSize - 42, $white);
-        $this->drawQrCode($image, FlightPlanICAOFormatter::toICAOMessage($flight), $qrOuterX + 78, $qrOuterY + 78, $qrOuterSize - 156, 4, $black, $white);
+        $this->drawQrCode($image, $payload, $qrOuterX + 78, $qrOuterY + 78, $qrOuterSize - 156, 4, $black, $white);
 
         $metaTop = 1380;
         $boxWidth = 410;
@@ -574,6 +651,126 @@ class FlightController extends Controller
         $time = (string) ($flight->proposed_time ?? '');
 
         return $time !== '' ? $time.' Z' : 'N/A';
+    }
+
+    /**
+     * Build the matched-flight payload summary used by the public and admin QR lookup flows.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildMatchedFlightFromPayload(Request $request, string $payload): ?array
+    {
+        $parsedPayload = $this->qrPayloads()->parsePayload($payload);
+
+        if ($parsedPayload === null) {
+            return null;
+        }
+
+        if (($parsedPayload['format'] ?? null) === 'v2-offline') {
+            $snapshot = $parsedPayload['snapshot'] ?? null;
+
+            if (! is_array($snapshot)) {
+                return null;
+            }
+
+            $flight = Flight::find((int) $parsedPayload['flight_id']);
+            $status = $flight?->status instanceof FlightPlanStatus
+                ? $flight->status
+                : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
+            $previewToken = $this->storeScannedFlightPlanPreview($request, [
+                'payload' => $parsedPayload['normalized_payload'],
+                'snapshot' => $snapshot,
+                'flight_id' => $parsedPayload['flight_id'],
+                'issued_at' => $parsedPayload['issued_at'],
+                'key_id' => $parsedPayload['key_id'],
+                'schema_id' => $parsedPayload['schema_id'],
+            ]);
+
+            return [
+                'id' => (int) $parsedPayload['flight_id'],
+                'aircraft_identification' => (string) ($snapshot['aircraft_identification'] ?? 'N/A'),
+                'date_of_flight' => $this->formatFlightDateForLookup($snapshot['date_of_flight'] ?? null),
+                'proposed_time' => UtcFourDigitTime::formatForDisplay($snapshot['proposed_time'] ?? null) ?? 'N/A',
+                'departure_aerodrome' => (string) ($snapshot['departure_aerodrome'] ?? 'N/A'),
+                'destination_aerodrome' => (string) ($snapshot['destination_aerodrome'] ?? 'N/A'),
+                'status' => $status?->value ?? 'signed_offline_payload',
+                'status_label' => $status?->label() ?? 'Signed Offline Payload',
+                'status_color' => $status?->filamentColor() ?? 'info',
+                'view_url' => route('flightplan.scan-qr.preview', ['token' => $previewToken]),
+                'can_open' => true,
+            ];
+        }
+
+        $flight = Flight::find((int) $parsedPayload['flight_id']);
+
+        if (! $flight) {
+            return null;
+        }
+
+        $status = $flight->status instanceof FlightPlanStatus
+            ? $flight->status
+            : FlightPlanStatus::tryFrom((string) $flight->status);
+
+        $canOpen = Auth::check() || $this->sessionCanAccessFlight($request, $flight);
+
+        return [
+            'id' => $flight->getKey(),
+            'aircraft_identification' => (string) ($flight->aircraft_identification ?? 'N/A'),
+            'date_of_flight' => $this->formatFlightDateForLookup($flight->date_of_flight),
+            'proposed_time' => UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? 'N/A',
+            'departure_aerodrome' => (string) ($flight->departure_aerodrome ?? 'N/A'),
+            'destination_aerodrome' => (string) ($flight->destination_aerodrome ?? 'N/A'),
+            'status' => $status?->value ?? (string) ($flight->status ?? 'unknown'),
+            'status_label' => $status?->label() ?? str((string) ($flight->status ?? 'unknown'))->headline()->toString(),
+            'status_color' => $status?->filamentColor() ?? 'gray',
+            'view_url' => route('flights.view', $flight),
+            'can_open' => $canOpen,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $preview
+     */
+    private function storeScannedFlightPlanPreview(Request $request, array $preview): string
+    {
+        $previewToken = (string) Str::uuid();
+        $previews = $request->session()->get('scanned_flight_plan_previews', []);
+
+        if (! is_array($previews)) {
+            $previews = [];
+        }
+
+        $previews[$previewToken] = $preview;
+
+        if (count($previews) > 10) {
+            $previews = array_slice($previews, -10, null, true);
+        }
+
+        $request->session()->put('scanned_flight_plan_previews', $previews);
+
+        return $previewToken;
+    }
+
+    private function qrPayloads(): FlightPlanQrPayloadService
+    {
+        return app(FlightPlanQrPayloadService::class);
+    }
+
+    private function formatFlightDateForLookup(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return 'N/A';
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->format('Y-m-d');
+        }
+
+        try {
+            return Carbon::parse((string) $value)->format('Y-m-d');
+        } catch (\Throwable) {
+            return (string) $value;
+        }
     }
 
     private function ensureReviewerAccess(): void

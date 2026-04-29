@@ -269,7 +269,7 @@
                     <p class="echo-import-kicker echo-label">Echo ATC Tools</p>
                     <h2 class="echo-display" style="margin: 0.5rem 0 0;">Import / Scan QR</h2>
                     <p class="echo-import-subtitle echo-body">
-                        Scan a live QR code from a device camera or upload an image file, then load the matching Echo flight plan record for review.
+                        Scan a live QR code from a device camera or upload an image file, then verify the signed Echo payload and load the flight plan record for review.
                     </p>
                 </div>
             </div>
@@ -339,7 +339,7 @@
                             wire:model.live.debounce.300ms="payload"
                             rows="4"
                             autofocus
-                            placeholder="ECHOFPL|1|DB|123"
+                            placeholder="ECHOFPL|2|OFFLINE|K1|S1|123|20260428T143000Z|..."
                             class="echo-payload-textarea echo-mono"
                         ></textarea>
                         @error('payload')
@@ -410,6 +410,8 @@
 
                         <a
                             href="{{ $matchedFlight['view_url'] }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
                             class="echo-button echo-button-primary"
                             style="margin-top: 1rem;"
                         >
@@ -436,7 +438,7 @@
 
                         <div class="echo-workflow-step">
                             <div class="echo-label">2. Load the Echo record</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">The page validates the payload format and locates the matching flight plan by database ID.</div>
+                            <div class="echo-help" style="margin-top: 0.3rem;">The page verifies the signature, then uses the embedded full record even if the live database copy is unavailable.</div>
                         </div>
 
                         <div class="echo-workflow-step">

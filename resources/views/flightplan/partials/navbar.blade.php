@@ -19,9 +19,9 @@
         [
             'key' => 'scan-upload-qr',
             'label' => 'Scan / Upload QR',
-            'href' => null,
+            'href' => route('flightplan.scan-qr'),
             'icon' => 'qr',
-            'disabled' => true,
+            'disabled' => false,
         ],
     ];
 

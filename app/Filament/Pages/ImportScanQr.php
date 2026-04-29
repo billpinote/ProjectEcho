@@ -5,12 +5,14 @@ namespace App\Filament\Pages;
 use App\Enums\FlightPlanStatus;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
+use App\Services\FlightPlanQrPayloadService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class ImportScanQr extends Page
 {
@@ -39,7 +41,7 @@ class ImportScanQr extends Page
     protected function rules(): array
     {
         return [
-            'payload' => ['required', 'string', 'max:255'],
+            'payload' => ['required', 'string', 'max:20000'],
         ];
     }
 
@@ -58,9 +60,9 @@ class ImportScanQr extends Page
 
     public function updatedPayload(string $value): void
     {
-        $normalizedPayload = strtoupper(trim($value));
+        $normalizedPayload = trim($value);
 
-        if (! preg_match('/^ECHOFPL\|1\|DB\|\d+$/', $normalizedPayload)) {
+        if (! $this->qrPayloads()->looksLikeSupportedPayload($normalizedPayload)) {
             return;
         }
 
@@ -90,17 +92,16 @@ class ImportScanQr extends Page
 
     private function lookupPayload(string $payload, bool $notifyOnSuccess, bool $notifyOnFailure): void
     {
-        $normalizedPayload = strtoupper(trim($payload));
-        $parts = explode('|', $normalizedPayload);
+        $parsedPayload = $this->qrPayloads()->parsePayload($payload);
 
-        if (count($parts) !== 4 || $parts[0] !== 'ECHOFPL' || $parts[1] !== '1' || $parts[2] !== 'DB' || ! ctype_digit($parts[3])) {
+        if ($parsedPayload === null) {
             $this->matchedFlight = null;
             $this->lastProcessedPayload = null;
 
             if ($notifyOnFailure) {
                 Notification::make()
                     ->title('Invalid QR payload')
-                    ->body('Expected format: ECHOFPL|1|DB|{flight_id}')
+                    ->body('Expected a valid Echo QR payload. V2 signed offline payloads and legacy V1 database payloads are supported.')
                     ->danger()
                     ->send();
             }
@@ -108,11 +109,61 @@ class ImportScanQr extends Page
             return;
         }
 
-        $flight = Flight::find((int) $parts[3]);
+        if (($parsedPayload['format'] ?? null) === 'v2-offline') {
+            $snapshot = $parsedPayload['snapshot'] ?? null;
+
+            if (! is_array($snapshot)) {
+                $this->matchedFlight = null;
+                $this->lastProcessedPayload = null;
+
+                return;
+            }
+
+            $flight = Flight::find((int) $parsedPayload['flight_id']);
+            $status = $flight?->status instanceof FlightPlanStatus
+                ? $flight->status
+                : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
+            $previewToken = $this->storeScannedFlightPlanPreview([
+                'payload' => $parsedPayload['normalized_payload'],
+                'snapshot' => $snapshot,
+                'flight_id' => $parsedPayload['flight_id'],
+                'issued_at' => $parsedPayload['issued_at'],
+                'key_id' => $parsedPayload['key_id'],
+                'schema_id' => $parsedPayload['schema_id'],
+            ]);
+
+            $this->payload = $parsedPayload['normalized_payload'];
+            $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
+            $this->matchedFlight = [
+                'id' => (int) $parsedPayload['flight_id'],
+                'aircraft_identification' => (string) ($snapshot['aircraft_identification'] ?? 'N/A'),
+                'date_of_flight' => $this->formatFlightDate($snapshot['date_of_flight'] ?? null),
+                'proposed_time' => UtcFourDigitTime::formatForDisplay($snapshot['proposed_time'] ?? null) ?? 'N/A',
+                'departure_aerodrome' => (string) ($snapshot['departure_aerodrome'] ?? 'N/A'),
+                'destination_aerodrome' => (string) ($snapshot['destination_aerodrome'] ?? 'N/A'),
+                'status' => $status?->value ?? 'signed_offline_payload',
+                'status_label' => $status?->label() ?? 'Signed Offline Payload',
+                'status_color' => $status?->filamentColor() ?? 'info',
+                'view_url' => $flight
+                    ? route('flights.view', $flight)
+                    : route('flightplan.scan-qr.preview', ['token' => $previewToken]),
+            ];
+
+            if ($notifyOnSuccess) {
+                Notification::make()
+                    ->title('Signed flight plan loaded')
+                    ->success()
+                    ->send();
+            }
+
+            return;
+        }
+
+        $flight = Flight::find((int) $parsedPayload['flight_id']);
 
         if (! $flight) {
             $this->matchedFlight = null;
-            $this->lastProcessedPayload = $normalizedPayload;
+            $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
 
             if ($notifyOnFailure) {
                 Notification::make()
@@ -125,8 +176,8 @@ class ImportScanQr extends Page
             return;
         }
 
-        $this->payload = $normalizedPayload;
-        $this->lastProcessedPayload = $normalizedPayload;
+        $this->payload = $parsedPayload['normalized_payload'];
+        $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
         $status = $flight->status instanceof FlightPlanStatus ? $flight->status : FlightPlanStatus::tryFrom((string) $flight->status);
 
         $this->matchedFlight = [
@@ -148,5 +199,33 @@ class ImportScanQr extends Page
                 ->success()
                 ->send();
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $preview
+     */
+    private function storeScannedFlightPlanPreview(array $preview): string
+    {
+        $previewToken = (string) Str::uuid();
+        $previews = session()->get('scanned_flight_plan_previews', []);
+
+        if (! is_array($previews)) {
+            $previews = [];
+        }
+
+        $previews[$previewToken] = $preview;
+
+        if (count($previews) > 10) {
+            $previews = array_slice($previews, -10, null, true);
+        }
+
+        session()->put('scanned_flight_plan_previews', $previews);
+
+        return $previewToken;
+    }
+
+    private function qrPayloads(): FlightPlanQrPayloadService
+    {
+        return app(FlightPlanQrPayloadService::class);
     }
 }
