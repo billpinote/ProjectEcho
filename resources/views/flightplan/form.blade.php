@@ -15,15 +15,7 @@
 <body class="bg-gray-100">
     @include('flightplan.partials.navbar', ['activeNav' => 'flight-plan'])
 
-    <div class="flightplan-zoom-controls" aria-label="Form zoom controls">
-        <button type="button" class="flightplan-zoom-button" data-flightplan-zoom-in aria-label="Zoom in">
-            +
-        </button>
-        <div class="flightplan-zoom-readout" data-flightplan-zoom-readout>100%</div>
-        <button type="button" class="flightplan-zoom-button" data-flightplan-zoom-out aria-label="Zoom out">
-            -
-        </button>
-    </div>
+    
 
     <div class="flightplan-card-scroll">
         <div class="flightplan-zoom-stage" data-flightplan-zoom-stage>
