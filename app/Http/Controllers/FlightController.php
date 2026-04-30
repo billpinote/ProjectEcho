@@ -57,6 +57,7 @@ class FlightController extends Controller
 
         return view('flightplan.form', [
             'aircraftWtcMap' => $aircraftWtcMap,
+            'prefilled' => [],
         ]);
     }
 
@@ -99,6 +100,38 @@ class FlightController extends Controller
             'payload' => trim((string) $validated['payload']),
             'matchedFlight' => $matchedFlight,
         ]);
+    }
+
+    /**
+     * Show the flight plan form prefilled with QR payload data for editing.
+     */
+    public function editFromQr(Request $request)
+    {
+        $validated = $request->validate([
+            'payload' => ['required', 'string', 'max:20000'],
+        ], [
+            'payload.required' => 'A QR payload is required.',
+        ]);
+
+        $parsedPayload = $this->qrPayloads()->parsePayload((string) $validated['payload']);
+
+        if ($parsedPayload === null || ($parsedPayload['format'] ?? null) !== 'v2-offline') {
+            return back()->withErrors([
+                'payload' => 'Invalid or unsupported QR payload format. Only signed offline (V2) payloads can be edited.',
+            ]);
+        }
+
+        $snapshot = $parsedPayload['snapshot'] ?? null;
+
+        if (! is_array($snapshot)) {
+            return back()->withErrors([
+                'payload' => 'Unable to decode the QR payload.',
+            ]);
+        }
+
+        return redirect()
+            ->route('flightplan')
+            ->withInput($this->prepareFlightPlanPreviewInput($snapshot));
     }
 
     /**

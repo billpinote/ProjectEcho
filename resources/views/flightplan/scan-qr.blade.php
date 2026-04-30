@@ -47,13 +47,27 @@
                     </div>
                 </div>
 
-                <form action="{{ route('flightplan.scan-qr.lookup') }}" method="POST" class="echo-import-stack" style="margin-top: 1.25rem;">
+                <form id="scan-qr-lookup-form" action="{{ route('flightplan.scan-qr.lookup') }}" method="POST" class="echo-import-stack" style="margin-top: 1.25rem;">
                     @csrf
+
+                    <div class="echo-input-card">
+                        <label for="qr-image-upload" class="echo-field-label echo-title" style="text-transform: none;">Upload QR</label>
+                        <input
+                            id="qr-image-upload"
+                            class="echo-file-input"
+                            type="file"
+                            accept=".png,image/png,image/jpeg,image/jpg,image/webp"
+                        >
+                        <p class="echo-help" style="margin: 0.75rem 0 0;">
+                            Upload a PNG, JPG, or WEBP image that contains the Echo QR code.
+                        </p>
+                        <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
+                    </div>
 
                     <div class="echo-camera-card">
                         <div class="echo-camera-header">
                             <div>
-                                <div class="echo-title">Scan with Webcam</div>
+                                <div class="echo-title">Scan QR</div>
                                 <div class="echo-help" style="margin-top: 0.35rem;">
                                     Allow camera access, then place the QR code inside the frame until it is detected.
                                 </div>
@@ -80,21 +94,7 @@
                         </div>
 
                         <div id="qr-reader"></div>
-                    </div>
-
-                    <div class="echo-input-card">
-                        <label for="qr-image-upload" class="echo-field-label echo-title">Upload QR Image</label>
-                        <input
-                            id="qr-image-upload"
-                            class="echo-file-input"
-                            type="file"
-                            accept=".png,image/png,image/jpeg,image/jpg,image/webp"
-                        >
-                        <p class="echo-help" style="margin: 0.75rem 0 0;">
-                            Upload a PNG, JPG, or WEBP image that contains the Echo QR code.
-                        </p>
-                        <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
-                    </div>
+                    </div>                    
 
                     <div style="display: none;">
                         <label for="payload" class="echo-field-label echo-title">QR Payload</label>
@@ -181,6 +181,19 @@
                                 This flight plan was found, but opening the full record requires the same browser session that created it or an authenticated ATC/admin account.
                             </div>
                         @endif
+
+                            <form
+                                action="{{ route('flightplan.edit-from-qr') }}"
+                                method="POST"
+                                style="margin-top: 1rem; display: inline;"
+                            >
+                                @csrf
+                                <input type="hidden" name="payload" value="{{ $payload }}">
+                                <button type="submit" class="echo-button echo-button-secondary">
+                                    Edit Flight Plan
+                                </button>
+                            </form>
+
                     </section>
                 @else
                     <section id="matched-flight-plan" class="echo-import-empty echo-empty-state">
@@ -216,19 +229,10 @@
     </div>
 
     <script>
-        if (!window.initImportScanQrPage && window.Html5Qrcode) {
+        if (!window.initImportScanQrPage) {
             let importScanQrReader = null;
-
-            const fillQrPayload = (value) => {
-                const payloadInput = document.getElementById('payload');
-
-                if (!payloadInput) {
-                    return;
-                }
-
-                payloadInput.value = value;
-                payloadInput.dispatchEvent(new Event('input', { bubbles: true }));
-            };
+            let importScanQrAutoSubmitTimer = null;
+            let importScanQrIsSubmitting = false;
 
             const getQrPayloadValue = () => {
                 const payloadInput = document.getElementById('payload');
@@ -259,6 +263,48 @@
                 status.style.color = '#475569';
             };
 
+            const submitQrLookup = () => {
+                const lookupForm = document.getElementById('scan-qr-lookup-form');
+
+                if (!lookupForm || !getQrPayloadValue() || importScanQrIsSubmitting) {
+                    return;
+                }
+
+                importScanQrIsSubmitting = true;
+                lookupForm.submit();
+            };
+
+            const queueQrLookupSubmit = (delay = 150) => {
+                if (!getQrPayloadValue()) {
+                    return;
+                }
+
+                if (importScanQrAutoSubmitTimer) {
+                    window.clearTimeout(importScanQrAutoSubmitTimer);
+                }
+
+                importScanQrAutoSubmitTimer = window.setTimeout(() => {
+                    setQrStatus('QR payload detected. Verifying now...', 'muted');
+                    submitQrLookup();
+                }, delay);
+            };
+
+            const fillQrPayload = (value, autoSubmit = true) => {
+                const payloadInput = document.getElementById('payload');
+
+                if (!payloadInput) {
+                    return;
+                }
+
+                payloadInput.value = value;
+                payloadInput.dispatchEvent(new Event('input', { bubbles: true }));
+                payloadInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                if (autoSubmit) {
+                    queueQrLookupSubmit();
+                }
+            };
+
             const stopImportScanQrCamera = async () => {
                 if (!importScanQrReader || !importScanQrReader.isScanning) {
                     return;
@@ -277,16 +323,41 @@
 
                 page.dataset.initialized = 'true';
 
+                const lookupForm = document.getElementById('scan-qr-lookup-form');
+                const payloadInput = document.getElementById('payload');
                 const uploadInput = document.getElementById('qr-image-upload');
                 const startButton = document.getElementById('start-qr-camera');
                 const stopButton = document.getElementById('stop-qr-camera');
                 const scannerRegionId = 'qr-reader';
+
+                lookupForm?.addEventListener('submit', () => {
+                    importScanQrIsSubmitting = true;
+                });
+
+                payloadInput?.addEventListener('input', () => {
+                    if (getQrPayloadValue()) {
+                        queueQrLookupSubmit(250);
+                    }
+                });
+
+                payloadInput?.addEventListener('paste', () => {
+                    window.setTimeout(() => {
+                        if (getQrPayloadValue()) {
+                            queueQrLookupSubmit(100);
+                        }
+                    }, 0);
+                });
 
                 uploadInput?.addEventListener('change', async (event) => {
                     const file = event.target.files?.[0];
 
                     if (!file) {
                         setQrStatus('');
+                        return;
+                    }
+
+                    if (!window.Html5Qrcode) {
+                        setQrStatus('QR decoding library is not available. Reload the page and try again.', 'danger');
                         return;
                     }
 
@@ -297,13 +368,18 @@
                         const decodedText = await fileReader.scanFile(file, true);
 
                         fillQrPayload(decodedText);
-                        setQrStatus('QR payload loaded from image. Submit to continue.', 'success');
+                        setQrStatus('QR payload loaded from image. Verifying now...', 'success');
                     } catch (error) {
                         setQrStatus('Unable to decode that image. Try a clearer QR image or use the webcam scanner.', 'danger');
                     }
                 });
 
                 startButton?.addEventListener('click', async () => {
+                    if (!window.Html5Qrcode) {
+                        setQrStatus('QR scanning library is not available. Reload the page and try again.', 'danger');
+                        return;
+                    }
+
                     try {
                         setQrStatus('Starting camera...', 'muted');
 
@@ -319,7 +395,7 @@
                             },
                             async (decodedText) => {
                                 fillQrPayload(decodedText);
-                                setQrStatus('QR payload captured from camera. Submit to continue.', 'success');
+                                setQrStatus('QR payload captured from camera. Verifying now...', 'success');
                                 await stopImportScanQrCamera();
                             },
                             () => {}
@@ -350,7 +426,6 @@
                         }
                     }
                 });
-
             };
         }
 

@@ -75,6 +75,7 @@ const invertedCheckboxes = document.querySelectorAll('input[type="checkbox"].inv
 const form = document.getElementById("flightplan-form");
 const formStateKey = "flightplan-form-state";
 const hasServerProvidedInput = form?.dataset.hasOldInput === "true";
+const hasPrefilledInput = form?.dataset.hasPrefilledInput === "true";
 
 function syncInvertedCheckboxValue(checkbox) {
     const hiddenInput = checkbox.parentElement?.querySelector(`input[type="hidden"][name="${checkbox.name}"]`);
@@ -113,7 +114,7 @@ invertedCheckboxes.forEach(checkbox => {
 });
 
 // Before form submission, disable the visible checkboxes so they don't send their values
-form.addEventListener("submit", () => {
+form?.addEventListener("submit", () => {
     validateOtherInformationTags();
 
     invertedCheckboxes.forEach(checkbox => {
@@ -206,9 +207,9 @@ function persistFormState() {
     sessionStorage.setItem(formStateKey, JSON.stringify(state));
 }
 
-form.addEventListener("input", persistFormState);
-form.addEventListener("change", persistFormState);
-form.addEventListener("reset", () => {
+form?.addEventListener("input", persistFormState);
+form?.addEventListener("change", persistFormState);
+form?.addEventListener("reset", () => {
     sessionStorage.removeItem(formStateKey);
 });
 
@@ -216,24 +217,26 @@ form.addEventListener("reset", () => {
 const dinghiesCheckbox = document.getElementById("dinghies-checkbox");
 const dinghiesFields = document.querySelectorAll(".dinghies-field");
 
-dinghiesCheckbox.addEventListener("change", () => {
-    const isChecked = dinghiesCheckbox.checked; // true = X mark = disabled, false = unchecked = enabled
-    dinghiesFields.forEach(field => {
-        if (isChecked) {
-            // When checked (X mark), disable fields and remove required
-            field.disabled = true;
-            field.removeAttribute("required");
-            field.value = "";
-        } else {
-            // When unchecked, enable fields and make required
-            field.disabled = false;
-            field.setAttribute("required", "required");
-        }
+if (dinghiesCheckbox) {
+    dinghiesCheckbox.addEventListener("change", () => {
+        const isChecked = dinghiesCheckbox.checked; // true = X mark = disabled, false = unchecked = enabled
+        dinghiesFields.forEach(field => {
+            if (isChecked) {
+                // When checked (X mark), disable fields and remove required
+                field.disabled = true;
+                field.removeAttribute("required");
+                field.value = "";
+            } else {
+                // When unchecked, enable fields and make required
+                field.disabled = false;
+                field.setAttribute("required", "required");
+            }
+        });
     });
-});
 
-// Initialize dinghies fields from the server-rendered checkbox state.
-dinghiesCheckbox.dispatchEvent(new Event("change", { bubbles: true }));
+    // Initialize dinghies fields from the server-rendered checkbox state.
+    dinghiesCheckbox.dispatchEvent(new Event("change", { bubbles: true }));
+}
 
 const departureAerodromeInput = form.querySelector('input[name="departure_aerodrome"]');
 const destinationAerodromeInput = form.querySelector('input[name="destination_aerodrome"]');
@@ -482,7 +485,9 @@ const authRepIdInput = document.querySelector('input[name="authorized_representa
 const authRepExpiryInput = document.querySelector('input[name="authorized_representative_expiry_date"]');
 
 const setAuthorizedRepState = isEnabled => {
-    authRepEnabled.value = isEnabled ? "1" : "0";
+    if (authRepEnabled) {
+        authRepEnabled.value = isEnabled ? "1" : "0";
+    }
     authRepPanel.classList.toggle("collapsible-disabled", !isEnabled);
     authRepContent.classList.toggle("hidden", !isEnabled);
 
@@ -508,12 +513,14 @@ const setAuthorizedRepState = isEnabled => {
     }
 };
 
-setAuthorizedRepState(authRepCheckbox.checked);
+if (authRepCheckbox && authRepPanel && authRepContent) {
+    setAuthorizedRepState(!authRepCheckbox.checked);
 
-authRepCheckbox.addEventListener("change", () => {
-    setAuthorizedRepState(authRepCheckbox.checked);
-    syncCertificationLines();
-});
+    authRepCheckbox.addEventListener("change", () => {
+        setAuthorizedRepState(!authRepCheckbox.checked);
+        syncCertificationLines();
+    });
+}
 
 // Auto-copy data into certification signature lines
 const pilotNameInput = document.querySelector('input[name="pilot_in_command"]');
@@ -566,12 +573,12 @@ syncCertificationLines();
 const navigationEntry = performance.getEntriesByType("navigation")[0];
 const isReloadOrBackForward = navigationEntry && ["reload", "back_forward"].includes(navigationEntry.type);
 
-if (isReloadOrBackForward && !hasServerProvidedInput) {
+if (isReloadOrBackForward && !hasServerProvidedInput && !hasPrefilledInput) {
     resetInvertedCheckboxes();
 }
 
 window.addEventListener("pageshow", event => {
-    if (event.persisted && !hasServerProvidedInput) {
+    if (event.persisted && !hasServerProvidedInput && !hasPrefilledInput) {
         resetInvertedCheckboxes();
     }
 });
@@ -598,7 +605,7 @@ if (successAlert) {
     }, 12000);
 }
 
-if (successAlert || discardAlert || hasServerProvidedInput) {
+if (successAlert || discardAlert || hasServerProvidedInput || hasPrefilledInput) {
     sessionStorage.removeItem(formStateKey);
 } else {
     restoreFormState();
