@@ -319,7 +319,7 @@ class FlightController extends Controller
                 ->withErrors(['payload' => 'That scanned flight-plan preview is no longer available in this browser session.']);
         }
 
-        $flight = new Flight($preview['snapshot']);
+        $flight = new Flight($this->preparePreviewFlightAttributes($preview['snapshot']));
 
         return view('flightplan.pdf', [
             'flight' => $flight,
@@ -404,6 +404,66 @@ class FlightController extends Controller
         }
 
         return $flightData;
+    }
+
+    /**
+     * Prepare preview-only attributes that are normally derived during form submission.
+     *
+     * @param  array<string, mixed>  $flightData
+     * @return array<string, mixed>
+     */
+    private function preparePreviewFlightAttributes(array $flightData): array
+    {
+        $otherInformation = (string) ($flightData['other_information'] ?? '');
+
+        $tagMap = [
+            'other_info_dof' => 'DOF',
+            'other_info_rmk' => 'RMK',
+            'other_info_typ' => 'TYP',
+            'other_info_dep' => 'DEP',
+            'other_info_route' => 'RTE',
+            'other_info_dest' => 'DEST',
+            'other_info_altn_1' => 'ALTN',
+            'other_info_altn_2' => 'ALTN2',
+            'other_info_pbn' => 'PBN',
+            'other_info_reg' => 'REG',
+            'other_info_opr' => 'OPR',
+        ];
+
+        foreach ($tagMap as $field => $tag) {
+            if (! array_key_exists($field, $flightData) || blank($flightData[$field])) {
+                $flightData[$field] = $this->extractOtherInfoTagValue($tag, $otherInformation);
+            }
+        }
+
+        return $flightData;
+    }
+
+    private function extractOtherInfoTagValue(string $tag, string $text): ?string
+    {
+        if ($text === '') {
+            return null;
+        }
+
+        $tagWithSlash = $tag.'/';
+        $tagPos = stripos($text, $tagWithSlash);
+
+        if ($tagPos === false) {
+            return null;
+        }
+
+        $startPos = $tagPos + strlen($tagWithSlash);
+        $remainingText = substr($text, $startPos);
+
+        if (preg_match('/\s+[A-Z0-9]{2,5}\//i', $remainingText, $matches, PREG_OFFSET_CAPTURE)) {
+            $value = substr($remainingText, 0, $matches[0][1]);
+        } else {
+            $value = $remainingText;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
     }
 
     /**

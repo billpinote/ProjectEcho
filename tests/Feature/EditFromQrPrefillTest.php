@@ -7,6 +7,7 @@ use App\Services\FlightPlanQrPayloadService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class EditFromQrPrefillTest extends TestCase
@@ -120,5 +121,37 @@ class EditFromQrPrefillTest extends TestCase
             ->assertDontSee('name="survival_equipment_desert" value="0" class="inverted-checkbox" checked', false)
             ->assertSee('name="jackets_fluores" value="0" class="inverted-checkbox" checked', false)
             ->assertDontSee('name="jackets_light" value="0" class="inverted-checkbox" checked', false);
+    }
+
+    public function test_scanned_preview_shows_other_information_from_snapshot(): void
+    {
+        $token = (string) Str::uuid();
+
+        $snapshot = [
+            'aircraft_identification' => 'RPC9999',
+            'flight_rules' => 'V',
+            'type_of_flight' => 'G',
+            'departure_aerodrome' => 'RPLL',
+            'destination_aerodrome' => 'RPLC',
+            'date_of_flight' => '2026-04-29',
+            'proposed_time' => '14:30',
+            'other_information' => 'DOF/20260429 RMK/TEST REMARK DEP/MANILA BAY',
+        ];
+
+        $response = $this
+            ->withSession([
+                'scanned_flight_plan_previews' => [
+                    $token => [
+                        'payload' => 'test-payload',
+                        'snapshot' => $snapshot,
+                    ],
+                ],
+            ])
+            ->get(route('flightplan.scan-qr.preview', ['token' => $token]));
+
+        $response
+            ->assertOk()
+            ->assertSee('RMK/TEST REMARK', false)
+            ->assertSee('DEP/MANILA BAY', false);
     }
 }
