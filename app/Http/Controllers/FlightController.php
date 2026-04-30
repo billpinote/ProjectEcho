@@ -319,7 +319,17 @@ class FlightController extends Controller
                 ->withErrors(['payload' => 'That scanned flight-plan preview is no longer available in this browser session.']);
         }
 
-        $flight = new Flight($this->preparePreviewFlightAttributes($preview['snapshot']));
+        // Try to load the actual flight record if it exists in the database
+        // This ensures CAAP acceptance details are shown for accepted flights
+        $flight = null;
+        if (isset($preview['flight_id']) && is_numeric($preview['flight_id'])) {
+            $flight = Flight::find((int) $preview['flight_id']);
+        }
+
+        // Fall back to creating a flight from the snapshot data if no database record exists
+        if (! $flight) {
+            $flight = new Flight($this->preparePreviewFlightAttributes($preview['snapshot']));
+        }
 
         return view('flightplan.pdf', [
             'flight' => $flight,

@@ -27,6 +27,7 @@
             font-size: 10px;
             color: #000;
             line-height: 1.0;
+            -webkit-text-size-adjust: 100%;
         }
 
         /* Header */
