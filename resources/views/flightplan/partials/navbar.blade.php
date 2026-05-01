@@ -1,5 +1,6 @@
 @php
     $activeNav = $activeNav ?? 'flight-plan';
+    $showMobileViewToggle = $showMobileViewToggle ?? false;
 
     $navItems = [
         [
@@ -58,12 +59,30 @@
                 <span class="flightplan-nav__title">Project Echo</span>
             </div>
 
-            <button type="button" class="flightplan-nav__toggle" data-flightplan-nav-toggle aria-expanded="false" aria-controls="flightplan-nav-mobile">
-                <span class="sr-only">Toggle navigation</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                    <path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16" />
-                </svg>
-            </button>
+            <div class="flightplan-nav__mobile-actions">
+                @if ($showMobileViewToggle)
+                    <label class="flightplan-view-switch" for="flightplan-mobile-toggle">
+                        <span class="flightplan-view-switch__label">Mobile</span>
+                        <input
+                            id="flightplan-mobile-toggle"
+                            type="checkbox"
+                            class="flightplan-view-switch__input"
+                            data-flightplan-mobile-toggle
+                            aria-label="Toggle mobile form view"
+                        >
+                        <span class="flightplan-view-switch__track" aria-hidden="true">
+                            <span class="flightplan-view-switch__thumb"></span>
+                        </span>
+                    </label>
+                @endif
+
+                <button type="button" class="flightplan-nav__toggle" data-flightplan-nav-toggle aria-expanded="false" aria-controls="flightplan-nav-mobile">
+                    <span class="sr-only">Toggle navigation</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" d="M4 7h16M4 12h16M4 17h16" />
+                    </svg>
+                </button>
+            </div>
 
             <div class="flightplan-nav__menu">
                 @foreach ($navItems as $item)
