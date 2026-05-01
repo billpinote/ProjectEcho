@@ -3,6 +3,7 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
     flatpickr(input, {
         dateFormat: "Y-m-d",
         allowInput: true,
+        disableMobile: true,
         defaultDate: input.value || null,
         minDate: input.min || null
     });
