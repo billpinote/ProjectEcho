@@ -12,8 +12,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="{{ asset('css/flightplan.css') }}">
 </head>
-<body class="bg-gray-100">
-    @include('flightplan.partials.navbar', ['activeNav' => 'flight-plan'])
+<body class="bg-gray-100" data-flightplan-page="form">
+    @include('flightplan.partials.navbar', ['activeNav' => 'flight-plan', 'showMobileViewToggle' => true])
 
     
 

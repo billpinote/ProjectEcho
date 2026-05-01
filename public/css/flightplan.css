@@ -482,6 +482,73 @@ body {
     height: 1.25rem;
 }
 
+.flightplan-nav__mobile-actions {
+    display: none;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.flightplan-view-switch {
+    display: none;
+    align-items: center;
+    gap: 0.55rem;
+    color: #0f5f4a;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.flightplan-view-switch__label {
+    line-height: 1;
+}
+
+.flightplan-view-switch__input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.flightplan-view-switch__track {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    width: 3.55rem;
+    height: 2rem;
+    padding: 0.2rem;
+    border: 1px solid #d9e2da;
+    border-radius: 9999px;
+    background: rgba(255, 253, 247, 0.96);
+    box-shadow: 0 8px 18px rgba(10, 63, 50, 0.08);
+    transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    box-sizing: border-box;
+}
+
+.flightplan-view-switch__thumb {
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 9999px;
+    background: #0f5f4a;
+    box-shadow: 0 4px 10px rgba(10, 63, 50, 0.18);
+    transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.flightplan-view-switch:hover .flightplan-view-switch__track,
+.flightplan-view-switch__input:focus-visible + .flightplan-view-switch__track {
+    border-color: rgba(15, 95, 74, 0.24);
+    box-shadow: 0 10px 22px rgba(10, 63, 50, 0.12);
+}
+
+.flightplan-view-switch__input:checked + .flightplan-view-switch__track {
+    background: rgba(15, 95, 74, 0.12);
+    border-color: rgba(15, 95, 74, 0.3);
+}
+
+.flightplan-view-switch__input:checked + .flightplan-view-switch__track .flightplan-view-switch__thumb {
+    transform: translateX(1.5rem);
+    background: #0a3f32;
+}
+
 .echo-status-badge {
     display: inline-flex;
     align-items: center;
@@ -763,6 +830,88 @@ body {
     color: #68726b;
 }
 
+body.flightplan-mobile-mode .flightplan-card-scroll {
+    overflow-x: visible;
+    padding: 0 0.75rem 1.75rem;
+}
+
+body.flightplan-mobile-mode .flightplan-zoom-stage {
+    width: 100%;
+    height: auto !important;
+    transform: none !important;
+}
+
+body.flightplan-mobile-mode .flightplan-card {
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 1.15rem !important;
+    overflow: visible;
+    border-radius: 1.2rem !important;
+}
+
+body.flightplan-mobile-mode .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.35rem;
+}
+
+body.flightplan-mobile-mode .col-1 {
+    grid-column: span 1;
+}
+
+body.flightplan-mobile-mode .col-2,
+body.flightplan-mobile-mode .col-3,
+body.flightplan-mobile-mode .col-4,
+body.flightplan-mobile-mode .col-5,
+body.flightplan-mobile-mode .col-6,
+body.flightplan-mobile-mode .col-7,
+body.flightplan-mobile-mode .col-8,
+body.flightplan-mobile-mode .form-grid > h2 {
+    grid-column: 1 / -1;
+}
+
+body.flightplan-mobile-mode .form-grid > h2 {
+    font-size: 1.75rem;
+    margin-bottom: 0.2rem;
+}
+
+body.flightplan-mobile-mode .flightplan-card input[type="text"],
+body.flightplan-mobile-mode .flightplan-card input[type="date"],
+body.flightplan-mobile-mode .flightplan-card input[type="time"],
+body.flightplan-mobile-mode .flightplan-card textarea,
+body.flightplan-mobile-mode .flightplan-card select {
+    width: 100% !important;
+    font-size: 0.95rem;
+}
+
+body.flightplan-mobile-mode .flightplan-card textarea {
+    min-height: 8rem;
+}
+
+body.flightplan-mobile-mode .flightplan-card .flex.gap-4 {
+    flex-wrap: wrap;
+    row-gap: 0.75rem;
+}
+
+body.flightplan-mobile-mode .dispatch-trigger {
+    align-items: flex-start;
+}
+
+body.flightplan-mobile-mode .cert-signature-grid {
+    grid-template-columns: 1fr;
+    gap: 1.1rem;
+    margin-top: 2.5rem;
+}
+
+body.flightplan-mobile-mode .cert-signature-or {
+    justify-self: center;
+    padding-bottom: 0;
+}
+
+body.flightplan-mobile-mode .flightplan-zoom-controls {
+    display: none;
+}
+
 @media (max-width: 900px) {
     .flightplan-import-page,
     .echo-import-hero-grid,
@@ -789,10 +938,15 @@ body {
         width: 3.25rem;
     }
 
+    .flightplan-nav__mobile-actions {
+        display: flex;
+    }
+
     .flightplan-nav__menu {
         display: none;
     }
 
+    .flightplan-view-switch,
     .flightplan-nav__toggle {
         display: inline-flex;
     }
@@ -805,5 +959,17 @@ body {
     .flightplan-nav__mobile .flightplan-nav__button {
         width: 100%;
         justify-content: flex-start;
+    }
+
+    body.flightplan-mobile-mode .flightplan-card {
+        padding: 1rem !important;
+    }
+
+    body.flightplan-mobile-mode .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    body.flightplan-mobile-mode .col-1 {
+        grid-column: 1 / -1;
     }
 }

@@ -3,10 +3,49 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
     flatpickr(input, {
         dateFormat: "Y-m-d",
         allowInput: true,
+        disableMobile: true,
         defaultDate: input.value || null,
         minDate: input.min || null
     });
 });
+
+const body = document.body;
+const mobileViewToggleButtons = document.querySelectorAll("[data-flightplan-mobile-toggle]");
+const mobileViewStorageKey = "flightplan-form-mobile-view";
+const supportsMobileViewToggle = body?.dataset.flightplanPage === "form" && mobileViewToggleButtons.length > 0;
+
+function isMobileViewEnabled() {
+    return supportsMobileViewToggle && window.localStorage.getItem(mobileViewStorageKey) === "true";
+}
+
+function syncMobileViewToggleButtons(isEnabled) {
+    mobileViewToggleButtons.forEach(button => {
+        button.checked = isEnabled;
+        button.setAttribute("aria-checked", isEnabled ? "true" : "false");
+    });
+}
+
+function applyMobileViewMode(isEnabled) {
+    if (!supportsMobileViewToggle) {
+        return;
+    }
+
+    body.classList.toggle("flightplan-mobile-mode", isEnabled);
+    syncMobileViewToggleButtons(isEnabled);
+}
+
+if (supportsMobileViewToggle) {
+    applyMobileViewMode(isMobileViewEnabled());
+
+    mobileViewToggleButtons.forEach(button => {
+        button.addEventListener("change", () => {
+            const nextState = button.checked;
+            window.localStorage.setItem(mobileViewStorageKey, String(nextState));
+            applyMobileViewMode(nextState);
+            window.dispatchEvent(new Event("resize"));
+        });
+    });
+}
 
 const zoomStage = document.querySelector("[data-flightplan-zoom-stage]");
 const zoomScrollContainer = document.querySelector(".flightplan-card-scroll");
@@ -37,6 +76,13 @@ if (zoomStage && zoomScrollContainer && zoomReadout && zoomInButton && zoomOutBu
     };
 
     const syncZoomLayout = scale => {
+        if (body.classList.contains("flightplan-mobile-mode")) {
+            zoomStage.style.transform = "";
+            zoomStage.style.height = "";
+            zoomReadout.textContent = "Auto";
+            return;
+        }
+
         zoomStage.style.transform = `scale(${scale})`;
         zoomStage.style.height = `${measureZoomHeight(scale)}px`;
         zoomReadout.textContent = `${Math.round(scale * 100)}%`;
