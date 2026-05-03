@@ -15,10 +15,8 @@
 <body class="bg-gray-100">
     @include('flightplan.partials.navbar', ['activeNav' => 'flight-plan'])
 
-    
-
     <div class="flightplan-card-scroll">
-        <div class="flightplan-zoom-stage" data-flightplan-zoom-stage>
+        <div class="flightplan-zoom-stage">
             <div class="flightplan-card bg-white rounded-lg shadow-lg mx-8 p-8" style="min-width: 1400px;">
 
         @php

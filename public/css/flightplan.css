@@ -201,8 +201,8 @@ body {
 
 .flightplan-card {
     display: block;
-    max-width: 100%;        /* keeps it within parent width */
-    overflow-x: hidden;     /* hides horizontal overflow */
+    max-width: 100%;
+    overflow-x: hidden;
     background: #fffdf7 !important;
     border: 1px solid #d9e2da;
     box-shadow: 0 18px 38px rgba(10, 63, 50, 0.08) !important;
@@ -271,57 +271,6 @@ body {
     padding: 0;
 }
 
-.flightplan-zoom-controls {
-    position: fixed;
-    left: 0.85rem;
-    top: 50vh;
-    z-index: 45;
-    display: grid;
-    gap: 0.45rem;
-    transform: translateY(-50%);
-}
-
-.flightplan-zoom-button,
-.flightplan-zoom-readout {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 3rem;
-    min-height: 3rem;
-    border: 1px solid #d9e2da;
-    border-radius: 1rem;
-    background: rgba(255, 253, 247, 0.94);
-    color: #0f5f4a;
-    box-shadow: 0 12px 28px rgba(10, 63, 50, 0.12);
-    backdrop-filter: blur(8px);
-}
-
-.flightplan-zoom-button {
-    font-size: 1.35rem;
-    font-weight: 700;
-    line-height: 1;
-    cursor: pointer;
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease;
-}
-
-.flightplan-zoom-button:hover,
-.flightplan-zoom-button:focus-visible {
-    background: rgba(15, 95, 74, 0.08);
-    border-color: rgba(15, 95, 74, 0.24);
-    color: #0a3f32;
-    transform: translateY(-1px);
-}
-
-.flightplan-zoom-readout {
-    width: 3.5rem;
-    min-height: 2.4rem;
-    margin-inline-start: -0.25rem;
-    font-size: 0.74rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: #162018;
-}
-
 .flightplan-card-scroll {
     width: 100%;
     overflow-x: auto;
@@ -331,8 +280,7 @@ body {
 }
 
 .flightplan-zoom-stage {
-    width: 100%;
-    transform-origin: top left;
+    width: max-content;
 }
 
 .flightplan-nav {
@@ -769,24 +717,6 @@ body {
     .echo-import-layout,
     .echo-summary-grid {
         grid-template-columns: 1fr;
-    }
-
-    .flightplan-zoom-controls {
-        left: 0.6rem;
-        top: auto;
-        bottom: 1rem;
-        transform: none;
-    }
-
-    .flightplan-zoom-button,
-    .flightplan-zoom-readout {
-        width: 2.8rem;
-        min-height: 2.8rem;
-        border-radius: 0.9rem;
-    }
-
-    .flightplan-zoom-readout {
-        width: 3.25rem;
     }
 
     .flightplan-nav__menu {

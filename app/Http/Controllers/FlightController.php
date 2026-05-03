@@ -319,7 +319,15 @@ class FlightController extends Controller
                 ->withErrors(['payload' => 'That scanned flight-plan preview is no longer available in this browser session.']);
         }
 
-        $flight = new Flight($this->preparePreviewFlightAttributes($preview['snapshot']));
+        $flight = null;
+
+        if (isset($preview['flight_id']) && is_numeric($preview['flight_id'])) {
+            $flight = Flight::find((int) $preview['flight_id']);
+        }
+
+        if (! $flight) {
+            $flight = new Flight($this->preparePreviewFlightAttributes($preview['snapshot']));
+        }
 
         return view('flightplan.pdf', [
             'flight' => $flight,

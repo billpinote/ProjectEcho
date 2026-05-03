@@ -3,65 +3,11 @@ document.querySelectorAll('input[type="date"]').forEach(input => {
     flatpickr(input, {
         dateFormat: "Y-m-d",
         allowInput: true,
+        disableMobile: true,
         defaultDate: input.value || null,
         minDate: input.min || null
     });
 });
-
-const zoomStage = document.querySelector("[data-flightplan-zoom-stage]");
-const zoomScrollContainer = document.querySelector(".flightplan-card-scroll");
-const zoomReadout = document.querySelector("[data-flightplan-zoom-readout]");
-const zoomInButton = document.querySelector("[data-flightplan-zoom-in]");
-const zoomOutButton = document.querySelector("[data-flightplan-zoom-out]");
-const zoomStorageKey = "flightplan-form-zoom";
-
-if (zoomStage && zoomScrollContainer && zoomReadout && zoomInButton && zoomOutButton) {
-    const MIN_ZOOM = 0.25;
-    const MAX_ZOOM = 1.25;
-    const STEP = 0.1;
-
-    const clampZoom = value => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
-
-    const measureZoomHeight = scale => {
-        const card = zoomStage.firstElementChild;
-
-        if (!card) {
-            return 0;
-        }
-
-        const cardHeight = card.offsetHeight;
-        const marginBottom = parseFloat(window.getComputedStyle(card).marginBottom || "0");
-        const marginTop = parseFloat(window.getComputedStyle(card).marginTop || "0");
-
-        return (cardHeight + marginTop + marginBottom) * scale;
-    };
-
-    const syncZoomLayout = scale => {
-        zoomStage.style.transform = `scale(${scale})`;
-        zoomStage.style.height = `${measureZoomHeight(scale)}px`;
-        zoomReadout.textContent = `${Math.round(scale * 100)}%`;
-        window.localStorage.setItem(zoomStorageKey, String(scale));
-    };
-
-    const savedZoom = Number.parseFloat(window.localStorage.getItem(zoomStorageKey) || "1");
-    let currentZoom = clampZoom(Number.isFinite(savedZoom) ? savedZoom : 1);
-
-    syncZoomLayout(currentZoom);
-
-    zoomInButton.addEventListener("click", () => {
-        currentZoom = clampZoom(Number((currentZoom + STEP).toFixed(2)));
-        syncZoomLayout(currentZoom);
-    });
-
-    zoomOutButton.addEventListener("click", () => {
-        currentZoom = clampZoom(Number((currentZoom - STEP).toFixed(2)));
-        syncZoomLayout(currentZoom);
-    });
-
-    window.addEventListener("resize", () => {
-        syncZoomLayout(currentZoom);
-    });
-}
 
 // Keep time fields as plain 4-digit inputs on the form while the backend stores HH:mm.
 document.querySelectorAll('.plain-time-input').forEach(input => {
