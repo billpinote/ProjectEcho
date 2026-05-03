@@ -375,9 +375,9 @@
                 </form>
             </section>
 
-            <div class="echo-import-stack">                
+            <div class="echo-import-stack">
                 @if($matchedFlight)
-                    <section class="echo-import-summary">
+                    <section id="matched-flight-plan" class="echo-import-summary">
                         <div class="echo-summary-header">
                             <div>
                                 <div class="echo-label" style="color: var(--color-echo-primary);">Matched Flight Plan</div>
@@ -453,7 +453,55 @@
 
     @vite('resources/js/app.js')
     <script>
+        const scrollToMatchedFlight = () => {
+            setTimeout(() => {
+                const matchedFlightPanel = document.getElementById('matched-flight-plan');
+
+                console.log('Scroll triggered', matchedFlightPanel);
+
+                if (!matchedFlightPanel || !matchedFlightPanel.classList.contains('echo-import-summary')) {
+                    console.log('Element not found or wrong class');
+                    return;
+                }
+
+                console.log('Found matched flight panel, scrolling...');
+
+                // Try direct scrollIntoView
+                try {
+                    matchedFlightPanel.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center',
+                    });
+                } catch (e) {
+                    console.log('scrollIntoView failed:', e);
+                }
+
+                // Scroll window to element position
+                const rect = matchedFlightPanel.getBoundingClientRect();
+                const absoluteTop = rect.top + window.scrollY;
+                window.scrollTo({
+                    top: absoluteTop - 100,
+                    behavior: 'smooth',
+                });
+
+                // Also check for parent scrollable containers
+                let parent = matchedFlightPanel.parentElement;
+                while (parent) {
+                    const style = window.getComputedStyle(parent);
+                    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+                        console.log('Found scrollable parent:', parent);
+                        parent.scrollTop = matchedFlightPanel.offsetTop - 100;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+            }, 300);
+        };
+
         window.initImportScanQrPage?.();
         window.setTimeout(() => window.initImportScanQrPage?.(), 250);
+        scrollToMatchedFlight();
+
+        document.addEventListener('livewire:updated', scrollToMatchedFlight);
     </script>
 </x-filament-panels::page>

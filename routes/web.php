@@ -3,7 +3,7 @@
 use App\Http\Controllers\FlightController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome');
+Route::view('/', 'flightplan.form');
 
 Route::get('/flightplan', [FlightController::class, 'flightplan'])->name('flightplan');
 Route::post('/flightplan', [FlightController::class, 'store'])->name('flightplan.store');

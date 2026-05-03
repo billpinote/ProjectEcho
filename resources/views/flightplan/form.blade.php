@@ -19,7 +19,7 @@
 
     <div class="flightplan-card-scroll">
         <div class="flightplan-zoom-stage" data-flightplan-zoom-stage>
-            <div class="flightplan-card bg-white rounded-lg shadow-lg mx-8 p-8" style="min-width: 1400px;">
+            <div class="flightplan-card bg-white rounded-lg shadow-lg mx-8 p-8" style="min-width: 900px;">
 
         @php
             // Initialize prefilled if not provided
