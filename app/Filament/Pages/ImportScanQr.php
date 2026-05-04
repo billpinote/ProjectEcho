@@ -141,8 +141,8 @@ class ImportScanQr extends Page
                 'proposed_time' => UtcFourDigitTime::formatForDisplay($snapshot['proposed_time'] ?? null) ?? 'N/A',
                 'departure_aerodrome' => (string) ($snapshot['departure_aerodrome'] ?? 'N/A'),
                 'destination_aerodrome' => (string) ($snapshot['destination_aerodrome'] ?? 'N/A'),
-                'status' => $status?->value ?? 'signed_offline_payload',
-                'status_label' => $status?->label() ?? 'Signed Offline Payload',
+                'status' => $status?->value ?? 'verified_qr_only',
+                'status_label' => $status?->label() ?? 'Valid QR. Needs ATC Review.',
                 'status_color' => $status?->filamentColor() ?? 'info',
                 'view_url' => $flight
                     ? route('flights.view', $flight)

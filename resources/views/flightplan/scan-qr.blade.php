@@ -105,11 +105,18 @@
                             autofocus
                             placeholder="ECHOFPL|2|OFFLINE|K1|S1|123|20260428T143000Z|..."
                             class="echo-payload-textarea echo-mono"
-                        >{{ old('payload', $payload ?? '') }}</textarea>
-                        @error('payload')
-                            <p class="echo-help" style="margin: 0.75rem 0 0; color: #ef4444;">{{ $message }}</p>
-                        @enderror
+                        >{{ old('payload', $payload ?? '') }}</textarea>                        
                     </div>
+
+                    @error('payload')
+                        <p
+                            id="qr-payload-error"
+                            class="echo-help"
+                            role="alert"
+                            tabindex="-1"
+                            style="margin: 0.75rem 0 0; color: #ef4444;"
+                        >{{ $message }}</p>
+                    @enderror
 
                     <div class="echo-action-row">
                         <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
@@ -433,6 +440,18 @@
         window.setTimeout(() => window.initImportScanQrPage?.(), 250);
 
         window.requestAnimationFrame(() => {
+            const payloadError = document.getElementById('qr-payload-error');
+
+            if (payloadError) {
+                payloadError.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center',
+                });
+                payloadError.focus({ preventScroll: true });
+
+                return;
+            }
+
             const matchedFlightPanel = document.getElementById('matched-flight-plan');
 
             if (!matchedFlightPanel || !matchedFlightPanel.classList.contains('echo-import-summary')) {

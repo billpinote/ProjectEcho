@@ -100,6 +100,6 @@ class FlightPlanQrPayloadServiceTest extends TestCase
         ]);
 
         $this->assertNull($service->parsePayload($payload));
-        $this->assertStringContainsString('Ed25519 signature could not be verified', $service->invalidPayloadMessage($payload));
+        $this->assertSame('Invalid QR! Error #04', $service->invalidPayloadMessage($payload));
     }
 }
