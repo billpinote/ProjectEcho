@@ -101,7 +101,7 @@ class ImportScanQr extends Page
             if ($notifyOnFailure) {
                 Notification::make()
                     ->title('Invalid QR payload')
-                    ->body('Expected a valid Echo QR payload. V2 signed offline payloads and legacy V1 database payloads are supported.')
+                    ->body($this->qrPayloads()->invalidPayloadMessage($payload))
                     ->danger()
                     ->send();
             }

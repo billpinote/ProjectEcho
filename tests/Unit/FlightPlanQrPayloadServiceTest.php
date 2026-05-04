@@ -82,4 +82,24 @@ class FlightPlanQrPayloadServiceTest extends TestCase
         $this->assertTrue($parsed['snapshot']['emergency_radio_uhf']);
         $this->assertFalse($parsed['snapshot']['authorized_representative_enabled']);
     }
+
+    public function test_it_explains_v2_payloads_that_fail_signature_verification(): void
+    {
+        $service = app(FlightPlanQrPayloadService::class);
+        $badSignature = rtrim(strtr(base64_encode(str_repeat("\0", 64)), '+/', '-_'), '=');
+        $payload = implode('|', [
+            'ECHOFPL',
+            '2',
+            'OFFLINE',
+            'K1',
+            'S1',
+            '123',
+            '20260429T143000Z',
+            'payload',
+            $badSignature,
+        ]);
+
+        $this->assertNull($service->parsePayload($payload));
+        $this->assertStringContainsString('Ed25519 signature could not be verified', $service->invalidPayloadMessage($payload));
+    }
 }

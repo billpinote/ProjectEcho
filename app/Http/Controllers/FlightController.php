@@ -93,7 +93,7 @@ class FlightController extends Controller
         if ($matchedFlight === null) {
             return back()
                 ->withErrors([
-                    'payload' => 'Expected a valid Echo QR payload. V2 signed offline payloads and legacy V1 database payloads are supported.',
+                    'payload' => $this->qrPayloads()->invalidPayloadMessage((string) $validated['payload']),
                 ])
                 ->withInput();
         }
