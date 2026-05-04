@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserRole;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -25,7 +26,7 @@ return new class extends Migration
             }
 
             if (! Schema::hasColumn('users', 'role')) {
-                $table->string('role')->default('atc')->after('password');
+                $table->enum('role', UserRole::values())->default(UserRole::Pilot->value)->after('password');
             }
 
             if (! Schema::hasColumn('users', 'station')) {

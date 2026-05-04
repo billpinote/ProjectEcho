@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\UserRole;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -53,7 +54,13 @@ class User extends Authenticatable implements FilamentUser
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'role' => UserRole::class,
         ];
+    }
+
+    public function setRoleAttribute(mixed $value): void
+    {
+        $this->attributes['role'] = UserRole::normalize($value)?->value ?? UserRole::Pilot->value;
     }
 
     public function acceptedFlights()
@@ -65,7 +72,65 @@ class User extends Authenticatable implements FilamentUser
     {
         return $panel->getId() === 'admin'
             && $this->is_active
-            && $this->role === 'admin';
+            && $this->canAccessFlightPanel();
     }
-    
+
+    public function canAccessFlightPanel(): bool
+    {
+        return match ($this->role) {
+            UserRole::Artisan,
+            UserRole::Admin,
+            UserRole::AtsHq,
+            UserRole::Avsec,
+            UserRole::Pilot => true,
+            UserRole::Atmo => $this->isRpusStation(),
+            default => false,
+        };
+    }
+
+    public function hasFullFlightAccess(): bool
+    {
+        return match ($this->role) {
+            UserRole::Artisan,
+            UserRole::Admin => true,
+            UserRole::Atmo => $this->isRpusStation(),
+            default => false,
+        };
+    }
+
+    public function canViewFlightPlans(): bool
+    {
+        return $this->is_active && $this->canAccessFlightPanel();
+    }
+
+    public function canCreateFlightPlans(): bool
+    {
+        return $this->is_active
+            && ($this->hasFullFlightAccess() || $this->role === UserRole::Pilot);
+    }
+
+    public function canUpdateFlightPlans(): bool
+    {
+        return $this->is_active && $this->hasFullFlightAccess();
+    }
+
+    public function canDeleteFlightPlans(): bool
+    {
+        return $this->canUpdateFlightPlans();
+    }
+
+    public function canReviewFlightPlans(): bool
+    {
+        return $this->canUpdateFlightPlans();
+    }
+
+    public function createsFlightPlanRevisionsOnly(): bool
+    {
+        return $this->is_active && $this->role === UserRole::Pilot;
+    }
+
+    private function isRpusStation(): bool
+    {
+        return strtoupper(trim((string) $this->station)) === 'RPUS';
+    }
 }

@@ -11,6 +11,7 @@ use App\Models\Flight;
 use BackedEnum;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -44,6 +45,30 @@ class FlightResource extends Resource
     public static function table(Table $table): Table
     {
         return FlightsTable::configure($table, static::class);
+    }
+
+    public static function canViewAny(): bool
+    {
+        return Auth::user()?->canViewFlightPlans() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return Auth::user()?->canCreateFlightPlans() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        $user = Auth::user();
+
+        return $user?->canUpdateFlightPlans()
+            || $user?->createsFlightPlanRevisionsOnly()
+            || false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return Auth::user()?->canDeleteFlightPlans() ?? false;
     }
 
     protected static function getFlightPlanBaseQuery(): Builder

@@ -177,9 +177,9 @@ class FlightController extends Controller
      */
     public function showFlightPlanView(Request $request, Flight $flight)
     {
-        $this->ensureReviewerAccess();
+        $this->ensureFlightUserAccess();
 
-        if ($flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
+        if (Auth::user()?->canReviewFlightPlans() && $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
             $flight->markAsReviewed();
         }
 
@@ -190,7 +190,9 @@ class FlightController extends Controller
             'qrCodeBase64' => $this->generateFlightPlanQrCodeBase64($flight),
             'isPreview' => true,
             'showPreviewActions' => false,
-            'showReviewActions' => $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired(),
+            'showReviewActions' => Auth::user()?->canReviewFlightPlans()
+                && $flight->status === FlightPlanStatus::Pending
+                && ! $flight->isPendingExpired(),
             'backActionUrl' => $backActionUrl,
             'acceptActionUrl' => route('flights.accept', $flight),
             'rejectActionUrl' => route('flights.reject', $flight),
@@ -879,12 +881,23 @@ class FlightController extends Controller
     private function ensureReviewerAccess(): void
     {
         $user = Auth::user();
-        $allowedRoles = ['admin', 'atc'];
 
         abort_unless(
             $user
             && $user->is_active
-            && in_array(strtolower((string) $user->role), $allowedRoles, true),
+            && $user->canReviewFlightPlans(),
+            403
+        );
+    }
+
+    private function ensureFlightUserAccess(): void
+    {
+        $user = Auth::user();
+
+        abort_unless(
+            $user
+            && $user->is_active
+            && $user->canViewFlightPlans(),
             403
         );
     }
@@ -892,7 +905,7 @@ class FlightController extends Controller
     private function ensureFlightAssetAccess(Request $request, Flight $flight): void
     {
         if (Auth::check()) {
-            $this->ensureReviewerAccess();
+            $this->ensureFlightUserAccess();
 
             return;
         }

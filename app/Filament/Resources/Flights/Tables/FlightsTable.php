@@ -23,6 +23,7 @@ use Filament\Tables\Columns\TextInputColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component as LivewireComponent;
 
 class FlightsTable
@@ -39,6 +40,7 @@ class FlightsTable
         ];
 
         $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
+        $canUpdateFlights = Auth::user()?->canUpdateFlightPlans() ?? false;
 
         $columns = [
             TextColumn::make('date_of_flight')
@@ -194,6 +196,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
+                    ->disabled(! $canUpdateFlights)
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -223,6 +226,7 @@ class FlightsTable
                         'data-confirm-heading' => 'Confirm Start Up Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
+                    ->visible($canUpdateFlights)
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('3px'),
@@ -341,6 +345,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
+                    ->disabled(! $canUpdateFlights)
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -370,6 +375,7 @@ class FlightsTable
                         'data-confirm-heading' => 'Confirm Airborne Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
+                    ->visible($canUpdateFlights)
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('5px'),
@@ -425,6 +431,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
+                    ->disabled(! $canUpdateFlights)
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -454,6 +461,7 @@ class FlightsTable
                         'data-confirm-heading' => 'Confirm Touchdown Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
+                    ->visible($canUpdateFlights)
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('5px'),
@@ -511,6 +519,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
+                    ->disabled(! $canUpdateFlights)
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -540,6 +549,7 @@ class FlightsTable
                         'data-confirm-heading' => 'Confirm Shutdown Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
+                    ->visible($canUpdateFlights)
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('6px'),
@@ -651,7 +661,8 @@ class FlightsTable
                     ->label('PDF')
                     ->url(fn (Flight $record): string => route('flights.pdf.download', $record))
                     ->openUrlInNewTab(),
-                EditAction::make(),
+                EditAction::make()
+                    ->label(fn (): string => Auth::user()?->createsFlightPlanRevisionsOnly() ? 'Revise' : 'Edit'),
             ]);
     }
 

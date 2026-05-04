@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\UserRole;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -31,8 +32,8 @@ class UserFactory extends Factory
             'wiresign' => fake()->unique()->bothify('ATC-###'),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => 'atc',
-            'station' => fake()->randomElement(['RPLL', 'RPVM', 'RPVD', 'RPLC']),
+            'role' => UserRole::Atmo,
+            'station' => fake()->randomElement(['RPUS', 'RPLL', 'RPVM', 'RPVD', 'RPLC']),
             'is_active' => true,
             'last_login_at' => null,
             'remember_token' => Str::random(10),

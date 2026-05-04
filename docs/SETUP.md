@@ -43,7 +43,7 @@ This installs Laravel framework, Filament admin panel, QR code libraries, and al
 ## Step 3: Environment Setup
 
 ```bash
-cp .env.example .env
+copy .env.example .env
 php artisan key:generate
 ```
 
