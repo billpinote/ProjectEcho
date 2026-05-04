@@ -11,17 +11,23 @@ use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
+use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Resources\Reports\ActiveFlightDataResource;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Support\Enums\FontFamily;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextInputColumn;
+use Filament\Tables\Enums\FiltersLayout;
+use Filament\Tables\Enums\FiltersResetActionPosition;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component as LivewireComponent;
@@ -36,11 +42,66 @@ class FlightsTable
             AirborneFlightResource::class,
             LandedFlightResource::class,
             CompletedFlightResource::class,
+            AbbreviatedFlightReportResource::class,
             ActiveFlightDataResource::class,
         ];
 
         $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
         $canUpdateFlights = Auth::user()?->canUpdateFlightPlans() ?? false;
+
+        $filters = [
+            SelectFilter::make('flight_rules')
+                ->options([
+                    'I' => 'IFR',
+                    'V' => 'VFR',
+                    'Y' => 'IFR then VFR',
+                    'Z' => 'VFR then IFR',
+                ]),
+            SelectFilter::make('type_of_flight')
+                ->options([
+                    'S' => 'Scheduled',
+                    'N' => 'Non-scheduled',
+                    'G' => 'General aviation',
+                    'M' => 'Military',
+                    'X' => 'Other',
+                ]),
+            SelectFilter::make('accepted_by_user_id')
+                ->label('Accepted by')
+                ->relationship('acceptedBy', 'name')
+                ->searchable()
+                ->preload(),
+        ];
+
+        if ($resourceClass === AbbreviatedFlightReportResource::class) {
+            $abbreviatedReportDateOptions = fn (): array => AbbreviatedFlightReportResource::getEloquentQuery()
+                ->whereNotNull('date_of_flight')
+                ->orderByDesc('date_of_flight')
+                ->pluck('date_of_flight')
+                ->unique()
+                ->mapWithKeys(fn (mixed $date): array => [
+                    (string) $date => Carbon::parse((string) $date)->format('M d, Y'),
+                ])
+                ->all();
+
+            $filters = [
+                Filter::make('date_of_flight')
+                    ->schema([
+                        Select::make('value')
+                            ->label('Date of Flight')
+                            ->default(now('UTC')->toDateString())
+                            ->options($abbreviatedReportDateOptions)
+                            ->native(false)
+                            ->selectablePlaceholder()
+                            ->grow(false)
+                            ->extraFieldWrapperAttributes([
+                                'class' => 'echo-abbreviated-date-filter',
+                            ]),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                        ? $query->whereDate('date_of_flight', $data['value'])
+                        : $query),
+            ];
+        }
 
         $columns = [
             TextColumn::make('date_of_flight')
@@ -317,6 +378,88 @@ class FlightsTable
             ];
 
             $columns = $reportColumns;
+        }
+
+        if ($resourceClass === AbbreviatedFlightReportResource::class) {
+            $columns = [
+                TextColumn::make('aircraft_identification')
+                    ->label('Callsign')
+                    ->fontFamily(FontFamily::Mono)
+                    ->sortable()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('6px')
+                    ->weight('bold'),
+                TextColumn::make('type_of_aircraft')
+                    ->label('Type')
+                    ->sortable()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px'),
+                TextColumn::make('departure_aerodrome')
+                    ->label('Dep')
+                    ->sortable()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px')
+                    ->tooltip(fn (Flight $record): ?string => strtoupper((string) $record->departure_aerodrome) === 'ZZZZ'
+                        ? (filled($record->other_info_dep) ? (string) $record->other_info_dep : 'Departure aerodrome details not provided.')
+                        : null),
+                TextColumn::make('destination_aerodrome')
+                    ->label('Dest')
+                    ->sortable()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px')
+                    ->tooltip(fn (Flight $record): ?string => strtoupper((string) $record->destination_aerodrome) === 'ZZZZ'
+                        ? (filled($record->other_info_dest) ? (string) $record->other_info_dest : 'Destination aerodrome details not provided.')
+                        : null),
+                TextColumn::make('proposed_time')
+                    ->label('PTD')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->proposed_time))
+                    ->fontFamily(FontFamily::Mono)
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px')
+                    ->sortable(),
+                TextColumn::make('time_airborne')
+                    ->label('ATD')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
+                    ->fontFamily(FontFamily::Mono)
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px')
+                    ->sortable(),
+                TextColumn::make('route')
+                    ->label('Route')
+                    ->fontFamily(FontFamily::Mono)
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->limit(30)
+                    ->width('10px')
+                    ->tooltip(fn (Flight $record): ?string => filled($record->route) ? $record->route : null),
+                TextColumn::make('total_eet')
+                    ->label('EET')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->total_eet))
+                    ->fontFamily(FontFamily::Mono)
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px')
+                    ->sortable(),
+                TextColumn::make('fob')
+                    ->label('FOB')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->endurance))
+                    ->fontFamily(FontFamily::Mono)
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px')
+                    ->sortable(),
+                TextColumn::make('persons_on_board')
+                    ->label('POB')
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px')
+                    ->sortable(),
+                TextColumn::make('pilot_in_command')
+                    ->label('Pilot')
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+                TextColumn::make('report_remarks')
+                    ->label('REMARKS')
+                    ->state(fn (): string => '')
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+            ];
         }
 
         if ($resourceClass === ActiveFlightResource::class) {
@@ -626,28 +769,30 @@ class FlightsTable
                 ? ['echo-new-flight-row']
                 : [])
             ->columns($columns)
-            ->filters([
-                SelectFilter::make('flight_rules')
-                    ->options([
-                        'I' => 'IFR',
-                        'V' => 'VFR',
-                        'Y' => 'IFR then VFR',
-                        'Z' => 'VFR then IFR',
-                    ]),
-                SelectFilter::make('type_of_flight')
-                    ->options([
-                        'S' => 'Scheduled',
-                        'N' => 'Non-scheduled',
-                        'G' => 'General aviation',
-                        'M' => 'Military',
-                        'X' => 'Other',
-                    ]),
-                SelectFilter::make('accepted_by_user_id')
-                    ->label('Accepted by')
-                    ->relationship('acceptedBy', 'name')
-                    ->searchable()
-                    ->preload(),
-            ])
+            ->filters(
+                $filters,
+                layout: $resourceClass === AbbreviatedFlightReportResource::class
+                    ? FiltersLayout::Hidden
+                    : null,
+            )
+            ->when(
+                $resourceClass === AbbreviatedFlightReportResource::class,
+                fn (Table $table): Table => $table
+                    ->header(view('filament.tables.headers.abbreviated-flight-report-header', [
+                        'dateOptions' => $abbreviatedReportDateOptions(),
+                        'reportUrl' => route('reports.abbreviated.pdf'),
+                        'showTestAction' => (static function (): bool {
+                            $user = Auth::user();
+
+                            return $user !== null
+                                && (bool) $user->is_active
+                                && $user->canReviewFlightPlans();
+                        })(),
+                    ]))
+                    ->deferFilters(false)
+                    ->filtersResetActionPosition(FiltersResetActionPosition::Footer)
+                    ->hiddenFilterIndicators()
+            )
             ->recordActions($isOperationalFlightTable ? [] : [
                 Action::make('qr')
                     ->label('QR')

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Enums\FlightPlanStatus;
+use App\Filament\Resources\Flights\Schemas\FlightForm;
+use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
@@ -198,6 +200,35 @@ class FlightController extends Controller
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->resolveAtcWiresign(),
         ]);
+    }
+
+    /**
+     * Stream the abbreviated RPUS report as an inline A4 landscape PDF.
+     */
+    public function downloadAbbreviatedReportPdf(Request $request)
+    {
+        $this->ensureReviewerAccess();
+
+        $generatedAt = now('UTC');
+        $selectedDate = (string) ($request->query('date') ?: now('UTC')->toDateString());
+        $flights = AbbreviatedFlightReportResource::getEloquentQuery()
+            ->whereDate('date_of_flight', $selectedDate)
+            ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
+            ->orderBy('date_of_flight')
+            ->orderByRaw('case when proposed_time is null then 1 else 0 end')
+            ->orderBy('proposed_time')
+            ->orderBy('id')
+            ->get();
+
+        $pdf = Pdf::loadView('reports.abbreviated-flight-report-pdf', [
+            'flights' => $flights,
+            'generatedAt' => $generatedAt,
+            'selectedDate' => $selectedDate,
+            'generatedBy' => $this->resolveAtcWiresign(),
+            'formatTime' => static fn (?string $time): ?string => FlightForm::formatTimeForForm($time),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->stream('abbreviated-flight-report-'.$generatedAt->format('Y-m-d-His').'.pdf');
     }
 
     /**
