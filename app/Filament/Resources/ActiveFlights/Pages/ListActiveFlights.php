@@ -17,6 +17,8 @@ class ListActiveFlights extends ListRecords
 
     public function confirmAirborneNow(string|int $recordId): void
     {
+        abort_unless(auth()->user()?->canUpdateFlightPlans() ?? false, 403);
+
         $record = Flight::query()->findOrFail($recordId);
 
         $record->forceFill([

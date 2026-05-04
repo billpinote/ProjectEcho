@@ -9,6 +9,7 @@ enum UserRole: string
     case Atmo = 'ATMO';
     case AtsHq = 'ATSHQ';
     case Avsec = 'AVSEC';
+    case Dispatch = 'DISPATCH';
     case Pilot = 'PILOT';
 
     /**
@@ -44,6 +45,7 @@ enum UserRole: string
             self::Atmo => 'ATMO',
             self::AtsHq => 'ATSHQ',
             self::Avsec => 'AVSEC',
+            self::Dispatch => 'Dispatch',
             self::Pilot => 'Pilot',
         };
     }

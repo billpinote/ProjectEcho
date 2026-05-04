@@ -82,6 +82,7 @@ class User extends Authenticatable implements FilamentUser
             UserRole::Admin,
             UserRole::AtsHq,
             UserRole::Avsec,
+            UserRole::Dispatch,
             UserRole::Pilot => true,
             UserRole::Atmo => $this->isRpusStation(),
             default => false,
@@ -106,7 +107,11 @@ class User extends Authenticatable implements FilamentUser
     public function canCreateFlightPlans(): bool
     {
         return $this->is_active
-            && ($this->hasFullFlightAccess() || $this->role === UserRole::Pilot);
+            && (
+                $this->hasFullFlightAccess()
+                || $this->role === UserRole::Dispatch
+                || $this->role === UserRole::Pilot
+            );
     }
 
     public function canUpdateFlightPlans(): bool
@@ -122,6 +127,18 @@ class User extends Authenticatable implements FilamentUser
     public function canReviewFlightPlans(): bool
     {
         return $this->canUpdateFlightPlans();
+    }
+
+    public function canUpdateFlightStartUpTime(): bool
+    {
+        return $this->canUpdateFlightPlans()
+            || ($this->is_active && $this->role === UserRole::Dispatch);
+    }
+
+    public function canUpdateFlightShutdownTime(): bool
+    {
+        return $this->canUpdateFlightPlans()
+            || ($this->is_active && $this->role === UserRole::Dispatch);
     }
 
     public function createsFlightPlanRevisionsOnly(): bool

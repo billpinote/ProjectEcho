@@ -48,6 +48,8 @@ class FlightsTable
 
         $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
         $canUpdateFlights = Auth::user()?->canUpdateFlightPlans() ?? false;
+        $canUpdateStartUpTime = Auth::user()?->canUpdateFlightStartUpTime() ?? false;
+        $canUpdateShutdownTime = Auth::user()?->canUpdateFlightShutdownTime() ?? false;
 
         $filters = [
             SelectFilter::make('flight_rules')
@@ -237,6 +239,8 @@ class FlightsTable
                     ->label('START UP TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        abort_unless(Auth::user()?->canUpdateFlightStartUpTime() ?? false, 403);
+
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
                                 'echo-modal:open',
@@ -257,7 +261,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
-                    ->disabled(! $canUpdateFlights)
+                    ->disabled(! $canUpdateStartUpTime)
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -287,7 +291,7 @@ class FlightsTable
                         'data-confirm-heading' => 'Confirm Start Up Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
-                    ->visible($canUpdateFlights)
+                    ->visible($canUpdateStartUpTime)
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('3px'),
@@ -468,6 +472,8 @@ class FlightsTable
                     ->label('TAKE-OFF TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        abort_unless(Auth::user()?->canUpdateFlightPlans() ?? false, 403);
+
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
                                 'echo-modal:open',
@@ -554,6 +560,8 @@ class FlightsTable
                     ->label('TOUCHDOWN TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        abort_unless(Auth::user()?->canUpdateFlightPlans() ?? false, 403);
+
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
                                 'echo-modal:open',
@@ -642,6 +650,8 @@ class FlightsTable
                     ->label('SHUTDOWN TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_shutdown))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        abort_unless(Auth::user()?->canUpdateFlightShutdownTime() ?? false, 403);
+
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
                                 'echo-modal:open',
@@ -662,7 +672,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
-                    ->disabled(! $canUpdateFlights)
+                    ->disabled(! $canUpdateShutdownTime)
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -692,7 +702,7 @@ class FlightsTable
                         'data-confirm-heading' => 'Confirm Shutdown Time',
                         'data-callsign' => (string) $record->aircraft_identification,
                     ])
-                    ->visible($canUpdateFlights)
+                    ->visible($canUpdateShutdownTime)
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('6px'),

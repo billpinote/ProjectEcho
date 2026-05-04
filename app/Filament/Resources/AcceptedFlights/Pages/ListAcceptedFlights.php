@@ -17,6 +17,8 @@ class ListAcceptedFlights extends ListRecords
 
     public function confirmStartUpNow(string|int $recordId): void
     {
+        abort_unless(auth()->user()?->canUpdateFlightStartUpTime() ?? false, 403);
+
         $record = Flight::query()->findOrFail($recordId);
 
         $record->forceFill([

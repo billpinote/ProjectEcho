@@ -7,6 +7,7 @@ ProjectEcho uses the `App\Enums\UserRole` enum for user roles. Valid role values
 - `ATMO`
 - `ATSHQ`
 - `AVSEC`
+- `DISPATCH`
 - `PILOT`
 
 ## Access Rules
@@ -53,6 +54,18 @@ Aviation Security users who review manifest, cargo, and related flight informati
 - Can view flight plans and related assets
 - Cannot create, update, review, accept, reject, or delete flight plans
 - Cannot update operational flight times
+
+### DISPATCH
+
+Flight dispatch users who prepare flight plans and update limited operational times.
+
+- Can create flight plans
+- Can view flight plans
+- Cannot edit or delete flight plans
+- Can enter start-up time on accepted flights
+- Can enter engine shutdown time on landed flights
+- Cannot update take-off, touchdown, or other operational flight times
+- Cannot review, accept, or reject flight plans
 
 ### PILOT
 
