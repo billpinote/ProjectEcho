@@ -13,7 +13,7 @@
 
         @font-face {
             font-family: 'Trajan Pro Custom';
-            src: url('{{ storage_path('app/public/fonts/TrajanPro-Bold.ttf') }}') format('truetype');
+            src: url('{{ storage_path('app/public/fonts/TrajanPro-Bold.otf') }}') format('opentype');
             font-weight: 400;
             font-style: normal;
         }

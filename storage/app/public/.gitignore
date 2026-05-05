@@ -1,2 +1,5 @@
 *
 !.gitignore
+!fonts/
+!fonts/OpenSans-Var.ttf
+!fonts/TrajanPro-Bold.otf
