@@ -124,6 +124,30 @@ class FlightsTable
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->width('10px')
                 ->sortable(),
+            TextColumn::make('time_airborne')
+                ->label('ATD')
+                ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
+                ->fontFamily(FontFamily::Mono)
+                ->alignCenter()
+                ->extraHeaderAttributes(['class' => 'text-center'])
+                ->width('10px')
+                ->sortable(),
+            TextColumn::make('time_touchdown')
+                ->label('TOUCHDOWN')
+                ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
+                ->fontFamily(FontFamily::Mono)
+                ->alignCenter()
+                ->extraHeaderAttributes(['class' => 'text-center'])
+                ->width('10px')
+                ->sortable(),
+            TextColumn::make('time_shutdown')
+                ->label('SHUTDOWN')
+                ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_shutdown))
+                ->fontFamily(FontFamily::Mono)
+                ->alignCenter()
+                ->extraHeaderAttributes(['class' => 'text-center'])
+                ->width('10px')
+                ->sortable(),
             TextColumn::make('aircraft_identification')
                 ->label('Callsign')
                 ->fontFamily(FontFamily::Mono)
@@ -703,20 +727,20 @@ class FlightsTable
                     'time_touchdown_now',
                     'aircraft_identification',
                     'proposed_time',
+                    'time_airborne',
                     'departure_aerodrome',
                     'destination_aerodrome',
                     'route',
-                    'time_airborne',
                 ]),
                 ...self::remainingColumns($columns, [
                     'time_touchdown',
                     'time_touchdown_now',
                     'aircraft_identification',
                     'proposed_time',
+                    'time_airborne',
                     'departure_aerodrome',
                     'destination_aerodrome',
                     'route',
-                    'time_airborne',
                 ]),
             ];
 
@@ -793,26 +817,53 @@ class FlightsTable
                     'time_shutdown_now',
                     'aircraft_identification',
                     'proposed_time',
+                    'time_airborne',
+                    'time_touchdown',
                     'departure_aerodrome',
                     'destination_aerodrome',
                     'route',
-                    'time_airborne',
-                    'time_touchdown',
                 ]),
                 ...self::remainingColumns($columns, [
                     'time_shutdown',
                     'time_shutdown_now',
                     'aircraft_identification',
                     'proposed_time',
+                    'time_airborne',
+                    'time_touchdown',
                     'departure_aerodrome',
                     'destination_aerodrome',
                     'route',
-                    'time_airborne',
-                    'time_touchdown',
                 ]),
             ];
 
             $columns = $landedColumns;
+        }
+
+        if ($resourceClass === CompletedFlightResource::class) {
+            $completedColumns = [
+                ...self::pickColumns($columns, [
+                    'aircraft_identification',
+                    'proposed_time',
+                    'time_airborne',
+                    'time_touchdown',
+                    'time_shutdown',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                ]),
+                ...self::remainingColumns($columns, [
+                    'aircraft_identification',
+                    'proposed_time',
+                    'time_airborne',
+                    'time_touchdown',
+                    'time_shutdown',
+                    'departure_aerodrome',
+                    'destination_aerodrome',
+                    'route',
+                ]),
+            ];
+
+            $columns = $completedColumns;
         }
 
         if ($resourceClass === RejectedFlightResource::class) {
