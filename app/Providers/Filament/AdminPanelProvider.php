@@ -14,7 +14,7 @@ use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Resources\Reports\ActiveFlightDataResource;
-use Filament\Support\Facades\FilamentView;
+use App\Filament\Resources\Reports\PostOpsLogResource;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -26,15 +26,16 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+
 use function Filament\Support\original_request;
 
 class AdminPanelProvider extends PanelProvider
@@ -96,6 +97,7 @@ class AdminPanelProvider extends PanelProvider
                         ->childItems([
                             ...ActiveFlightDataResource::getNavigationItems(),
                             ...AbbreviatedFlightReportResource::getNavigationItems(),
+                            ...PostOpsLogResource::getNavigationItems(),
                         ]),
                 ]);
             })

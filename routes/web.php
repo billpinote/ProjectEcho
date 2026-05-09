@@ -24,3 +24,6 @@ Route::get('/flights/{flight}/pdf', [FlightController::class, 'downloadPdf'])->n
 Route::get('/reports/abbreviated/pdf', [FlightController::class, 'downloadAbbreviatedReportPdf'])
     ->middleware('auth')
     ->name('reports.abbreviated.pdf');
+Route::get('/reports/post-ops-log/pdf', [FlightController::class, 'downloadPostOpsLogPdf'])
+    ->middleware('auth')
+    ->name('reports.post-ops-log.pdf');

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Abbreviated Flight Report</title>
+    <title>Post Ops Log</title>
     <style>
         @font-face {
             font-family: 'Open Sans Custom';
@@ -31,7 +31,7 @@
             margin: 0;
             font-family: 'Open Sans Custom', DejaVu Sans, Arial, sans-serif;
             color: #111;
-            font-size: 10px;
+            font-size: 11px;
             line-height: 0.9;
         }
 
@@ -41,8 +41,6 @@
 
         .header {
             width: 100%;
-            /*border: 1.5px solid #000;*/
-            /*border-bottom: 1px solid #000;*/
             border-collapse: collapse;
         }
 
@@ -52,33 +50,26 @@
 
         .header-logo {
             width: 100px;
-            padding: 6px 6px 0px 0px;
-            /*border: 1.5px solid #000;*/
+            padding: 6px 6px 0 0;
         }
 
         .header-logo img {
             display: block;
             width: 100px;
-            /*height: 120px;*/
             margin: 0 auto;
             object-fit: contain;
         }
 
         .header-copy {
-            padding: 2px 0px 0px 10px;
+            padding: 2px 0 0 10px;
         }
 
         .agency-line,
-        .agency-subline,
         .agency-office {
             margin: 0;
             text-align: left;
         }
-/*
-        .agency-line {
-            vertical-align: middle;
-        }
-*/
+
         .agency-line--republic {
             font-family: 'Open Sans Custom', DejaVu Sans, Arial, sans-serif;
             font-weight: 400;
@@ -92,7 +83,6 @@
             text-transform: uppercase;
         }
 
-        .agency-subline,
         .agency-office {
             font-size: 9px;
         }
@@ -102,32 +92,6 @@
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-        }
-
-        .report-subtitle {
-            margin: 0;
-            text-align: center;
-            font-size: 8px;
-            text-transform: uppercase;
-        }
-
-        .header-meta {
-            width: 100%;
-            border-collapse: collapse;
-            padding-bottom: 10px;
-            font-size: 10px;
-            font-weight: 700;
-            text-align: right;
-        }
-
-        .header-meta__label {            
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .header-meta__value {
-            border-bottom: 1px solid #000;
-            padding-left: 6px !important;
         }
 
         .report-table {
@@ -149,7 +113,6 @@
 
         .report-table tbody td {
             border: 1px solid #000;
-            /*height: 18px;*/
             padding: 1px 1px;
             vertical-align: middle;
             word-wrap: break-word;
@@ -165,10 +128,6 @@
 
         .small {
             font-size: 8px;
-        }
-
-        .remarks-cell {
-            color: #222;
         }
 
         .footer {
@@ -219,7 +178,7 @@
                 </tr>
                 <tr>
                     <td colspan="2">
-                        <p class="report-title">Abbreviated Flight Plans for Air Carriers, General Aviation & Military Aircraft</p>
+                        <p class="report-title">Post Operations Log</p>
                     </td>
                 </tr>
                 <tr>
@@ -232,46 +191,40 @@
             <table class="report-table">
                 <thead>
                     <tr>
-                        <th style="width: 9%;">Call Sign</th>
-                        <th style="width: 5%;">Type</th>
+                        <th style="width: 7%;">T/G</th>
+                        <th style="width: 9%;">Callsign</th>
+                        <th style="width: 7%;">Take-off</th>
+                        <th style="width: 7%;">Landing</th>
+                        <th style="width: 7%;">Overfly</th>
                         <th style="width: 8%;">Origin</th>
                         <th style="width: 8%;">Destination</th>
-                        <th style="width: 5%;">PTD</th>
-                        <th style="width: 5%;">ATD</th>
-                        <th style="width: 28%;">Route of Flight</th>
-                        <th style="width: 5%;">ETE</th>
-                        <th style="width: 5%;">FOB</th>
-                        <th style="width: 5%;">POB</th>
-                        <th style="width: 19%;">Pilot In Command</th>
-                        <th style="width: 8%;">Remarks</th>
+                        <th style="width: 7%;">Type</th>
+                        <th style="width: 30%;">Nature</th>
+                        <th style="width: 10%;">Operator</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($pageFlights as $flight)
                         <tr>
-                            <td class="center">{{ $flight->aircraft_identification }}</td>
-                            <td class="center ">{{ $flight->type_of_aircraft }}</td>
+                            <td class="center"></td>
+                            <td class="mono center">{{ $flight->aircraft_identification }}</td>
+                            <td class="mono center">{{ $formatTime($flight->time_airborne) }}</td>
+                            <td class="mono center">{{ $formatTime($flight->time_touchdown) }}</td>
+                            <td class="center"></td>
                             <td class="center">{{ $flight->departure_aerodrome }}</td>
                             <td class="center">{{ $flight->destination_aerodrome }}</td>
-                            <td class="center">{{ $formatTime($flight->proposed_time) }}</td>
-                            <td class="center">{{ $formatTime($flight->time_airborne) }}</td>
+                            <td class="center">{{ $flight->type_of_aircraft }}</td>
                             <td class="center">{{ $flight->route }}</td>
-                            <td class="center">{{ $formatTime($flight->total_eet) }}</td>
-                            <td class="center">{{ $formatTime($flight->endurance) }}</td>
-                            <td class="center">{{ $flight->persons_on_board }}</td>
-                            <td class="center">{{ $flight->pilot_in_command }}</td>
                             <td class="center"></td>
                         </tr>
                     @empty
                         <tr class="empty-state">
-                            <td colspan="12">No abbreviated RPUS flight records available.</td>
+                            <td colspan="10">Traffic NIL</td>
                         </tr>
                     @endforelse
 
                     @for ($row = 0; $row < $blankRows; $row++)
                         <tr>
-                            <td>&nbsp;</td>
-                            <td>&nbsp;</td>
                             <td>&nbsp;</td>
                             <td>&nbsp;</td>
                             <td>&nbsp;</td>
@@ -288,7 +241,7 @@
             </table>
 
             <div class="footer">
-                Generated from Project Echo abbreviated report export | Page {{ $pageNumber }} of {{ $totalPages }}
+                Generated from Project Echo post ops log export | Page {{ $pageNumber }} of {{ $totalPages }}
             </div>
         </div>
     @endforeach

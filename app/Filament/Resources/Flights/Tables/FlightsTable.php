@@ -13,6 +13,7 @@ use App\Filament\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Resources\Reports\ActiveFlightDataResource;
+use App\Filament\Resources\Reports\PostOpsLogResource;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
 use Filament\Actions\Action;
@@ -27,8 +28,8 @@ use Filament\Tables\Enums\FiltersResetActionPosition;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component as LivewireComponent;
 
@@ -44,6 +45,7 @@ class FlightsTable
             CompletedFlightResource::class,
             AbbreviatedFlightReportResource::class,
             ActiveFlightDataResource::class,
+            PostOpsLogResource::class,
         ];
 
         $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
@@ -74,8 +76,8 @@ class FlightsTable
                 ->preload(),
         ];
 
-        if ($resourceClass === AbbreviatedFlightReportResource::class) {
-            $abbreviatedReportDateOptions = fn (): array => AbbreviatedFlightReportResource::getEloquentQuery()
+        if (in_array($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class], true)) {
+            $reportDateOptions = fn (): array => $resourceClass::getEloquentQuery()
                 ->whereNotNull('date_of_flight')
                 ->orderByDesc('date_of_flight')
                 ->pluck('date_of_flight')
@@ -91,7 +93,7 @@ class FlightsTable
                         Select::make('value')
                             ->label('Date of Flight')
                             ->default(now('UTC')->toDateString())
-                            ->options($abbreviatedReportDateOptions)
+                            ->options($reportDateOptions)
                             ->native(false)
                             ->selectablePlaceholder()
                             ->grow(false)
@@ -466,6 +468,83 @@ class FlightsTable
             ];
         }
 
+        if ($resourceClass === PostOpsLogResource::class) {
+            $columns = [
+                TextColumn::make('tg')
+                    ->label('T/G')
+                    ->state(fn (): string => '')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('4px'),
+                TextColumn::make('aircraft_identification')
+                    ->label('Callsign')
+                    ->fontFamily(FontFamily::Mono)
+                    ->sortable()
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('8px')
+                    ->weight('bold'),
+                TextColumn::make('time_airborne')
+                    ->label('Take-off')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
+                    ->fontFamily(FontFamily::Mono)
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('6px')
+                    ->sortable(),
+                TextColumn::make('time_touchdown')
+                    ->label('Landing')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
+                    ->fontFamily(FontFamily::Mono)
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('6px')
+                    ->sortable(),
+                TextColumn::make('overfly')
+                    ->label('Overfly')
+                    ->state(fn (): string => '')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('6px'),
+                TextColumn::make('departure_aerodrome')
+                    ->label('Origin')
+                    ->sortable()
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('6px')
+                    ->tooltip(fn (Flight $record): ?string => strtoupper((string) $record->departure_aerodrome) === 'ZZZZ'
+                        ? (filled($record->other_info_dep) ? (string) $record->other_info_dep : 'Departure aerodrome details not provided.')
+                        : null),
+                TextColumn::make('destination_aerodrome')
+                    ->label('Destination')
+                    ->sortable()
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('8px')
+                    ->tooltip(fn (Flight $record): ?string => strtoupper((string) $record->destination_aerodrome) === 'ZZZZ'
+                        ? (filled($record->other_info_dest) ? (string) $record->other_info_dest : 'Destination aerodrome details not provided.')
+                        : null),
+                TextColumn::make('type_of_aircraft')
+                    ->label('Aircraft Type')
+                    ->sortable()
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('8px'),
+                TextColumn::make('nature')
+                    ->label('Nature')
+                    ->state(fn (): string => '')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('6px'),
+                TextColumn::make('operator')
+                    ->label('Operator')
+                    ->state(fn (): string => '')
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('8px'),
+            ];
+        }
+
         if ($resourceClass === ActiveFlightResource::class) {
             array_splice($columns, 2, 0, [
                 TextInputColumn::make('time_airborne')
@@ -534,7 +613,7 @@ class FlightsTable
                 ...self::pickColumns($columns, [
                     'time_airborne',
                     'time_airborne_now',
-                    'aircraft_identification',                    
+                    'aircraft_identification',
                     'proposed_time',
                     'departure_aerodrome',
                     'destination_aerodrome',
@@ -781,16 +860,18 @@ class FlightsTable
             ->columns($columns)
             ->filters(
                 $filters,
-                layout: $resourceClass === AbbreviatedFlightReportResource::class
+                layout: in_array($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class], true)
                     ? FiltersLayout::Hidden
                     : null,
             )
             ->when(
-                $resourceClass === AbbreviatedFlightReportResource::class,
+                in_array($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class], true),
                 fn (Table $table): Table => $table
                     ->header(view('filament.tables.headers.abbreviated-flight-report-header', [
-                        'dateOptions' => $abbreviatedReportDateOptions(),
-                        'reportUrl' => route('reports.abbreviated.pdf'),
+                        'dateOptions' => $reportDateOptions(),
+                        'reportUrl' => $resourceClass === AbbreviatedFlightReportResource::class
+                            ? route('reports.abbreviated.pdf')
+                            : route('reports.post-ops-log.pdf'),
                         'showTestAction' => (static function (): bool {
                             $user = Auth::user();
 

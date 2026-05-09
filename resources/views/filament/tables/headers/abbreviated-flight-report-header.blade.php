@@ -18,7 +18,7 @@
         </label>
 
         <!-- Button -->
-        @if ($showTestAction)
+        @if ($showTestAction && filled($reportUrl ?? null))
             <x-filament::button
                 color="gray"
                 tag="a"
