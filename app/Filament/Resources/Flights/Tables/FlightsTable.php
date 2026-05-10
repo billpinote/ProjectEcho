@@ -658,7 +658,7 @@ class FlightsTable
         }
 
         if ($resourceClass === AirborneFlightResource::class) {
-            array_splice($columns, 2, 0, [
+            $airborneColumns = [
                 TextInputColumn::make('time_touchdown')
                     ->label('TOUCHDOWN TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
@@ -719,12 +719,7 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('5px'),
-            ]);
-
-            $airborneColumns = [
                 ...self::pickColumns($columns, [
-                    'time_touchdown',
-                    'time_touchdown_now',
                     'aircraft_identification',
                     'proposed_time',
                     'time_airborne',
@@ -748,7 +743,7 @@ class FlightsTable
         }
 
         if ($resourceClass === LandedFlightResource::class) {
-            array_splice($columns, 2, 0, [
+            $landedColumns = [
                 TextInputColumn::make('time_shutdown')
                     ->label('SHUTDOWN TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_shutdown))
@@ -809,12 +804,7 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('6px'),
-            ]);
-
-            $landedColumns = [
                 ...self::pickColumns($columns, [
-                    'time_shutdown',
-                    'time_shutdown_now',
                     'aircraft_identification',
                     'proposed_time',
                     'time_airborne',
