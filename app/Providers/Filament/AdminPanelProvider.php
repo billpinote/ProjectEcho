@@ -3,6 +3,8 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\ImportScanQr;
+use App\Filament\Pages\Alpha;
+use App\Filament\Pages\Coordinator;
 use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
@@ -68,6 +70,13 @@ class AdminPanelProvider extends PanelProvider
                         ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.pages.dashboard'))
                         ->sort(-2)
                         ->url(fn (): string => Dashboard::getUrl()),
+                    NavigationItem::make('Operations')
+                        ->icon('heroicon-o-cog-6-tooth')
+                        ->sort(5)
+                        ->childItems([
+                            ...Alpha::getNavigationItems(),
+                            ...Coordinator::getNavigationItems(),
+                        ]),
                     NavigationItem::make('Flight Plan')
                         ->icon(Heroicon::OutlinedPaperAirplane)
                         ->sort(10)
