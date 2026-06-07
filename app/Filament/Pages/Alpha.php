@@ -15,7 +15,7 @@ class Alpha extends Page
 
     protected static ?int $navigationSort = 1;
 
-    protected static ?string $title = 'Alpha';
+    protected static ?string $title = 'Alpha Controller Dashboard';
 
     protected string $view = 'filament.pages.alpha';
 

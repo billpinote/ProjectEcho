@@ -5,45 +5,41 @@ namespace App\Filament\Widgets;
 use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Models\Flight;
 use Filament\Support\Enums\FontFamily;
-use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
-use Illuminate\Database\Eloquent\Builder;
 
 class AlphaFlightsTable extends TableWidget
 {
-    protected static ?string $heading = 'Alpha Flights';
-
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
         return $table
+            ->heading(false)
             ->query(
                 Flight::query()
-                    ->accepted()
-                    ->where(function (Builder $query): void {
-                        $query
-                            ->whereNull('date_of_flight')
-                            ->orWhereDate('date_of_flight', now('Asia/Manila')->toDateString());
+                    ->where('status', 'accepted')
+                    ->where(function ($query) {
+                        $query->whereDate('date_of_flight', now('UTC')->toDateString())
+                            // today’s flights
+                            ->orWhere(function ($sub) {
+                                $sub->whereDate('date_of_flight', now('UTC')->subDay()->toDateString())
+                                    ->whereTime('time_start_up', '>=', '21:00:00');
+                            });
                     })
+                    ->orderBy('date_of_flight', 'asc')
+                    ->orderBy('time_start_up', 'asc')
             )
-            ->defaultSort('proposed_time')
             ->columns([
                 TextColumn::make('aircraft_identification')
                     ->label('Callsign')
-                    ->fontFamily(FontFamily::Mono)
-                    ->weight(FontWeight::Black)
-                    ->size('lg')
                     ->searchable()
                     ->sortable()
-                    ->extraHeaderAttributes([
-                        'class' => 'text-left text-base font-black uppercase tracking-[0.2em] text-slate-900',
-                    ])
-                    ->extraCellAttributes([
-                        'class' => 'text-lg font-black tracking-wide text-slate-950',
-                    ]),
+                    ->alignCenter()
+                    ->width('20px')
+                    ->weight('bold')
+                    ->size('md'),
                 TextColumn::make('proposed_time')
                     ->label('PTD')
                     ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->proposed_time))
@@ -51,41 +47,39 @@ class AlphaFlightsTable extends TableWidget
                     ->alignCenter()
                     ->searchable()
                     ->sortable()
-                    ->extraHeaderAttributes([
-                        'class' => 'text-center font-semibold uppercase tracking-wide text-slate-700',
-                    ]),
-                TextColumn::make('time_block_off')
-                    ->label('Block Off')
-                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_block_off))
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+                TextColumn::make('time_start_up')
+                    ->label('START-UP TIME')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
                     ->placeholder('-')
                     ->fontFamily(FontFamily::Mono)
                     ->alignCenter()
                     ->searchable()
                     ->sortable()
-                    ->extraHeaderAttributes([
-                        'class' => 'text-center font-semibold uppercase tracking-wide text-slate-700',
-                    ]),
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
                 TextColumn::make('route')
                     ->label('Route')
                     ->fontFamily(FontFamily::Mono)
-                    ->wrap()
+                    ->alignCenter()
                     ->searchable()
-                    ->sortable()
-                    ->extraHeaderAttributes([
-                        'class' => 'text-center font-semibold uppercase tracking-wide text-slate-700',
-                    ]),
+                    ->limit(30)
+                    ->width('25px')
+                    ->tooltip(fn (Flight $record): ?string => filled($record->route) ? $record->route : null),
                 TextColumn::make('destination_aerodrome')
                     ->label('Destination')
                     ->alignCenter()
                     ->searchable()
                     ->sortable()
-                    ->extraHeaderAttributes([
-                        'class' => 'text-center font-semibold uppercase tracking-wide text-slate-700',
-                    ]),
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('14px')
+                    ->tooltip(fn (Flight $record): ?string => strtoupper((string) $record->destination_aerodrome) === 'ZZZZ'
+                        ? (filled($record->other_info_dest) ? (string) $record->other_info_dest : 'Destination aerodrome details not provided.')
+                        : null),
             ])
-            ->poll('10s')
+            ->poll('5s')
             ->striped()
             ->paginated([10, 25, 50]);
     }
 }
-

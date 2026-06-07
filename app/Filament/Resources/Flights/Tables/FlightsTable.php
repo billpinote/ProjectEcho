@@ -262,7 +262,7 @@ class FlightsTable
         if ($resourceClass === AcceptedFlightResource::class) {
             $readyColumns = [
                 TextInputColumn::make('time_start_up')
-                    ->label('START UP TIME')
+                    ->label('START-UP TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
                         abort_unless(Auth::user()?->canUpdateFlightStartUpTime() ?? false, 403);
@@ -321,20 +321,18 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('3px'),
-                ...self::pickColumns($columns, [
-                    'aircraft_identification',
-                    'proposed_time',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
-                ...self::remainingColumns($columns, [
-                    'aircraft_identification',
-                    'proposed_time',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
+                ...self::relabelColumns(
+                    self::pickColumns($columns, [
+                        'aircraft_identification',
+                        'proposed_time',
+                        'route',
+                        'destination_aerodrome',
+                    ]),
+                    [
+                        'route' => 'Route',
+                        'destination_aerodrome' => 'Destination',
+                    ],
+                ),
             ];
 
             $columns = $readyColumns;
@@ -570,9 +568,9 @@ class FlightsTable
         }
 
         if ($resourceClass === ActiveFlightResource::class) {
-            array_splice($columns, 2, 0, [
+            $activeColumns = [
                 TextInputColumn::make('time_airborne')
-                    ->label('TAKE-OFF TIME')
+                    ->label('TAKE OFF TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
                         abort_unless(Auth::user()?->canUpdateFlightPlans() ?? false, 403);
@@ -631,27 +629,30 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('5px'),
-            ]);
-
-            $activeColumns = [
                 ...self::pickColumns($columns, [
-                    'time_airborne',
-                    'time_airborne_now',
                     'aircraft_identification',
                     'proposed_time',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
                 ]),
-                ...self::remainingColumns($columns, [
-                    'time_airborne',
-                    'time_airborne_now',
-                    'aircraft_identification',
-                    'proposed_time',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
+                TextColumn::make('time_start_up')
+                    ->label('START-UP TIME')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
+                    ->placeholder('-')
+                    ->fontFamily(FontFamily::Mono)
+                    ->alignCenter()
+                    ->searchable()
+                    ->sortable()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+                ...self::relabelColumns(
+                    self::pickColumns($columns, [
+                        'route',
+                        'destination_aerodrome',
+                    ]),
+                    [
+                        'route' => 'Route',
+                        'destination_aerodrome' => 'Destination',
+                    ],
+                ),
             ];
 
             $columns = $activeColumns;
@@ -719,24 +720,18 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('5px'),
-                ...self::pickColumns($columns, [
-                    'aircraft_identification',
-                    'proposed_time',
-                    'time_airborne',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
-                ...self::remainingColumns($columns, [
-                    'time_touchdown',
-                    'time_touchdown_now',
-                    'aircraft_identification',
-                    'proposed_time',
-                    'time_airborne',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
+                ...self::relabelColumns(
+                    self::pickColumns($columns, [
+                        'aircraft_identification',
+                        'time_airborne',
+                        'route',
+                        'destination_aerodrome',
+                    ]),
+                    [
+                        'route' => 'Route',
+                        'destination_aerodrome' => 'Destination',
+                    ],
+                ),
             ];
 
             $columns = $airborneColumns;
@@ -804,26 +799,16 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('6px'),
-                ...self::pickColumns($columns, [
-                    'aircraft_identification',
-                    'proposed_time',
-                    'time_airborne',
-                    'time_touchdown',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
-                ...self::remainingColumns($columns, [
-                    'time_shutdown',
-                    'time_shutdown_now',
-                    'aircraft_identification',
-                    'proposed_time',
-                    'time_airborne',
-                    'time_touchdown',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
+                ...self::relabelColumns(
+                    self::pickColumns($columns, [
+                        'aircraft_identification',
+                        'time_touchdown',
+                        'route',
+                    ]),
+                    [
+                        'route' => 'Route',
+                    ],
+                ),
             ];
 
             $columns = $landedColumns;
@@ -834,23 +819,28 @@ class FlightsTable
                 ...self::pickColumns($columns, [
                     'aircraft_identification',
                     'proposed_time',
-                    'time_airborne',
-                    'time_touchdown',
-                    'time_shutdown',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
                 ]),
-                ...self::remainingColumns($columns, [
-                    'aircraft_identification',
-                    'proposed_time',
-                    'time_airborne',
-                    'time_touchdown',
-                    'time_shutdown',
-                    'departure_aerodrome',
-                    'destination_aerodrome',
-                    'route',
-                ]),
+                TextColumn::make('time_start_up')
+                    ->label('START-UP TIME')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
+                    ->placeholder('-')
+                    ->fontFamily(FontFamily::Mono)
+                    ->alignCenter()
+                    ->searchable()
+                    ->sortable()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('10px'),
+                ...self::relabelColumns(
+                    self::pickColumns($columns, [
+                        'time_airborne',
+                        'time_touchdown',
+                        'time_shutdown',
+                        'route',
+                    ]),
+                    [
+                        'route' => 'Route',
+                    ],
+                ),
             ];
 
             $columns = $completedColumns;
@@ -969,14 +959,19 @@ class FlightsTable
 
     /**
      * @param  array<int, TextColumn|TextInputColumn|IconColumn>  $columns
-     * @param  array<int, string>  $excludedNames
+     * @param  array<string, string>  $labels
      * @return array<int, TextColumn|TextInputColumn|IconColumn>
      */
-    private static function remainingColumns(array $columns, array $excludedNames): array
+    private static function relabelColumns(array $columns, array $labels): array
     {
-        return array_values(array_filter(
-            $columns,
-            fn (TextColumn|TextInputColumn|IconColumn $column): bool => ! in_array($column->getName(), $excludedNames, true),
-        ));
+        foreach ($columns as $column) {
+            $label = $labels[$column->getName()] ?? null;
+
+            if ($label !== null) {
+                $column->label($label);
+            }
+        }
+
+        return $columns;
     }
 }
