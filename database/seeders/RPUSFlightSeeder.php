@@ -62,7 +62,7 @@ class RPUSFlightSeeder extends Seeder
         for ($i = 8; $i < 12; $i++) {
             $trainingArea = $trainingAreas[($i - 8) % count($trainingAreas)];
             $aircraftType = $aircraftTypes[$i % count($aircraftTypes)];
-            $route = 'RPUS DCT ' . $trainingArea . ' DCT RPUS';
+            $route = 'RPUS ' . $trainingArea . ' RPUS';
             $callsign = $this->generateRandomCallsign($usedCallsigns);
 
             $flights[] = [
@@ -90,8 +90,8 @@ class RPUSFlightSeeder extends Seeder
                     'date_of_flight' => $dateOfFlight,
                 ],
                 [
-                    'addressees' => 'RPUSQZQX',
-                    'originator' => 'PROJECTECHO',
+                    'addressees' => 'RPLLYJYX',
+                    'originator' => 'RPUSYFYX',
                     'date_of_filing' => $today->toDateString(),
                     'date_of_flight' => $dateOfFlight,
                     'aircraft_identification' => $flight['aircraft_identification'],
@@ -151,11 +151,11 @@ class RPUSFlightSeeder extends Seeder
     private function generateRoute(string $destination): string
     {
         $routes = [
-            'RPUQ' => 'RPUS DCT MAGWA DCT RPUQ',
-            'RPLB' => 'RPUS DCT SUMIC DCT RPLB',
-            'RPLC' => 'RPUS DCT OLMEN DCT RPLC',
-            'RPUI' => 'RPUS DCT INDAI DCT RPUI',
-            'RPUR' => 'RPUS DCT BORON DCT RPUR',
+            'RPUQ' => 'RPUS RPUQ',
+            'RPLB' => 'RPUS RPLB',
+            'RPLC' => 'RPUS RPLC',
+            'RPUI' => 'RPUS RPUI',
+            'RPUR' => 'RPUS RPUR',
         ];
 
         return $routes[$destination] ?? 'DCT ' . $destination;
@@ -164,11 +164,11 @@ class RPUSFlightSeeder extends Seeder
     private function calculateEET(string $destination): string
     {
         $eettimes = [
-            'RPUQ' => '0130',
-            'RPLB' => '0145',
-            'RPLC' => '0125',
-            'RPUI' => '0115',
-            'RPUR' => '0140',
+            'RPUQ' => '0100',
+            'RPLB' => '0200',
+            'RPLC' => '0200',
+            'RPUI' => '0200',
+            'RPUR' => '0200',
         ];
 
         return $eettimes[$destination] ?? '0130';
@@ -177,9 +177,9 @@ class RPUSFlightSeeder extends Seeder
     private function calculateEndurance(string $aircraftType): string
     {
         $endurances = [
-            'C172' => '0430',
+            'C172' => '0500',
             'SIRA' => '0500',
-            'C152' => '0330',
+            'C152' => '0430',
         ];
 
         return $endurances[$aircraftType] ?? '0400';

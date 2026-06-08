@@ -22,7 +22,6 @@ class AlphaFlightsTable extends TableWidget
                     ->where('status', 'accepted')
                     ->where(function ($query) {
                         $query->whereDate('date_of_flight', now('UTC')->toDateString())
-                            // today’s flights
                             ->orWhere(function ($sub) {
                                 $sub->whereDate('date_of_flight', now('UTC')->subDay()->toDateString())
                                     ->whereTime('time_start_up', '>=', '21:00:00');

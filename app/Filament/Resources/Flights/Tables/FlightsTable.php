@@ -131,7 +131,8 @@ class FlightsTable
                 ->alignCenter()
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->width('10px')
-                ->sortable(),
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('time_touchdown')
                 ->label('TOUCHDOWN')
                 ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
@@ -139,7 +140,8 @@ class FlightsTable
                 ->alignCenter()
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->width('10px')
-                ->sortable(),
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('time_shutdown')
                 ->label('SHUTDOWN')
                 ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_shutdown))
@@ -147,7 +149,8 @@ class FlightsTable
                 ->alignCenter()
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->width('10px')
-                ->sortable(),
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('aircraft_identification')
                 ->label('Callsign')
                 ->fontFamily(FontFamily::Mono)
@@ -157,7 +160,6 @@ class FlightsTable
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->width('14px')
                 ->weight('bold'),
-
             TextColumn::make('departure_aerodrome')
                 ->label('From')
                 ->width('14px')
