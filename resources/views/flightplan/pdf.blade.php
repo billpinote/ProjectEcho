@@ -18,8 +18,8 @@
         @page {
             margin-top: 4mm;
             margin-bottom: 0;
-            margin-left: 10mm;
-            margin-right: 10mm;
+            margin-left: 6mm;
+            margin-right: 6mm;
         }
 
         body {
@@ -458,7 +458,7 @@
             <td colspan="2">
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="width: 20%;">
+                        <td style="width: 15%;">
                             <span class="field-label">15. CRUISING SPEED</span>
                             <div style="padding: 4px;  text-align: left; margin-left: 10px;">
                                 @php
@@ -467,7 +467,7 @@
                                 {!! $charBoxes($cruispeed) !!}
                             </div>
                         </td>
-                        <td style="width: 20%;">
+                        <td style="width: 15%;">
                             <span class="field-label">LEVEL</span>
                             <div style="padding: 4px;  text-align: left; margin-left: -1px;">
                                 @php
@@ -476,7 +476,7 @@
                                 {!! $charBoxes($lvl) !!}
                             </div>
                         </td>
-                        <td style="width: 60%;">
+                        <td style="width: 70%;">
                             <span class="field-label">ROUTE</span>
                             <div style="padding: 4px; text-align: left;">
                                 <div class="multi-line-box">{{ $flight->route ?? '' }}</div>

@@ -4,11 +4,23 @@ namespace Tests\Feature;
 
 use App\Http\Requests\StoreFlightPlanRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class FlightPlanRequestTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_public_flight_plan_form_loads_without_aircraft_wtc_table(): void
+    {
+        Schema::dropIfExists('aircraft_types_wtc');
+
+        $response = $this->get(route('flightplan'));
+
+        $response
+            ->assertOk()
+            ->assertSee('Flight Plan Form');
+    }
 
     /**
      * Test that other info tags are properly extracted from the other_information field.

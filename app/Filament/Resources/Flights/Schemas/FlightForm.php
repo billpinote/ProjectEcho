@@ -23,6 +23,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema as SchemaFacade;
 
 class FlightForm
 {
@@ -416,6 +417,10 @@ class FlightForm
         $designator = strtoupper(trim((string) $state));
 
         if ($designator === '' || $designator === 'ZZZZ') {
+            return;
+        }
+
+        if (! SchemaFacade::hasTable('aircraft_types_wtc')) {
             return;
         }
 
