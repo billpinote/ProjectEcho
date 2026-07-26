@@ -433,7 +433,7 @@
                             </div>
                         </td>
                         
-                        <td style="width: 20%;">
+                        <td style="width: 15%;">
                             <span class="field-label">TIME</span>
                             <div style="padding: 4px; text-align: left;">
                                 @php
@@ -806,11 +806,11 @@
                             </table>
                         </td>
                         <!-- QR Code Section -->
-                        <td style="width: 20%; padding-left: 4px; vertical-align: top; text-align: center;">
+                        <td style="width: 20%; padding-left: 0px; vertical-align: top; text-align: center;">
                             <span class="field-label" style="margin-bottom: 46px;"></span>
-                            <div style="padding: 4px; border: 1px solid #000;">
+                            <div style="padding: 1px; border: 1px solid #000;">
                                 @if(isset($qrCodeBase64))
-                                    <img src="{{ $qrCodeBase64 }}" style="width: 120px; height: 120px;" />
+                                    <img src="{{ $qrCodeBase64 }}" style="width: 140px; height: 140px;" />
                                 @elseif(isset($isPreview) && ($showPreviewActions ?? true))
                                     <div style="width: 120px; height: 120px; border: 1px dashed #666; display: flex; align-items: center; justify-content: center; margin: 0 auto; padding: 8px; box-sizing: border-box; font-size: 9px; line-height: 1.3; text-align: center; color: #444;">
                                         QR will be generated when the PDF is generated.

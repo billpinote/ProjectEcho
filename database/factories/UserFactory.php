@@ -24,8 +24,15 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $name = fake()->name();
+
         return [
-            'name' => fake()->name(),
+            'name' => $name,
+            'display_name' => $name,
+            'first_name' => fake()->firstName(),
+            'middle_name' => fake()->optional()->firstName(),
+            'last_name' => fake()->lastName(),
+            'suffix' => fake()->optional()->randomElement(['Jr', 'Sr', 'III', null]),
             'email' => fake()->unique()->safeEmail(),
             'username' => fake()->unique()->userName(),
             'employee_id' => fake()->unique()->bothify('EMP-####'),

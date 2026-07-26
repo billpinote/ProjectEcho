@@ -11,6 +11,11 @@
         <script src="https://unpkg.com/html5-qrcode"></script>
     @endif
     <link rel="stylesheet" href="{{ asset('css/flightplan.css') }}">
+    <style>
+        #qr-reader video {
+            transform: scaleX(-1);
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
     @include('flightplan.partials.navbar', ['activeNav' => 'scan-upload-qr'])

@@ -8,6 +8,7 @@ use App\Filament\Pages\Coordinator;
 use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
+use App\Filament\Resources\AllFlightPlans\AllFlightResource;
 use App\Filament\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Resources\Flights\FlightResource;
@@ -87,6 +88,7 @@ class AdminPanelProvider extends PanelProvider
                                 ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.resources.flights.create'))
                                 ->url(fn (): string => CreateFlight::getUrl()),
                             ...FlightResource::getNavigationItems(),
+                            ...AllFlightResource::getNavigationItems(),
                             ...RejectedFlightResource::getNavigationItems(),
                             ...ExpiredFlightResource::getNavigationItems(),
                         ]),

@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Enums\UserRole;
+use App\Models\AuthAccount;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -21,6 +23,11 @@ class User extends Authenticatable implements FilamentUser
      */
     protected $fillable = [
         'name',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'suffix',
+        'display_name',
         'email',
         'username',
         'employee_id',
@@ -61,6 +68,11 @@ class User extends Authenticatable implements FilamentUser
     public function setRoleAttribute(mixed $value): void
     {
         $this->attributes['role'] = UserRole::normalize($value)?->value ?? UserRole::Pilot->value;
+    }
+
+    public function authAccounts(): HasMany
+    {
+        return $this->hasMany(AuthAccount::class);
     }
 
     public function acceptedFlights()
