@@ -4,10 +4,13 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Models\AuthAccount;
+use App\Models\Operator;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -31,6 +34,7 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'username',
         'employee_id',
+        'operator_id',
         'wiresign',
         'password',
         'role',
@@ -75,9 +79,80 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(AuthAccount::class);
     }
 
-    public function acceptedFlights()
+    public function operator(): BelongsTo
+    {
+        return $this->belongsTo(Operator::class);
+    }
+
+    public function pilotProfile(): HasOne
+    {
+        return $this->hasOne(PilotProfile::class);
+    }
+
+    public function atcProfile(): HasOne
+    {
+        return $this->hasOne(AtcProfile::class);
+    }
+
+    public function dispatchProfile(): HasOne
+    {
+        return $this->hasOne(DispatchProfile::class);
+    }
+
+    public function avsecProfile(): HasOne
+    {
+        return $this->hasOne(AvsecProfile::class);
+    }
+
+    public function acceptedFlights(): HasMany
     {
         return $this->hasMany(Flight::class, 'accepted_by_user_id');
+    }
+
+    public function pilotFlights(): HasMany
+    {
+        return $this->hasMany(Flight::class, 'pilot_id');
+    }
+
+    public function fullName(): string
+    {
+        return trim(implode(' ', array_filter([
+            $this->first_name,
+            $this->middle_name,
+            $this->last_name,
+            $this->suffix,
+        ])));
+    }
+
+    public function icaoPilotName(): string
+    {
+        $parts = array_filter([
+            strtoupper(trim((string) $this->first_name)),
+            strtoupper(trim((string) $this->middle_name)),
+            strtoupper(trim((string) $this->last_name)),
+        ]);
+
+        return implode(' ', $parts);
+    }
+
+    public function isPilot(): bool
+    {
+        return $this->role === UserRole::Pilot;
+    }
+
+    public function isAtc(): bool
+    {
+        return $this->role === UserRole::Atmo || $this->role === UserRole::AtsHq;
+    }
+
+    public function isDispatch(): bool
+    {
+        return $this->role === UserRole::Dispatch;
+    }
+
+    public function isAvsec(): bool
+    {
+        return $this->role === UserRole::Avsec;
     }
 
     public function canAccessPanel(Panel $panel): bool
@@ -161,5 +236,10 @@ class User extends Authenticatable implements FilamentUser
     private function isRpusStation(): bool
     {
         return strtoupper(trim((string) $this->station)) === 'RPUS';
+    }
+
+    public function flights(): HasMany
+    {
+        return $this->hasMany(Flight::class);
     }
 }

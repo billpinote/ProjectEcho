@@ -17,8 +17,8 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->unique();
             $table->string('username')->unique()->nullable();
-            $table->string('employee_id')->unique()->nullable();
-            $table->string('wiresign')->unique()->nullable();
+            $table->string('employee_id')->nullable();
+            $table->string('wiresign')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->enum('role', UserRole::values())->default(UserRole::Pilot->value);

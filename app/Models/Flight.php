@@ -52,6 +52,7 @@ class Flight extends Model
     ];
 
     protected $fillable = [
+        'user_id',
         'time_start_up',
         'time_shutdown',
         'time_block_off',
@@ -116,6 +117,7 @@ class Flight extends Model
         'aircraft_colour_and_markings',
         'remarks',
         'pilot_in_command',
+        'pilot_id',
         'filed_by_name',
         'filed_by_signature',
         'pilot_license_no',
@@ -148,6 +150,11 @@ class Flight extends Model
     public function acceptedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'accepted_by_user_id');
+    }
+
+    public function pilot(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pilot_id');
     }
 
     public function scopePendingActive(Builder $query): Builder
@@ -346,5 +353,10 @@ class Flight extends Model
 
             $this->attributes[$field] = UtcFourDigitTime::normalizeDatabaseTime($this->attributes[$field]);
         }
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

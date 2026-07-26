@@ -24,6 +24,8 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class FlightController extends Controller
 {
+    
+
     /**
      * Store form data in session and show preview.
      */
@@ -407,6 +409,9 @@ class FlightController extends Controller
         if (! $flightData) {
             return redirect()->route('flightplan');
         }
+
+        // Assign the logged-in user as the owner of the flight
+        $flightData['user_id'] = Auth::id();
 
         // Create the Flight record
         $flight = Flight::create($flightData);
