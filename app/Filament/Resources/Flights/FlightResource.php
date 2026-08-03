@@ -61,9 +61,15 @@ class FlightResource extends Resource
     {
         $user = Auth::user();
 
-        return $user?->canUpdateFlightPlans()
-            || $user?->createsFlightPlanRevisionsOnly()
-            || false;
+        if ($user?->canUpdateFlightPlans()) {
+            return true;
+        }
+
+        if ($user?->createsFlightPlanRevisionsOnly()) {
+            return $record?->user_id === $user->id;
+        }
+
+        return false;
     }
 
     public static function canDelete($record): bool
@@ -88,6 +94,13 @@ class FlightResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
+        $user = Auth::user();
+
+        if ($user?->isPilot()) {
+            return static::getFlightPlanBaseQuery()
+                ->where('user_id', $user->id);
+        }
+
         if (! static::hasStatusColumn()) {
             return static::getFlightPlanBaseQuery()->whereNull('accepted_by_user_id');
         }
@@ -232,13 +245,18 @@ class FlightResource extends Resource
      */
     private static function normalizeOtherInformation(array $data): array
     {
-        $otherInformation = (string) ($data['other_information'] ?? '');
+    dd($data['date_of_flight'] ?? null, $data['other_information'] ?? null);    
+    throw new \Exception('normalizeOtherInformation was called');
+    $otherInformation = (string) ($data['other_information'] ?? '');
 
-        if (blank($otherInformation) && filled($data['date_of_flight'] ?? null)) {
+        if (
+            filled($data['date_of_flight'] ?? null)
+            && self::extractOtherInfoTagValue('DOF', $otherInformation) === null
+        ) {
             $dateOfFlight = preg_replace('/\D/', '', (string) $data['date_of_flight']);
 
-            if (strlen((string) $dateOfFlight) === 8) {
-                $otherInformation = 'DOF/'.$dateOfFlight;
+            if (strlen($dateOfFlight) === 8) {
+                $otherInformation = trim($otherInformation.' DOF/'.$dateOfFlight);
             }
         }
 

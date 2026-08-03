@@ -22,6 +22,7 @@ use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as SchemaFacade;
 
@@ -152,6 +153,7 @@ class FlightForm
                                             ->afterStateUpdated(fn (Get $get, Set $set): mixed => self::syncRequiredOtherInfoTags($get, $set)),
 
                                         self::textarea('other_information', 'Other Information', 8, rows: 4)
+                                            ->default(fn (): ?string => self::pilotOtherInformationDefaults())
                                             ->live(onBlur: true)
                                             ->required(fn (Get $get): bool => self::requiresOtherInformation($get))
                                             ->helperText(fn (Get $get): ?string => self::otherInformationHint($get)),
@@ -228,15 +230,19 @@ class FlightForm
                                         self::text('remarks', 'Remarks', 8),
 
                                         self::text('pilot_in_command', 'Pilot In Command', 4)
+                                            ->default(fn (): ?string => self::pilotNameDefault())
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('pilot_license_no', 'Lic. No.', 1)
+                                            ->default(fn (): ?string => self::pilotLicenseDefault())
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('pilot_ratings', 'Pilot Ratings', 2)
+                                            ->default(fn (): ?string => self::pilotRatingsDefault())
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::date('license_expiry_date', 'Expiry Date', 1)
+                                            ->default(fn (): ?string => self::pilotLicenseExpiryDefault())
                                             ->live()
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
 
@@ -281,6 +287,55 @@ class FlightForm
                             ]),
                     ]),
             ]);
+    }
+
+    private static function pilotNameDefault(): ?string
+    {
+        $user = Auth::user();
+
+        return $user?->isPilot() ? trim((string) $user->fullName()) : null;
+    }
+
+    private static function pilotLicenseDefault(): ?string
+    {
+        $user = Auth::user();
+
+        return $user?->isPilot() ? trim((string) ($user->pilotProfile?->license_number ?? '')) : null;
+    }
+
+    private static function pilotRatingsDefault(): ?string
+    {
+        $user = Auth::user();
+
+        return $user?->isPilot() ? trim((string) ($user->pilotProfile?->ratings ?? '')) : null;
+    }
+
+    private static function pilotLicenseExpiryDefault(): ?string
+    {
+        $user = Auth::user();
+
+        return $user?->isPilot() && $user->pilotProfile?->license_expiry_date
+            ? $user->pilotProfile?->license_expiry_date->toDateString()
+            : null;
+    }
+
+    private static function pilotOtherInformationDefaults(): ?string
+    {
+        $parts = [
+            'DOF/' . now()->format('Ymd'),
+        ];
+
+        $user = Auth::user();
+
+        if ($user?->isPilot()) {
+            $operator = trim((string) ($user->pilotProfile?->operator ?? ''));
+
+            if ($operator !== '') {
+                $parts[] = 'OPR/' . $operator;
+            }
+        }
+
+        return implode(' ', $parts);
     }
 
     private static function text(string $name, string $label, int $span = 1): TextInput

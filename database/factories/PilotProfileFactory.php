@@ -20,7 +20,7 @@ class PilotProfileFactory extends Factory
             'ratings' => fake()->randomElement(['IR', 'ME', 'ATPL', 'CPL', 'SEL', 'MCC']),
             'license_expiry_date' => fake()->dateTimeBetween('now', '+3 years')->format('Y-m-d'),
             'medical_expiry_date' => fake()->dateTimeBetween('now', '+2 years')->format('Y-m-d'),
-            'home_base' => fake()->randomElement(['RPUS', 'RPLL', 'RPVM', 'RPVD', 'RPLC']),
+            'operator' => fake()->randomElement(['RPUS', 'RPLL', 'RPVM', 'RPVD', 'RPLC']),
             'remarks' => fake()->optional()->sentence(),
         ];
     }

@@ -23,7 +23,7 @@ class PilotProfileSeeder extends Seeder
                 'ratings' => 'IR ME',
                 'license_expiry_date' => now()->addYears(2)->toDateString(),
                 'medical_expiry_date' => now()->addYear()->toDateString(),
-                'home_base' => $user->station ?: 'RPUS',
+                'operator' => $user->station ?: 'RPUS',
                 'remarks' => 'Seeded pilot profile.',
             ]);
         }

@@ -16,7 +16,7 @@ class PilotProfile extends Model
         'ratings',
         'license_expiry_date',
         'medical_expiry_date',
-        'home_base',
+        'operator',
         'remarks',
     ];
 

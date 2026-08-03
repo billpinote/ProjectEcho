@@ -41,7 +41,7 @@ class PilotProfileResource extends Resource
             TextInput::make('ratings')->label('Ratings'),
             TextInput::make('license_expiry_date')->label('License Expiry Date'),
             TextInput::make('medical_expiry_date')->label('Medical Expiry Date'),
-            TextInput::make('home_base')->label('Home Base'),
+            TextInput::make('operator')->label('Operator (OPR)'),
             Textarea::make('remarks')->label('Remarks'),
         ]);
     }
@@ -54,7 +54,7 @@ class PilotProfileResource extends Resource
             TextColumn::make('ratings')->sortable(),
             TextColumn::make('license_expiry_date')->label('License Expiry')->sortable(),
             TextColumn::make('medical_expiry_date')->label('Medical Expiry')->sortable(),
-            TextColumn::make('home_base')->label('Home Base')->sortable(),
+            TextColumn::make('operator')->label('Operator (OPR)')->sortable(),
         ]);
     }
 

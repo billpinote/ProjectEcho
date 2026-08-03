@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('ratings')->nullable();
             $table->date('license_expiry_date')->nullable();
             $table->date('medical_expiry_date')->nullable();
-            $table->string('home_base')->nullable();
+            $table->string('operator')->nullable();
             $table->text('remarks')->nullable();
             $table->timestamps();
         });

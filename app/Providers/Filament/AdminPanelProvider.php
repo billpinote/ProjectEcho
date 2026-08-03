@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Pages\ImportScanQr;
 use App\Filament\Pages\Alpha;
 use App\Filament\Pages\Coordinator;
+use App\Filament\Pages\MyProfilePage;
 use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
@@ -14,10 +15,12 @@ use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
+use App\Filament\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Resources\Reports\ActiveFlightDataResource;
 use App\Filament\Resources\Reports\PostOpsLogResource;
+use App\Filament\Widgets\PilotDashboardWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -65,6 +68,31 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
+                $user = auth()->user();
+
+                if ($user?->isPilot()) {
+                    return $builder->items([
+                        NavigationItem::make(Dashboard::getNavigationLabel())
+                            ->icon(Dashboard::getNavigationIcon())
+                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.pages.dashboard'))
+                            ->sort(-2)
+                            ->url(fn (): string => Dashboard::getUrl()),
+                        NavigationItem::make('Create Flight Plan')
+                            ->icon(Heroicon::OutlinedPlusCircle)
+                            ->sort(10)
+                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.resources.flights.create'))
+                            ->url(fn (): string => CreateFlight::getUrl()),
+                        NavigationItem::make('My Flight Plans')
+                            ->icon(Heroicon::OutlinedPaperAirplane)
+                            ->sort(11)
+                            ->url(fn (): string => MyFlightPlansResource::getUrl('index')),
+                        NavigationItem::make('My Profile')
+                            ->icon(Heroicon::OutlinedUserCircle)
+                            ->sort(12)
+                            ->url(fn (): string => MyProfilePage::getUrl()),
+                    ]);
+                }
+
                 return $builder->items([
                     NavigationItem::make(Dashboard::getNavigationLabel())
                         ->icon(Dashboard::getNavigationIcon())
@@ -115,6 +143,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
                 AccountWidget::class,
+                PilotDashboardWidget::class,
                 FilamentInfoWidget::class,
             ])
             ->middleware([

@@ -175,6 +175,7 @@ class FlightController extends Controller
     public function showFlightPlanView(Request $request, Flight $flight)
     {
         $this->ensureFlightUserAccess();
+        abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
 
         if (Auth::user()?->canReviewFlightPlans() && $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
             $flight->markAsReviewed();
@@ -983,6 +984,7 @@ class FlightController extends Controller
     {
         if (Auth::check()) {
             $this->ensureFlightUserAccess();
+            abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
 
             return;
         }
