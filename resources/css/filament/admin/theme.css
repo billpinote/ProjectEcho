@@ -249,6 +249,46 @@
         text-transform: uppercase;
     }
 
+    .echo-flight-status-cell .fi-ta-text-item {
+        justify-content: center;
+    }
+
+    .echo-flight-status-cell .fi-badge {
+        min-width: 0;
+        padding-inline: 0.75rem;
+        padding-block: 0.35rem;
+        text-transform: none;
+        letter-spacing: 0;
+        white-space: nowrap;
+    }
+
+    .echo-flight-status-cell[data-flight-status='pending'] .fi-badge {
+        background: transparent;
+        color: var(--gray-600);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gray-400) 88%, white);
+    }
+
+    .echo-flight-status-cell[data-flight-status='pending'] .fi-badge .fi-icon {
+        color: var(--gray-500);
+    }
+
+    .echo-flight-status-cell[data-flight-status='accepted'] .fi-badge {
+        background: #334155;
+        color: #fffdf7;
+        box-shadow: none;
+    }
+
+    .echo-flight-status-cell[data-flight-status='accepted'] .fi-badge .fi-icon,
+    .echo-flight-status-cell[data-flight-status='expired'] .fi-badge .fi-icon {
+        color: inherit;
+    }
+
+    .echo-flight-status-cell[data-flight-status='expired'] .fi-badge {
+        background: #364152;
+        color: #fffdf7;
+        box-shadow: none;
+    }
+
     .fi-ta-ctn,
     .fi-ta-main,
     .fi-ta-content,

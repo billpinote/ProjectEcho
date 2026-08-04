@@ -27,10 +27,13 @@ trait ConfiguresEchoPanel
             ->login()
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
+                'charcoal' => Color::hex('#364152'),
                 'danger' => Color::hex('#EF4444'),
                 'gray' => Color::hex('#68726B'),
+                'indigo' => Color::hex('#4F46E5'),
                 'info' => Color::hex('#2563EB'),
                 'primary' => Color::hex('#0F5F4A'),
+                'slate' => Color::hex('#334155'),
                 'success' => Color::hex('#22C55E'),
                 'warning' => Color::hex('#F5A524'),
             ])

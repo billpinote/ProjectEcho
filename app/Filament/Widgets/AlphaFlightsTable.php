@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Models\Flight;
+use App\Support\FlightStatusDisplay;
 use Filament\Support\Enums\FontFamily;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -32,6 +33,7 @@ class AlphaFlightsTable extends TableWidget
                     ->orderBy('time_start_up', 'asc')
             )
             ->columns([
+                FlightStatusDisplay::tableColumn(),
                 TextColumn::make('aircraft_identification')
                     ->label('Callsign')
                     ->searchable()

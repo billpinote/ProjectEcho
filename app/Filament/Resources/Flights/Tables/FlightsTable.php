@@ -10,12 +10,14 @@ use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
+use App\Filament\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Resources\Reports\ActiveFlightDataResource;
 use App\Filament\Resources\Reports\PostOpsLogResource;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
+use App\Support\FlightStatusDisplay;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -254,6 +256,10 @@ class FlightsTable
                 ->extraHeaderAttributes(['class' => 'text-center'])
                 ->toggleable(isToggledHiddenByDefault: true),
         ];
+
+        if ($resourceClass === MyFlightPlansResource::class) {
+            array_unshift($columns, FlightStatusDisplay::tableColumn());
+        }
 
         if ($isOperationalFlightTable) {
             $columns = array_values(array_filter(
