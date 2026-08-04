@@ -55,6 +55,7 @@ trait ConfiguresEchoPanel
             ->topbar(false)
             ->breadcrumbs(false)
             ->darkMode(false)
+            ->globalSearch(false)
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => view('filament.components.echo-modal-root')->render(),

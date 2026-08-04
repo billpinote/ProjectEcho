@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ActiveFlightDataResource extends FlightResource
 {
-    protected static ?string $navigationParentItem = 'Reports';
+    protected static ?string $navigationParentItem = 'Coordinator';
+
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentChartBar;
 
@@ -19,7 +21,7 @@ class ActiveFlightDataResource extends FlightResource
 
     protected static ?string $pluralModelLabel = 'active flight data';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     public static function getEloquentQuery(): Builder
     {

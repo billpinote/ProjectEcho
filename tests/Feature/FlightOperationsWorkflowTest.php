@@ -33,6 +33,9 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->assertTrue(Route::has('filament.atmo.resources.expired-flights.index'));
         $this->assertTrue(Route::has('filament.atmo.resources.rejected-flights.index'));
         $this->assertTrue(Route::has('filament.atmo.resources.all-flight-plans.index'));
+        $this->assertTrue(Route::has('filament.atmo.resources.reports.abbreviated-flight-reports.index'));
+        $this->assertTrue(Route::has('filament.atmo.resources.reports.active-flight-data.index'));
+        $this->assertTrue(Route::has('filament.atmo.resources.reports.post-ops-logs.index'));
         $this->assertTrue(Route::has('filament.atmo.pages.coordinator'));
         $this->assertTrue(Route::has('filament.atmo.pages.import-scan-qr'));
 
@@ -40,6 +43,12 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->assertTrue(Route::has('filament.dispatch.resources.active-flights.index'));
         $this->assertTrue(Route::has('filament.dispatch.resources.landed-flights.index'));
         $this->assertTrue(Route::has('filament.dispatch.resources.completed-flights.index'));
+
+        foreach (['pilot', 'dispatch', 'avsec'] as $panel) {
+            $this->assertFalse(Route::has("filament.{$panel}.resources.reports.abbreviated-flight-reports.index"));
+            $this->assertFalse(Route::has("filament.{$panel}.resources.reports.active-flight-data.index"));
+            $this->assertFalse(Route::has("filament.{$panel}.resources.reports.post-ops-logs.index"));
+        }
     }
 
     public function test_atmo_sidebar_renders_operational_navigation_for_atmo_and_artisan_users(): void
@@ -64,6 +73,22 @@ class FlightOperationsWorkflowTest extends TestCase
                 ->assertSeeText('Coordinator')
                 ->assertSeeText('QR Import')
                 ->assertSeeText('Alpha');
+
+            $coordinatorResponse = $this->actingAs($user)->get('/atmo/coordinator');
+
+            $coordinatorResponse
+                ->assertOk()
+                ->assertSeeText('Coordinator')
+                ->assertSeeText('Abbreviated Flight Report')
+                ->assertSeeText('Active Flight Data')
+                ->assertSeeText('Post-Ops Log');
+
+            $this->assertTextContainsInOrder($coordinatorResponse->getContent(), [
+                'Coordinator',
+                'Abbreviated Flight Report',
+                'Active Flight Data',
+                'Post-Ops Log',
+            ]);
         }
     }
 
@@ -100,6 +125,9 @@ class FlightOperationsWorkflowTest extends TestCase
             '/atmo/rejected-flights',
             '/atmo/all-flight-plans',
             '/atmo/coordinator',
+            '/atmo/reports/abbreviated-flight-reports',
+            '/atmo/reports/active-flight-data',
+            '/atmo/reports/post-ops-logs',
             '/atmo/import-scan-qr',
             '/atmo/alpha',
         ] as $url) {
@@ -115,6 +143,40 @@ class FlightOperationsWorkflowTest extends TestCase
         ] as $url) {
             $this->actingAs($dispatch)->get($url)->assertOk();
         }
+    }
+
+    public function test_artisan_can_open_atmo_report_pages(): void
+    {
+        $artisan = $this->user(UserRole::Artisan);
+
+        foreach ([
+            '/atmo/reports/abbreviated-flight-reports',
+            '/atmo/reports/active-flight-data',
+            '/atmo/reports/post-ops-logs',
+        ] as $url) {
+            $this->actingAs($artisan)->get($url)->assertOk();
+        }
+    }
+
+    public function test_atmo_report_pdf_actions_and_date_filters_remain_available(): void
+    {
+        $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS', 'wiresign' => 'AT']);
+        $date = now('Asia/Manila')->addDay()->toDateString();
+
+        $this->flight([
+            'status' => FlightPlanStatus::Accepted,
+            'date_of_flight' => $date,
+            'received_facility' => 'RPUS',
+            'time_airborne' => '0915',
+        ]);
+
+        $this->actingAs($atmo)
+            ->get('/reports/abbreviated/pdf?date='.$date)
+            ->assertOk();
+
+        $this->actingAs($atmo)
+            ->get('/reports/post-ops-log/pdf?date='.$date)
+            ->assertOk();
     }
 
     public function test_operational_time_columns_render_in_the_expected_tables(): void
@@ -290,5 +352,22 @@ class FlightOperationsWorkflowTest extends TestCase
             'route' => 'DCT',
             ...$attributes,
         ]);
+    }
+
+    /**
+     * @param  list<string>  $expected
+     */
+    private function assertTextContainsInOrder(string $html, array $expected): void
+    {
+        $text = preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($html))) ?? '';
+        $offset = 0;
+
+        foreach ($expected as $needle) {
+            $position = strpos($text, $needle, $offset);
+
+            $this->assertNotFalse($position, "Failed asserting that [{$needle}] appears in order.");
+
+            $offset = $position + strlen($needle);
+        }
     }
 }

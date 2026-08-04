@@ -9,17 +9,19 @@ use Illuminate\Database\Eloquent\Builder;
 
 class PostOpsLogResource extends FlightResource
 {
-    protected static ?string $navigationParentItem = 'Reports';
+    protected static ?string $navigationParentItem = 'Coordinator';
+
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
 
-    protected static ?string $navigationLabel = 'Post Ops Log';
+    protected static ?string $navigationLabel = 'Post-Ops Log';
 
     protected static ?string $modelLabel = 'post ops log';
 
     protected static ?string $pluralModelLabel = 'post ops logs';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     public static function getEloquentQuery(): Builder
     {

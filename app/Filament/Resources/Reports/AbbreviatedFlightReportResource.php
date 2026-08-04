@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Builder;
 
 class AbbreviatedFlightReportResource extends FlightResource
 {
-    protected static ?string $navigationParentItem = 'Reports';
+    protected static ?string $navigationParentItem = 'Coordinator';
+
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentText;
 
-    protected static ?string $navigationLabel = 'Abbreviated';
+    protected static ?string $navigationLabel = 'Abbreviated Flight Report';
 
     protected static ?string $modelLabel = 'abbreviated flight report';
 
