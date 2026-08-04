@@ -157,9 +157,31 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $panel->getId() === 'admin'
-            && $this->is_active
-            && $this->canAccessFlightPanel();
+        if (! $this->is_active) {
+            return false;
+        }
+
+        if ($this->role === UserRole::Artisan) {
+            return in_array($panel->getId(), [
+                'artisan',
+                'admin',
+                'pilot',
+                'atmo',
+                'dispatch',
+                'avsec',
+                'ats',
+            ], true);
+        }
+
+        return match ($panel->getId()) {
+            'admin' => $this->role === UserRole::Admin,
+            'pilot' => $this->role === UserRole::Pilot,
+            'atmo' => $this->role === UserRole::Atmo && $this->canAccessFlightPanel(),
+            'dispatch' => $this->role === UserRole::Dispatch,
+            'avsec' => $this->role === UserRole::Avsec,
+            'ats' => $this->role === UserRole::AtsHq,
+            default => false,
+        };
     }
 
     public function canAccessFlightPanel(): bool
@@ -217,6 +239,12 @@ class User extends Authenticatable implements FilamentUser
     }
 
     public function canUpdateFlightStartUpTime(): bool
+    {
+        return $this->canUpdateFlightPlans()
+            || ($this->is_active && $this->role === UserRole::Dispatch);
+    }
+
+    public function canUpdateFlightBlockOffTime(): bool
     {
         return $this->canUpdateFlightPlans()
             || ($this->is_active && $this->role === UserRole::Dispatch);

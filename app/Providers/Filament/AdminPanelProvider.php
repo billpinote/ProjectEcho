@@ -2,171 +2,33 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\ImportScanQr;
-use App\Filament\Pages\Alpha;
-use App\Filament\Pages\Coordinator;
-use App\Filament\Pages\MyProfilePage;
-use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
-use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
-use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
-use App\Filament\Resources\AllFlightPlans\AllFlightResource;
-use App\Filament\Resources\CompletedFlights\CompletedFlightResource;
-use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
-use App\Filament\Resources\Flights\FlightResource;
-use App\Filament\Resources\Flights\Pages\CreateFlight;
-use App\Filament\Resources\LandedFlights\LandedFlightResource;
-use App\Filament\Resources\MyFlightPlans\MyFlightPlansResource;
-use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
-use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
-use App\Filament\Resources\Reports\ActiveFlightDataResource;
-use App\Filament\Resources\Reports\PostOpsLogResource;
-use App\Filament\Widgets\PilotDashboardWidget;
-use Filament\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
-use Filament\Http\Middleware\DisableBladeIconComponents;
-use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Navigation\NavigationBuilder;
-use Filament\Navigation\NavigationItem;
+use App\Filament\Resources\AtcProfiles\AtcProfileResource;
+use App\Filament\Resources\AvsecProfiles\AvsecProfileResource;
+use App\Filament\Resources\DispatchProfiles\DispatchProfileResource;
+use App\Filament\Resources\Operators\OperatorResource;
+use App\Filament\Resources\PilotProfiles\PilotProfileResource;
+use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
-use Filament\Support\Icons\Heroicon;
-use Filament\View\PanelsRenderHook;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
-use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
-use Illuminate\Routing\Middleware\SubstituteBindings;
-use Illuminate\Session\Middleware\StartSession;
-use Illuminate\View\Middleware\ShareErrorsFromSession;
-
-use function Filament\Support\original_request;
 
 class AdminPanelProvider extends PanelProvider
 {
+    use ConfiguresEchoPanel;
+
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        return $this->configureEchoPanel($panel, 'admin', 'admin')
             ->default()
-            ->id('admin')
-            ->path('admin')
-            ->login()
-            ->viteTheme('resources/css/filament/admin/theme.css')
-            ->colors([
-                'danger' => Color::hex('#EF4444'),
-                'gray' => Color::hex('#68726B'),
-                'info' => Color::hex('#2563EB'),
-                'primary' => Color::hex('#0F5F4A'),
-                'success' => Color::hex('#22C55E'),
-                'warning' => Color::hex('#F5A524'),
-            ])
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 Dashboard::class,
             ])
-            ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
-                $user = auth()->user();
-
-                if ($user?->isPilot()) {
-                    return $builder->items([
-                        NavigationItem::make(Dashboard::getNavigationLabel())
-                            ->icon(Dashboard::getNavigationIcon())
-                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.pages.dashboard'))
-                            ->sort(-2)
-                            ->url(fn (): string => Dashboard::getUrl()),
-                        NavigationItem::make('Create Flight Plan')
-                            ->icon(Heroicon::OutlinedPlusCircle)
-                            ->sort(10)
-                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.resources.flights.create'))
-                            ->url(fn (): string => CreateFlight::getUrl()),
-                        NavigationItem::make('My Flight Plans')
-                            ->icon(Heroicon::OutlinedPaperAirplane)
-                            ->sort(11)
-                            ->url(fn (): string => MyFlightPlansResource::getUrl('index')),
-                        NavigationItem::make('My Profile')
-                            ->icon(Heroicon::OutlinedUserCircle)
-                            ->sort(12)
-                            ->url(fn (): string => MyProfilePage::getUrl()),
-                    ]);
-                }
-
-                return $builder->items([
-                    NavigationItem::make(Dashboard::getNavigationLabel())
-                        ->icon(Dashboard::getNavigationIcon())
-                        ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.pages.dashboard'))
-                        ->sort(-2)
-                        ->url(fn (): string => Dashboard::getUrl()),
-                    NavigationItem::make('Operations')
-                        ->icon('heroicon-o-cog-6-tooth')
-                        ->sort(5)
-                        ->childItems([
-                            ...Alpha::getNavigationItems(),
-                            ...Coordinator::getNavigationItems(),
-                        ]),
-                    NavigationItem::make('Flight Plan')
-                        ->icon(Heroicon::OutlinedPaperAirplane)
-                        ->sort(10)
-                        ->childItems([
-                            ...ImportScanQr::getNavigationItems(),
-                            NavigationItem::make('New Flight Plan')
-                                ->icon(Heroicon::OutlinedPlusCircle)
-                                ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.resources.flights.create'))
-                                ->url(fn (): string => CreateFlight::getUrl()),
-                            ...FlightResource::getNavigationItems(),
-                            ...AllFlightResource::getNavigationItems(),
-                            ...RejectedFlightResource::getNavigationItems(),
-                            ...ExpiredFlightResource::getNavigationItems(),
-                        ]),
-                    NavigationItem::make('Flights')
-                        ->icon(Heroicon::OutlinedGlobeAlt)
-                        ->sort(11)
-                        ->childItems([
-                            ...AcceptedFlightResource::getNavigationItems(),
-                            ...ActiveFlightResource::getNavigationItems(),
-                            ...AirborneFlightResource::getNavigationItems(),
-                            ...LandedFlightResource::getNavigationItems(),
-                            ...CompletedFlightResource::getNavigationItems(),
-                        ]),
-                    NavigationItem::make('Reports')
-                        ->icon(Heroicon::OutlinedDocumentChartBar)
-                        ->sort(12)
-                        ->childItems([
-                            ...ActiveFlightDataResource::getNavigationItems(),
-                            ...AbbreviatedFlightReportResource::getNavigationItems(),
-                            ...PostOpsLogResource::getNavigationItems(),
-                        ]),
-                ]);
-            })
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
-            ->widgets([
-                AccountWidget::class,
-                PilotDashboardWidget::class,
-                FilamentInfoWidget::class,
-            ])
-            ->middleware([
-                EncryptCookies::class,
-                AddQueuedCookiesToResponse::class,
-                StartSession::class,
-                AuthenticateSession::class,
-                ShareErrorsFromSession::class,
-                VerifyCsrfToken::class,
-                SubstituteBindings::class,
-                DisableBladeIconComponents::class,
-                DispatchServingFilamentEvent::class,
-            ])
-            ->authMiddleware([
-                Authenticate::class,
-            ])
-            ->sidebarCollapsibleOnDesktop()
-            ->topbar(false)
-            ->breadcrumbs(false)
-            ->darkMode(false)
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                fn (): string => view('filament.components.echo-modal-root')->render(),
-            );
+            ->resources([
+                OperatorResource::class,
+                PilotProfileResource::class,
+                AtcProfileResource::class,
+                DispatchProfileResource::class,
+                AvsecProfileResource::class,
+            ]);
     }
 }

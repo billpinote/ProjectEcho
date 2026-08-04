@@ -13,16 +13,19 @@ use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use UnitEnum;
 
 class ImportScanQr extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQrCode;
 
-    protected static ?string $navigationLabel = 'Import / Scan QR';
+    protected static ?string $navigationLabel = 'QR Import';
 
-    protected static ?string $navigationParentItem = 'Flight Plan';
+    protected static ?string $navigationParentItem = null;
 
-    protected static ?int $navigationSort = 20;
+    protected static string|UnitEnum|null $navigationGroup = 'Flight Operations';
+
+    protected static ?int $navigationSort = 10;
 
     protected string $view = 'filament.pages.import-scan-qr';
 

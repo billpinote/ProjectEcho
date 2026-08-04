@@ -17,13 +17,13 @@ class AllFlightResource extends FlightResource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedSquaresPlus;
 
-    protected static ?string $navigationLabel = 'All';
+    protected static ?string $navigationLabel = 'All Flights';
 
     protected static ?string $modelLabel = 'flight plan';
 
     protected static ?string $pluralModelLabel = 'flight plans';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 9;
 
     public static function getEloquentQuery(): Builder
     {

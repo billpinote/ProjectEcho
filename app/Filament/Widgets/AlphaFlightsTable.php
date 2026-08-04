@@ -20,6 +20,7 @@ class AlphaFlightsTable extends TableWidget
             ->query(
                 Flight::query()
                     ->where('status', 'accepted')
+                    ->whereNull('time_airborne')
                     ->where(function ($query) {
                         $query->whereDate('date_of_flight', now('UTC')->toDateString())
                             ->orWhere(function ($sub) {
@@ -47,7 +48,7 @@ class AlphaFlightsTable extends TableWidget
                     ->searchable()
                     ->sortable()
                     ->extraHeaderAttributes(['class' => 'text-center'])
-                    ->width('10px'),
+                    ->width('6px'),
                 TextColumn::make('time_start_up')
                     ->label('START-UP TIME')
                     ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
@@ -57,7 +58,17 @@ class AlphaFlightsTable extends TableWidget
                     ->searchable()
                     ->sortable()
                     ->extraHeaderAttributes(['class' => 'text-center'])
-                    ->width('10px'),
+                    ->width('6px'),
+                TextColumn::make('time_block_off')
+                    ->label('OFF-BLOCK TIME')
+                    ->state(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_block_off))
+                    ->placeholder('-')
+                    ->fontFamily(FontFamily::Mono)
+                    ->alignCenter()
+                    ->searchable()
+                    ->sortable()
+                    ->extraHeaderAttributes(['class' => 'text-center'])
+                    ->width('6px'),
                 TextColumn::make('route')
                     ->label('Route')
                     ->fontFamily(FontFamily::Mono)

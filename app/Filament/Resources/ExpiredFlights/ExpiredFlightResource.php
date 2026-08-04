@@ -12,13 +12,13 @@ class ExpiredFlightResource extends FlightResource
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedArchiveBox;
 
-    protected static ?string $navigationLabel = 'Expired';
+    protected static ?string $navigationLabel = 'Expired Flights';
 
     protected static ?string $modelLabel = 'expired flight plan';
 
     protected static ?string $pluralModelLabel = 'expired flight plans';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 7;
 
     public static function getEloquentQuery(): Builder
     {

@@ -10,17 +10,17 @@ use Filament\Support\Icons\Heroicon;
 
 class AcceptedFlightResource extends FlightResource
 {
-    protected static ?string $navigationParentItem = 'Flights';
+    protected static ?string $navigationParentItem = null;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedCheckCircle;
 
-    protected static ?string $navigationLabel = 'Ready';
+    protected static ?string $navigationLabel = 'Accepted Flights';
 
     protected static ?string $modelLabel = 'ready flight';
 
     protected static ?string $pluralModelLabel = 'ready flights';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     public static function getEloquentQuery(): Builder
     {

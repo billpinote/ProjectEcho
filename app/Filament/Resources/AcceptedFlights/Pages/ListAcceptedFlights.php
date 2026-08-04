@@ -25,4 +25,15 @@ class ListAcceptedFlights extends ListRecords
             'time_start_up' => now('UTC')->format('H:i'),
         ])->save();
     }
+
+    public function confirmBlockOffNow(string|int $recordId): void
+    {
+        abort_unless(auth()->user()?->canUpdateFlightBlockOffTime() ?? false, 403);
+
+        $record = Flight::query()->findOrFail($recordId);
+
+        $record->forceFill([
+            'time_block_off' => now('UTC')->format('H:i'),
+        ])->save();
+    }
 }

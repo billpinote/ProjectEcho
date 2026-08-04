@@ -12,13 +12,13 @@ class RejectedFlightResource extends FlightResource
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedXCircle;
 
-    protected static ?string $navigationLabel = 'Rejected';
+    protected static ?string $navigationLabel = 'Rejected Flights';
 
     protected static ?string $modelLabel = 'rejected flight plan';
 
     protected static ?string $pluralModelLabel = 'rejected flight plans';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 8;
 
     public static function getEloquentQuery(): Builder
     {

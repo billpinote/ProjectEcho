@@ -17,6 +17,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
+
 use function Filament\Support\original_request;
 
 class FlightResource extends Resource
@@ -27,9 +29,11 @@ class FlightResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'aircraft_identification';
 
-    protected static ?string $navigationLabel = 'Pending';
+    protected static ?string $navigationLabel = 'Pending Flight Plans';
 
-    protected static ?string $navigationParentItem = 'Flight Plan';
+    protected static ?string $navigationParentItem = null;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Flight Operations';
 
     protected static ?string $modelLabel = 'pending flight plan';
 
@@ -245,9 +249,7 @@ class FlightResource extends Resource
      */
     private static function normalizeOtherInformation(array $data): array
     {
-    dd($data['date_of_flight'] ?? null, $data['other_information'] ?? null);    
-    throw new \Exception('normalizeOtherInformation was called');
-    $otherInformation = (string) ($data['other_information'] ?? '');
+        $otherInformation = (string) ($data['other_information'] ?? '');
 
         if (
             filled($data['date_of_flight'] ?? null)

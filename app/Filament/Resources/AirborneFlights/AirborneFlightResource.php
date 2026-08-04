@@ -10,17 +10,17 @@ use Illuminate\Database\Eloquent\Builder;
 
 class AirborneFlightResource extends FlightResource
 {
-    protected static ?string $navigationParentItem = 'Flights';
+    protected static ?string $navigationParentItem = null;
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedPaperAirplane;
 
-    protected static ?string $navigationLabel = 'Airborne';
+    protected static ?string $navigationLabel = 'Airborne Flights';
 
     protected static ?string $modelLabel = 'airborne flight';
 
     protected static ?string $pluralModelLabel = 'airborne flights';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     public static function getEloquentQuery(): Builder
     {

@@ -11,6 +11,11 @@ class DemoUsersSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call([
+            AdminUserSeeder::class,
+            AtsUserSeeder::class,
+        ]);
+
         $operator = Operator::first();
 
         $password = 'DemoUser!23';

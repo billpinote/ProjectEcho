@@ -21,8 +21,8 @@ class FlightPolicy
      */
     public function view(User $user, Flight $flight): bool
     {
-        // Controllers, Dispatch, AVSEC, Admin, etc.
-        if ($user->hasFullFlightAccess()) {
+        // Non-pilot panel users can inspect flight records they are authorized to list.
+        if (! $user->isPilot() && $user->canViewFlightPlans()) {
             return true;
         }
 

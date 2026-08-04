@@ -51,6 +51,7 @@ class FlightsTable
         $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
         $canUpdateFlights = Auth::user()?->canUpdateFlightPlans() ?? false;
         $canUpdateStartUpTime = Auth::user()?->canUpdateFlightStartUpTime() ?? false;
+        $canUpdateBlockOffTime = Auth::user()?->canUpdateFlightBlockOffTime() ?? false;
         $canUpdateShutdownTime = Auth::user()?->canUpdateFlightShutdownTime() ?? false;
 
         $filters = [
@@ -323,6 +324,66 @@ class FlightsTable
                     ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
                     ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
                     ->width('3px'),
+                TextInputColumn::make('time_block_off')
+                    ->label('OFF-BLOCK TIME')
+                    ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_block_off))
+                    ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
+                        abort_unless(Auth::user()?->canUpdateFlightBlockOffTime() ?? false, 403);
+
+                        if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
+                            $livewire->dispatch(
+                                'echo-modal:open',
+                                heading: 'Invalid UTC Time',
+                                message: UtcFourDigitTime::message('off-block time'),
+                                tone: 'danger',
+                                buttonLabel: 'Cancel',
+                            );
+
+                            return FlightForm::formatTimeForForm($record->time_block_off);
+                        }
+
+                        $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+
+                        $record->forceFill([
+                            'time_block_off' => $normalizedState,
+                        ])->save();
+
+                        return FlightForm::formatTimeForForm($normalizedState);
+                    })
+                    ->disabled(! $canUpdateBlockOffTime)
+                    ->inputMode('numeric')
+                    ->extraInputAttributes(fn (Flight $record): array => [
+                        'maxlength' => 4,
+                        'class' => 'echo-status-time-input',
+                        'data-confirm-status-time' => 'true',
+                        'data-time-label' => 'Off-Block Time',
+                        'data-confirm-heading' => 'Confirm Off-Block Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
+                    ->alignCenter()
+                    ->extraHeaderAttributes(['class' => 'text-center echo-ready-start-header echo-ready-start-header-main'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-main'])
+                    ->width('12px'),
+                TextColumn::make('time_block_off_now')
+                    ->label(' ')
+                    ->state('OFF-BLOCK')
+                    ->badge()
+                    ->color('warning')
+                    ->alignCenter()
+                    ->extraAttributes(fn (Flight $record): array => [
+                        'class' => 'echo-status-time-now-trigger',
+                        'role' => 'button',
+                        'tabindex' => 0,
+                        'data-record-id' => (string) $record->getKey(),
+                        'data-confirm-method' => 'confirmBlockOffNow',
+                        'data-time-label' => 'Off-Block Time',
+                        'data-confirm-heading' => 'Confirm Off-Block Time',
+                        'data-callsign' => (string) $record->aircraft_identification,
+                    ])
+                    ->visible($canUpdateBlockOffTime)
+                    ->extraHeaderAttributes(['class' => 'echo-ready-start-header echo-ready-start-header-now'])
+                    ->extraCellAttributes(['class' => 'echo-ready-start-cell echo-ready-start-cell-now'])
+                    ->width('5px'),
                 ...self::relabelColumns(
                     self::pickColumns($columns, [
                         'aircraft_identification',
