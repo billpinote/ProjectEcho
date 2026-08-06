@@ -19,15 +19,19 @@ class ListFlights extends ListRecords
     {
         $actions = [];
         $currentPanel = Filament::getCurrentPanel();
-        $importRouteName = $currentPanel instanceof Panel
-            ? "filament.{$currentPanel->getId()}.pages.import-scan-qr"
-            : null;
 
-        if ($importRouteName !== null && Route::has($importRouteName)) {
-            $actions[] = Action::make('importScanQr')
-                ->label('Import / Scan QR')
-                ->icon('heroicon-o-qr-code')
-                ->url(fn (): string => ImportScanQr::getUrl(panel: $currentPanel?->getId()));
+        if ($currentPanel instanceof Panel) {
+            $panelId = $currentPanel->getId();
+            $importRouteName = "filament.{$panelId}.pages.import-scan-qr";
+
+            if (Route::has($importRouteName)) {
+                $actions[] = Action::make('importScanQr')
+                    ->label('Import / Scan QR')
+                    ->icon('heroicon-o-qr-code')
+                    ->url(
+                        fn (): string => ImportScanQr::getUrl(panel: $panelId)
+                    );
+            }
         }
 
         $actions[] = CreateAction::make()
