@@ -3,11 +3,12 @@
 namespace App\Filament\Resources\Flights\Pages;
 
 use App\Filament\Resources\Flights\FlightResource;
+use App\Services\FlightPlanMutationService;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Width;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Database\Eloquent\Model;
 
 class CreateFlight extends CreateRecord
 {
@@ -26,13 +27,23 @@ class CreateFlight extends CreateRecord
         return 'Create New Flight Plan';
     }
 
+    public static function authorizeResourceAccess(): void
+    {
+        abort_unless(static::getResource()::canCreate(), 403);
+    }
+
+    public static function canAccess(array $parameters = []): bool
+    {
+        return static::getResource()::canCreate();
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        Log::info('normalizeOtherInformation reached', [
-            'date_of_flight' => $data['date_of_flight'] ?? null,
-            'other_information' => $data['other_information'] ?? null,
-        ]);
         $user = auth()->user();
+
+        if ($user !== null) {
+            $data['filed_by_user_id'] = $user->id;
+        }
 
         if ($user?->isPilot()) {
             $pilotProfile = $user->pilotProfile()->first();
@@ -53,6 +64,15 @@ class CreateFlight extends CreateRecord
         }
 
         return FlightResource::normalizeFormData($data);
+    }
+
+    protected function handleRecordCreation(array $data): Model
+    {
+        $flight = static::getModel()::create($data);
+
+        app(FlightPlanMutationService::class)->recordSubmission($flight, auth()->user());
+
+        return $flight;
     }
 
     protected function getCreateFormAction(): Action

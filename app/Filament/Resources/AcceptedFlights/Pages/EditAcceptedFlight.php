@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\AcceptedFlights\Pages;
 
 use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
-use App\Filament\Resources\Flights\Pages\Concerns\CreatesFlightRevisionForPilots;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -12,8 +11,6 @@ use Filament\Support\Enums\Width;
 
 class EditAcceptedFlight extends EditRecord
 {
-    use CreatesFlightRevisionForPilots;
-
     protected static string $resource = AcceptedFlightResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -35,7 +32,6 @@ class EditAcceptedFlight extends EditRecord
 
     protected function getSaveFormAction(): Action
     {
-        return parent::getSaveFormAction()
-            ->label(auth()->user()?->createsFlightPlanRevisionsOnly() ? 'Create New Flight Plan' : 'Save Flight Plan');
+        return parent::getSaveFormAction()->label('Save Flight Plan');
     }
 }

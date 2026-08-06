@@ -10,6 +10,9 @@ use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Resources\Flights\FlightResource;
 use App\Filament\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
+use App\Filament\Resources\MyArchivedFlights\MyArchivedFlightResource;
+use App\Filament\Resources\MyCompletedFlights\MyCompletedFlightResource;
+use App\Filament\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
 use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
@@ -17,10 +20,14 @@ use App\Filament\Resources\Reports\ActiveFlightDataResource;
 use App\Filament\Resources\Reports\PostOpsLogResource;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
+use App\Services\FlightPlanMutationService;
 use App\Support\FlightStatusDisplay;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontFamily;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -114,6 +121,7 @@ class FlightsTable
             TextColumn::make('date_of_flight')
                 ->label('DOF')
                 ->date()
+                ->searchable()
                 ->fontFamily(FontFamily::Mono)
                 ->alignCenter()
                 ->extraHeaderAttributes(['class' => 'text-center'])
@@ -257,7 +265,12 @@ class FlightsTable
                 ->toggleable(isToggledHiddenByDefault: true),
         ];
 
-        if ($resourceClass === MyFlightPlansResource::class) {
+        if (in_array($resourceClass, [
+            MyFlightPlansResource::class,
+            MyCurrentFlightResource::class,
+            MyCompletedFlightResource::class,
+            MyArchivedFlightResource::class,
+        ], true)) {
             array_unshift($columns, FlightStatusDisplay::tableColumn());
         }
 
@@ -942,18 +955,7 @@ class FlightsTable
                     ->recordUrl(fn (Flight $record): string => route('flights.view', $record))
                     ->openRecordUrlInNewTab()
             )
-            ->modifyQueryUsing(
-                fn (Builder $query): Builder => $isOperationalFlightTable || $resourceClass === FlightResource::class
-                    ? $query
-                        ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
-                        ->orderBy('date_of_flight')
-                        ->orderByRaw('case when proposed_time is null then 1 else 0 end')
-                        ->orderBy('proposed_time')
-                        ->orderBy('id')
-                    : $query
-                        ->orderByDesc('created_at')
-                        ->orderByDesc('id')
-            )
+            ->modifyQueryUsing(fn (Builder $query): Builder => self::applyDefaultOrdering($query, $resourceClass, $isOperationalFlightTable))
             ->recordClasses(fn (Flight $record): array => $resourceClass === FlightResource::class && $record->reviewed_at === null
                 ? ['echo-new-flight-row']
                 : [])
@@ -984,22 +986,7 @@ class FlightsTable
                     ->filtersResetActionPosition(FiltersResetActionPosition::Footer)
                     ->hiddenFilterIndicators()
             )
-            ->recordActions($isOperationalFlightTable ? [] : [
-                Action::make('qr')
-                    ->label('QR')
-                    ->url(fn (Flight $record): string => route('flights.qr', $record))
-                    ->openUrlInNewTab(),
-                Action::make('view')
-                    ->label('View')
-                    ->url(fn (Flight $record): string => route('flights.view', $record))
-                    ->openUrlInNewTab(),
-                Action::make('pdf')
-                    ->label('PDF')
-                    ->url(fn (Flight $record): string => route('flights.pdf.download', $record))
-                    ->openUrlInNewTab(),
-                EditAction::make()
-                    ->label(fn (): string => Auth::user()?->createsFlightPlanRevisionsOnly() ? 'Revise' : 'Edit'),
-            ]);
+            ->recordActions($isOperationalFlightTable ? [] : self::recordActions($resourceClass));
     }
 
     /**
@@ -1042,5 +1029,151 @@ class FlightsTable
         }
 
         return $columns;
+    }
+
+    private static function applyDefaultOrdering(Builder $query, ?string $resourceClass, bool $isOperationalFlightTable): Builder
+    {
+        if ($resourceClass === MyCurrentFlightResource::class) {
+            return $query
+                ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
+                ->orderBy('date_of_flight')
+                ->orderByRaw('case when proposed_time is null then 1 else 0 end')
+                ->orderBy('proposed_time')
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id');
+        }
+
+        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class], true)) {
+            return $query
+                ->orderByDesc('date_of_flight')
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id');
+        }
+
+        return $isOperationalFlightTable || $resourceClass === FlightResource::class
+            ? $query
+                ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
+                ->orderBy('date_of_flight')
+                ->orderByRaw('case when proposed_time is null then 1 else 0 end')
+                ->orderBy('proposed_time')
+                ->orderBy('id')
+            : $query
+                ->orderByDesc('created_at')
+                ->orderByDesc('id');
+    }
+
+    /**
+     * @return array<int, Action|EditAction>
+     */
+    private static function recordActions(?string $resourceClass): array
+    {
+        $actions = [
+            Action::make('qr')
+                ->label('QR')
+                ->url(fn (Flight $record): string => route('flights.qr', $record))
+                ->openUrlInNewTab(),
+            Action::make('view')
+                ->label('View')
+                ->url(fn (Flight $record): string => route('flights.view', $record))
+                ->openUrlInNewTab(),
+            Action::make('pdf')
+                ->label('PDF')
+                ->url(fn (Flight $record): string => route('flights.pdf.download', $record))
+                ->openUrlInNewTab(),
+        ];
+
+        if (in_array($resourceClass, [MyFlightPlansResource::class, MyCurrentFlightResource::class], true)) {
+            $actions[] = self::delayAction();
+            $actions[] = self::cancelAction();
+
+            return $actions;
+        }
+
+        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class], true)) {
+            return $actions;
+        }
+
+        $actions[] = EditAction::make()->label('Edit');
+
+        return $actions;
+    }
+
+    private static function delayAction(): Action
+    {
+        return Action::make('delay')
+            ->label('Delay')
+            ->icon('heroicon-o-clock')
+            ->fillForm(fn (Flight $record): array => [
+                'new_proposed_time' => UtcFourDigitTime::formatForDisplay($record->proposed_time) ?? '',
+            ])
+            ->form([
+                TextInput::make('new_proposed_time')
+                    ->label('New Proposed Time (UTC)')
+                    ->required()
+                    ->rule(new UtcFourDigitTime)
+                    ->maxLength(5)
+                    ->placeholder('HHMM')
+                    ->helperText('Enter a new UTC time in four-digit format.'),
+            ])
+            ->modalHeading('Delay Flight Plan')
+            ->modalDescription(function (Flight $record, array $data): string {
+                $current = UtcFourDigitTime::formatForDisplay($record->proposed_time) ?? 'N/A';
+                $next = UtcFourDigitTime::formatForDisplay($data['new_proposed_time'] ?? null) ?? ($data['new_proposed_time'] ?? 'N/A');
+
+                return "Current proposed time: {$current}. New proposed time: {$next}.";
+            })
+            ->requiresConfirmation()
+            ->visible(fn (Flight $record): bool => Auth::user()?->can('view', $record) ?? false)
+            ->disabled(fn (Flight $record): bool => ! (Auth::user()?->can('delay', $record) ?? false))
+            ->tooltip(fn (Flight $record): ?string => $record->canBeDelayedByPilot()
+                ? null
+                : 'Delay is unavailable once processing has started or the flight is no longer eligible.')
+            ->action(function (Flight $record, array $data): void {
+                app(FlightPlanMutationService::class)->delay(
+                    $record,
+                    Auth::user(),
+                    (string) $data['new_proposed_time']
+                );
+
+                Notification::make()
+                    ->success()
+                    ->title('Proposed time updated')
+                    ->send();
+            });
+    }
+
+    private static function cancelAction(): Action
+    {
+        return Action::make('cancel')
+            ->label('Cancel')
+            ->icon('heroicon-o-no-symbol')
+            ->color('danger')
+            ->form([
+                Textarea::make('reason')
+                    ->label('Cancellation Reason')
+                    ->rows(3)
+                    ->maxLength(255)
+                    ->placeholder('Optional short reason'),
+            ])
+            ->modalHeading('Cancel Flight Plan')
+            ->modalDescription('This keeps the record and marks the flight plan as cancelled.')
+            ->requiresConfirmation()
+            ->visible(fn (Flight $record): bool => Auth::user()?->can('view', $record) ?? false)
+            ->disabled(fn (Flight $record): bool => ! (Auth::user()?->can('cancel', $record) ?? false))
+            ->tooltip(fn (Flight $record): ?string => $record->canBeCancelledByPilot()
+                ? null
+                : 'Cancellation is unavailable once processing has started or the flight has already been closed.')
+            ->action(function (Flight $record, array $data): void {
+                app(FlightPlanMutationService::class)->cancel(
+                    $record,
+                    Auth::user(),
+                    $data['reason'] ?? null
+                );
+
+                Notification::make()
+                    ->success()
+                    ->title('Flight plan cancelled')
+                    ->send();
+            });
     }
 }

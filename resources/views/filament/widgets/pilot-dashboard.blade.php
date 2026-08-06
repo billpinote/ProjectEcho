@@ -13,14 +13,5 @@
                 <div><span class="font-semibold">Medical Expiry:</span> {{ $profile?->medical_expiry_date?->format('M d, Y') ?: '—' }}</div>
             </div>
         </div>
-
-        <div class="w-full max-w-md rounded-xl bg-gray-50 p-4">
-            <div class="text-sm font-semibold text-gray-900">Quick Actions</div>
-            <ul class="mt-3 space-y-2 text-sm text-primary-700">
-                <li><a href="{{ \App\Filament\Resources\Flights\Pages\CreateFlight::getUrl() }}">• Create Flight Plan</a></li>
-                <li><a href="{{ \App\Filament\Resources\MyFlightPlans\MyFlightPlansResource::getUrl('index') }}">• My Flight Plans</a></li>
-                <li><a href="{{ \App\Filament\Pages\MyProfilePage::getUrl() }}">• My Profile</a></li>
-            </ul>
-        </div>
     </div>
 </div>

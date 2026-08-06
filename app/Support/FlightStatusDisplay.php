@@ -11,12 +11,21 @@ use Illuminate\Support\Facades\Auth;
 final class FlightStatusDisplay
 {
     public const PENDING = 'pending';
+
     public const ACCEPTED = 'accepted';
+
     public const STARTED = 'started';
+
     public const AIRBORNE = 'airborne';
+
     public const LANDED = 'landed';
+
     public const COMPLETED = 'completed';
+
     public const REJECTED = 'rejected';
+
+    public const CANCELLED = 'cancelled';
+
     public const EXPIRED = 'expired';
 
     /**
@@ -30,6 +39,10 @@ final class FlightStatusDisplay
     {
         if ($flight->status === FlightPlanStatus::Rejected) {
             return self::REJECTED;
+        }
+
+        if ($flight->status === FlightPlanStatus::Cancelled) {
+            return self::CANCELLED;
         }
 
         if ($flight->isPendingExpired()) {
@@ -120,6 +133,7 @@ final class FlightStatusDisplay
                 self::LANDED => 'Landed',
                 self::COMPLETED => 'Flight Complete',
                 self::REJECTED => 'Action Required',
+                self::CANCELLED => 'Cancelled',
                 self::EXPIRED => 'Expired',
                 default => str($status)->headline()->toString(),
             };
@@ -133,6 +147,7 @@ final class FlightStatusDisplay
             self::LANDED => 'Landed',
             self::COMPLETED => 'Completed',
             self::REJECTED => 'Rejected',
+            self::CANCELLED => 'Cancelled',
             self::EXPIRED => 'Expired',
             default => str($status)->headline()->toString(),
         };
@@ -155,6 +170,7 @@ final class FlightStatusDisplay
             self::LANDED => 'warning',
             self::COMPLETED => 'success',
             self::REJECTED => 'danger',
+            self::CANCELLED => 'gray',
             self::EXPIRED => 'charcoal',
             default => 'gray',
         };
@@ -170,6 +186,7 @@ final class FlightStatusDisplay
             self::LANDED => 'heroicon-o-arrow-down-circle',
             self::COMPLETED => 'heroicon-o-check-circle',
             self::REJECTED => 'heroicon-o-x-circle',
+            self::CANCELLED => 'heroicon-o-no-symbol',
             self::EXPIRED => 'heroicon-o-archive-box',
             default => 'heroicon-o-question-mark-circle',
         };
@@ -193,6 +210,7 @@ final class FlightStatusDisplay
                 self::LANDED => 'Touchdown has been recorded. Shutdown or block-on is still pending.',
                 self::COMPLETED => 'The flight has completed its operational cycle.',
                 self::REJECTED => 'The flight plan was rejected. Review the reason and submit a revision.',
+                self::CANCELLED => 'This flight plan was cancelled by the pilot.',
                 self::EXPIRED => 'The date of flight passed before the flight plan was accepted.',
                 default => '',
             };
@@ -206,6 +224,7 @@ final class FlightStatusDisplay
             self::LANDED => 'Touchdown recorded; awaiting block-on or shutdown.',
             self::COMPLETED => 'Touchdown and block-on or shutdown recorded.',
             self::REJECTED => 'Rejected during flight-plan review.',
+            self::CANCELLED => 'Cancelled by the filing pilot.',
             self::EXPIRED => 'Pending flight plan whose date of flight has passed.',
             default => '',
         };

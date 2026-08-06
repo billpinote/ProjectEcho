@@ -9,6 +9,7 @@ use App\Filament\Resources\Reports\PostOpsLogResource;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
 use App\Rules\UtcFourDigitTime;
+use App\Services\FlightPlanMutationService;
 use App\Services\FlightPlanQrPayloadService;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
@@ -24,8 +25,6 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class FlightController extends Controller
 {
-    
-
     /**
      * Store form data in session and show preview.
      */
@@ -63,6 +62,8 @@ class FlightController extends Controller
      */
     public function scanQr()
     {
+        $this->ensurePilotCannotScanQr();
+
         return view('flightplan.scan-qr', [
             'payload' => old('payload', ''),
             'matchedFlight' => null,
@@ -74,6 +75,8 @@ class FlightController extends Controller
      */
     public function lookupScanQr(Request $request)
     {
+        $this->ensurePilotCannotScanQr();
+
         $validated = $request->validate([
             'payload' => ['required', 'string', 'max:20000'],
         ], [
@@ -104,6 +107,8 @@ class FlightController extends Controller
      */
     public function editFromQr(Request $request)
     {
+        $this->ensurePilotCannotScanQr();
+
         $validated = $request->validate([
             'payload' => ['required', 'string', 'max:20000'],
         ], [
@@ -369,6 +374,8 @@ class FlightController extends Controller
      */
     public function previewScannedFlightPlan(Request $request, string $token)
     {
+        $this->ensurePilotCannotScanQr();
+
         $preview = $request->session()->get('scanned_flight_plan_previews.'.$token);
 
         if (! is_array($preview) || ! isset($preview['snapshot']) || ! is_array($preview['snapshot'])) {
@@ -411,11 +418,24 @@ class FlightController extends Controller
             return redirect()->route('flightplan');
         }
 
-        // Assign the logged-in user as the owner of the flight
-        $flightData['user_id'] = Auth::id();
+        $user = Auth::user();
 
-        // Create the Flight record
-        $flight = Flight::create($flightData);
+        if ($user !== null) {
+            $flightData['filed_by_user_id'] = $user->id;
+
+            if ($user->isPilot()) {
+                $flightData['user_id'] = $user->id;
+                $flightData['pilot_id'] = $flightData['pilot_id'] ?? $user->id;
+            }
+        }
+
+        $flight = DB::transaction(function () use ($flightData, $user) {
+            $flight = Flight::create($flightData);
+
+            app(FlightPlanMutationService::class)->recordSubmission($flight, $user);
+
+            return $flight;
+        });
 
         // Generate PDF and QR code
         $storedPdfPath = $this->storeFlightPlanPdf($flight);
@@ -966,6 +986,13 @@ class FlightController extends Controller
             && $user->canReviewFlightPlans(),
             403
         );
+    }
+
+    private function ensurePilotCannotScanQr(): void
+    {
+        $user = Auth::user();
+
+        abort_if($user?->isPilot(), 403);
     }
 
     private function ensureFlightUserAccess(): void

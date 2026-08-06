@@ -6,7 +6,10 @@ use App\Filament\Pages\ImportScanQr;
 use App\Filament\Resources\Flights\FlightResource;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
+use Filament\Facades\Filament;
+use Filament\Panel;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Support\Facades\Route;
 
 class ListFlights extends ListRecords
 {
@@ -14,15 +17,24 @@ class ListFlights extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('importScanQr')
+        $actions = [];
+        $currentPanel = Filament::getCurrentPanel();
+        $importRouteName = $currentPanel instanceof Panel
+            ? "filament.{$currentPanel->getId()}.pages.import-scan-qr"
+            : null;
+
+        if ($importRouteName !== null && Route::has($importRouteName)) {
+            $actions[] = Action::make('importScanQr')
                 ->label('Import / Scan QR')
                 ->icon('heroicon-o-qr-code')
-                ->url(ImportScanQr::getUrl()),
-            CreateAction::make()
-                ->label('New Flight Plan')
-                ->icon('heroicon-o-plus')
-                ->url(fn (): string => FlightResource::getUrl('create')),
-        ];
+                ->url(fn (): string => ImportScanQr::getUrl(panel: $currentPanel?->getId()));
+        }
+
+        $actions[] = CreateAction::make()
+            ->label('New Flight Plan')
+            ->icon('heroicon-o-plus')
+            ->url(fn (): string => FlightResource::getUrl('create'));
+
+        return $actions;
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
@@ -49,10 +50,12 @@ class Flight extends Model
         'authorized_representative_enabled' => 'boolean',
         'status' => FlightPlanStatus::class,
         'reviewed_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     protected $fillable = [
         'user_id',
+        'filed_by_user_id',
         'time_start_up',
         'time_shutdown',
         'time_block_off',
@@ -133,11 +136,13 @@ class Flight extends Model
         'received_time',
         'received_facility',
         'accepted_by_user_id',
+        'cancelled_by_user_id',
         'accepted_by_wiresign',
         'rejected_by_wiresign',
         'rejection_reason',
         'status',
         'reviewed_at',
+        'cancelled_at',
     ];
 
     protected static function booted(): void
@@ -150,6 +155,21 @@ class Flight extends Model
     public function acceptedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'accepted_by_user_id');
+    }
+
+    public function filedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'filed_by_user_id');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by_user_id');
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(FlightPlanEvent::class);
     }
 
     public function pilot(): BelongsTo
@@ -260,6 +280,28 @@ class Flight extends Model
             });
     }
 
+    public function scopeCurrentForPilot(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query
+                ->pendingActive()
+                ->orWhere(fn (Builder $query): Builder => $query->ready())
+                ->orWhere(fn (Builder $query): Builder => $query->active())
+                ->orWhere(fn (Builder $query): Builder => $query->airborne())
+                ->orWhere(fn (Builder $query): Builder => $query->landed());
+        });
+    }
+
+    public function scopeArchivedForPilot(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query
+                ->pendingExpired()
+                ->orWhere(fn (Builder $query): Builder => $query->rejected())
+                ->orWhere('status', FlightPlanStatus::Cancelled);
+        });
+    }
+
     public function scopePendingUnreviewed(Builder $query): Builder
     {
         if (! static::hasReviewedAtColumn()) {
@@ -358,5 +400,51 @@ class Flight extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function isOwnedBy(User $user): bool
+    {
+        return $this->filed_by_user_id !== null && $this->filed_by_user_id === $user->getKey();
+    }
+
+    public function hasOperationalActivity(): bool
+    {
+        return filled($this->time_start_up)
+            || filled($this->time_block_off)
+            || filled($this->time_airborne);
+    }
+
+    public function canBeDelayedByPilot(): bool
+    {
+        if ($this->status === FlightPlanStatus::Cancelled || $this->status === FlightPlanStatus::Rejected) {
+            return false;
+        }
+
+        if ($this->status === FlightPlanStatus::Completed || $this->status === FlightPlanStatus::Active) {
+            return false;
+        }
+
+        if ($this->isPendingExpired()) {
+            return false;
+        }
+
+        return ! $this->hasOperationalActivity();
+    }
+
+    public function canBeCancelledByPilot(): bool
+    {
+        if ($this->status === FlightPlanStatus::Cancelled) {
+            return false;
+        }
+
+        if ($this->status === FlightPlanStatus::Rejected || $this->status === FlightPlanStatus::Completed) {
+            return false;
+        }
+
+        if ($this->isPendingExpired()) {
+            return false;
+        }
+
+        return ! $this->hasOperationalActivity();
     }
 }

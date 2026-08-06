@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Flight;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class FlightPolicy
 {
@@ -21,13 +20,11 @@ class FlightPolicy
      */
     public function view(User $user, Flight $flight): bool
     {
-        // Non-pilot panel users can inspect flight records they are authorized to list.
         if (! $user->isPilot() && $user->canViewFlightPlans()) {
             return true;
         }
 
-        // Pilots may only view their own flights.
-        return $flight->user_id === $user->id;
+        return $flight->isOwnedBy($user);
     }
 
     /**
@@ -43,19 +40,11 @@ class FlightPolicy
      */
     public function update(User $user, Flight $flight): bool
     {
-        // Controllers/Admin can always update.
         if ($user->hasFullFlightAccess()) {
             return true;
         }
 
-        // Pilot may only edit their own flight.
-        if ($flight->user_id !== $user->id) {
-            return false;
-        }
-
-        // Future:
-        // Only allow editing while Draft/Pending.
-        return true;
+        return false;
     }
 
     /**
@@ -63,11 +52,7 @@ class FlightPolicy
      */
     public function delete(User $user, Flight $flight): bool
     {
-        if ($user->hasFullFlightAccess()) {
-            return true;
-        }
-
-        return $flight->user_id === $user->id;
+        return $user->hasFullFlightAccess();
     }
 
     /**
@@ -100,5 +85,19 @@ class FlightPolicy
     public function reject(User $user, Flight $flight): bool
     {
         return $user->canReviewFlightPlans();
+    }
+
+    public function delay(User $user, Flight $flight): bool
+    {
+        return $user->isPilot()
+            && $flight->isOwnedBy($user)
+            && $flight->canBeDelayedByPilot();
+    }
+
+    public function cancel(User $user, Flight $flight): bool
+    {
+        return $user->isPilot()
+            && $flight->isOwnedBy($user)
+            && $flight->canBeCancelledByPilot();
     }
 }

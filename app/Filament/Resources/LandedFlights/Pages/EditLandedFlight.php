@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\LandedFlights\Pages;
 
 use App\Filament\Resources\LandedFlights\LandedFlightResource;
-use App\Filament\Resources\Flights\Pages\Concerns\CreatesFlightRevisionForPilots;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -12,8 +11,6 @@ use Filament\Support\Enums\Width;
 
 class EditLandedFlight extends EditRecord
 {
-    use CreatesFlightRevisionForPilots;
-
     protected static string $resource = LandedFlightResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -35,7 +32,6 @@ class EditLandedFlight extends EditRecord
 
     protected function getSaveFormAction(): Action
     {
-        return parent::getSaveFormAction()
-            ->label(auth()->user()?->createsFlightPlanRevisionsOnly() ? 'Create New Flight Plan' : 'Save Flight');
+        return parent::getSaveFormAction()->label('Save Flight');
     }
 }

@@ -1,6 +1,7 @@
 @php
     $activeNav = $activeNav ?? 'flight-plan';
     $showMobileViewToggle = $showMobileViewToggle ?? false;
+    $showScanQrNav = ! auth()->check() || ! auth()->user()?->isPilot();
 
     $navItems = [
         [
@@ -20,9 +21,9 @@
         [
             'key' => 'scan-upload-qr',
             'label' => 'Scan / Upload QR',
-            'href' => route('flightplan.scan-qr'),
+            'href' => $showScanQrNav ? route('flightplan.scan-qr') : null,
             'icon' => 'qr',
-            'disabled' => false,
+            'disabled' => ! $showScanQrNav,
         ],
     ];
 

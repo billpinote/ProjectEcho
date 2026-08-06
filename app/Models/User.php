@@ -3,8 +3,7 @@
 namespace App\Models;
 
 use App\Enums\UserRole;
-use App\Models\AuthAccount;
-use App\Models\Operator;
+use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,7 +15,7 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable implements FilamentUser
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
     /**
@@ -107,6 +106,16 @@ class User extends Authenticatable implements FilamentUser
     public function acceptedFlights(): HasMany
     {
         return $this->hasMany(Flight::class, 'accepted_by_user_id');
+    }
+
+    public function filedFlights(): HasMany
+    {
+        return $this->hasMany(Flight::class, 'filed_by_user_id');
+    }
+
+    public function cancelledFlights(): HasMany
+    {
+        return $this->hasMany(Flight::class, 'cancelled_by_user_id');
     }
 
     public function pilotFlights(): HasMany

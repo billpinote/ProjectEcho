@@ -10,6 +10,7 @@ enum FlightPlanStatus: string
     case Accepted = 'accepted';
     case Active = 'active';
     case Rejected = 'rejected';
+    case Cancelled = 'cancelled';
     case Completed = 'completed';
 
     public function label(): string
@@ -24,6 +25,7 @@ enum FlightPlanStatus: string
             self::Accepted => 'success',
             self::Active => 'info',
             self::Rejected => 'danger',
+            self::Cancelled => 'gray',
             self::Completed => 'gray',
         };
     }

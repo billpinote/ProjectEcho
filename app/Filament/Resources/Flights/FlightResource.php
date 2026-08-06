@@ -10,13 +10,13 @@ use App\Filament\Resources\Flights\Tables\FlightsTable;
 use App\Models\Flight;
 use BackedEnum;
 use Filament\Navigation\NavigationItem;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema as SchemaFacade;
 use UnitEnum;
 
 use function Filament\Support\original_request;
@@ -53,7 +53,13 @@ class FlightResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return Auth::user()?->canViewFlightPlans() ?? false;
+        $user = Auth::user();
+
+        if (static::class === self::class) {
+            return $user?->canReviewFlightPlans() ?? false;
+        }
+
+        return $user?->canViewFlightPlans() ?? false;
     }
 
     public static function canCreate(): bool
@@ -63,17 +69,7 @@ class FlightResource extends Resource
 
     public static function canEdit($record): bool
     {
-        $user = Auth::user();
-
-        if ($user?->canUpdateFlightPlans()) {
-            return true;
-        }
-
-        if ($user?->createsFlightPlanRevisionsOnly()) {
-            return $record?->user_id === $user->id;
-        }
-
-        return false;
+        return Auth::user()?->can('update', $record) ?? false;
     }
 
     public static function canDelete($record): bool
@@ -102,7 +98,7 @@ class FlightResource extends Resource
 
         if ($user?->isPilot()) {
             return static::getFlightPlanBaseQuery()
-                ->where('user_id', $user->id);
+                ->where('filed_by_user_id', $user->id);
         }
 
         if (! static::hasStatusColumn()) {
@@ -131,7 +127,7 @@ class FlightResource extends Resource
 
     public static function getNavigationItems(): array
     {
-        if (! static::hasPage('index')) {
+        if (! static::hasPage('index') || ! static::canViewAny()) {
             return [];
         }
 

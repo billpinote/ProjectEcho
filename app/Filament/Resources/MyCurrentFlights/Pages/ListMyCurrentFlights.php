@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Filament\Resources\MyFlightPlans\Pages;
+namespace App\Filament\Resources\MyCurrentFlights\Pages;
 
-use App\Filament\Resources\MyFlightPlans\MyFlightPlansResource;
+use App\Filament\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 
-class ListMyFlightPlans extends ListRecords
+class ListMyCurrentFlights extends ListRecords
 {
-    protected static string $resource = MyFlightPlansResource::class;
+    protected static string $resource = MyCurrentFlightResource::class;
 
     protected function getHeaderActions(): array
     {

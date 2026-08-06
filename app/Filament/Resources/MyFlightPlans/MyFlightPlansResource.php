@@ -3,11 +3,10 @@
 namespace App\Filament\Resources\MyFlightPlans;
 
 use App\Filament\Resources\AllFlightPlans\AllFlightResource;
-use App\Filament\Resources\MyFlightPlans\Pages\EditMyFlightPlan;
 use App\Filament\Resources\MyFlightPlans\Pages\ListMyFlightPlans;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
-use Filament\Support\Icons\Heroicon;
 
 class MyFlightPlansResource extends AllFlightResource
 {
@@ -23,20 +22,30 @@ class MyFlightPlansResource extends AllFlightResource
 
     protected static ?int $navigationSort = 20;
 
+    public static function canAccess(): bool
+    {
+        $user = Auth::user();
+
+        return $user?->canViewFlightPlans() ?? false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return static::canAccess();
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $userId = Auth::id();
 
         return static::getFlightPlanBaseQuery()
-            ->where('user_id', $userId)
-            ->whereNot(static fn (Builder $query): Builder => $query->pendingExpired());
+            ->where('filed_by_user_id', $userId);
     }
 
     public static function getPages(): array
     {
         return [
             'index' => ListMyFlightPlans::route('/'),
-            'edit' => EditMyFlightPlan::route('/{record}/edit'),
         ];
     }
 }
