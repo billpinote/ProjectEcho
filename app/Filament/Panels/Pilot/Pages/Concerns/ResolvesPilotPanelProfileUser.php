@@ -2,7 +2,6 @@
 
 namespace App\Filament\Panels\Pilot\Pages\Concerns;
 
-use App\Domain\Users\Enums\UserRole;
 use App\Models\User;
 use Filament\Facades\Filament;
 
@@ -14,7 +13,7 @@ trait ResolvesPilotPanelProfileUser
 
         return $user instanceof User
             && $user->is_active
-            && ($user->isPilot() || $user->role === UserRole::Artisan);
+            && $user->isPilot();
     }
 
     protected function getProfileUser(): User

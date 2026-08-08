@@ -2,13 +2,10 @@
 
 namespace App\Filament\Panels\Pilot\Pages;
 
-use App\Filament\Panels\Pilot\Pages\Concerns\ResolvesPilotPanelProfileUser;
 use Filament\Pages\Page;
 
 class PreferencesPage extends Page
 {
-    use ResolvesPilotPanelProfileUser;
-
     protected static ?string $title = 'Preferences';
 
     protected static bool $shouldRegisterNavigation = false;

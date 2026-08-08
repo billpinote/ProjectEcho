@@ -15,6 +15,7 @@ use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource
 use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Filament\Panels\Pilot\Widgets\PilotDashboardWidget;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
+use Filament\Facades\Filament;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationBuilder;
 use Filament\Navigation\NavigationItem;
@@ -55,6 +56,7 @@ class PilotPanelProvider extends PanelProvider
                     ->label('View Profile')
                     ->icon(Heroicon::OutlinedUserCircle)
                     ->url(fn (): string => MyProfilePage::getUrl(panel: 'pilot'))
+                    ->visible(fn (): bool => Filament::auth()->user()?->isPilot() ?? false)
                     ->sort(-1),
                 MenuItem::make()
                     ->label('Preferences')

@@ -2,13 +2,10 @@
 
 namespace App\Filament\Panels\Pilot\Pages;
 
-use App\Filament\Panels\Pilot\Pages\Concerns\ResolvesPilotPanelProfileUser;
 use Filament\Pages\Page;
 
 class SecurityPage extends Page
 {
-    use ResolvesPilotPanelProfileUser;
-
     protected static ?string $title = 'Security';
 
     protected static bool $shouldRegisterNavigation = false;
