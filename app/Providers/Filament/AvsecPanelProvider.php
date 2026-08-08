@@ -2,8 +2,8 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Shared\Pages\ImportScanQr;
-use App\Filament\Shared\Resources\AllFlightPlans\AllFlightResource;
+use App\Filament\Panels\Avsec\Pages\ImportScanQr;
+use App\Filament\Panels\Avsec\Resources\AllFlightPlans\AllFlightResource;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Pages\Dashboard;
 use Filament\Panel;

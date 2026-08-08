@@ -55,7 +55,7 @@ class FlightResource extends Resource
     {
         $user = Auth::user();
 
-        if (static::class === self::class) {
+        if (static::isPendingFlightResource()) {
             return $user?->canReviewFlightPlans() ?? false;
         }
 
@@ -131,7 +131,7 @@ class FlightResource extends Resource
             return [];
         }
 
-        $activeRoutePatterns = static::class === self::class
+        $activeRoutePatterns = static::isPendingFlightResource()
             ? [
                 static::getRouteBaseName().'.index',
                 static::getRouteBaseName().'.edit',
@@ -148,7 +148,7 @@ class FlightResource extends Resource
                 ->badge(static::getNavigationBadge(), color: static::getNavigationBadgeColor())
                 ->badgeTooltip(static::getNavigationBadgeTooltip())
                 ->extraAttributes(
-                    static::class === self::class
+                    static::isPendingFlightResource()
                         ? ['class' => 'echo-pending-nav-item']
                         : []
                 )
@@ -176,6 +176,12 @@ class FlightResource extends Resource
             'new' => $new,
             'total' => $total,
         ];
+    }
+
+    protected static function isPendingFlightResource(): bool
+    {
+        return static::class === self::class
+            || str_ends_with(static::class, '\\Resources\\Flights\\FlightResource');
     }
 
     public static function getRelations(): array

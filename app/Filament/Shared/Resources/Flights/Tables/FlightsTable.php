@@ -57,7 +57,7 @@ class FlightsTable
             PostOpsLogResource::class,
         ];
 
-        $isOperationalFlightTable = in_array($resourceClass, $operationalFlightResources, true);
+        $isOperationalFlightTable = self::matchesAnyResource($resourceClass, $operationalFlightResources);
         $canUpdateFlights = Auth::user()?->canUpdateFlightPlans() ?? false;
         $canUpdateStartUpTime = Auth::user()?->canUpdateFlightStartUpTime() ?? false;
         $canUpdateBlockOffTime = Auth::user()?->canUpdateFlightBlockOffTime() ?? false;
@@ -86,7 +86,7 @@ class FlightsTable
                 ->preload(),
         ];
 
-        if (in_array($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class], true)) {
+        if (self::matchesAnyResource($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class])) {
             $reportDateOptions = fn (): array => $resourceClass::getEloquentQuery()
                 ->whereNotNull('date_of_flight')
                 ->orderByDesc('date_of_flight')
@@ -281,7 +281,7 @@ class FlightsTable
             ));
         }
 
-        if ($resourceClass === AcceptedFlightResource::class) {
+        if (self::matchesResource($resourceClass, AcceptedFlightResource::class)) {
             $readyColumns = [
                 TextInputColumn::make('time_start_up')
                     ->label('START-UP TIME')
@@ -420,7 +420,7 @@ class FlightsTable
             $columns = $readyColumns;
         }
 
-        if ($resourceClass === ActiveFlightDataResource::class) {
+        if (self::matchesResource($resourceClass, ActiveFlightDataResource::class)) {
             $reportColumns = [
                 TextColumn::make('aircraft_identification')
                     ->label('Callsign')
@@ -490,7 +490,7 @@ class FlightsTable
             $columns = $reportColumns;
         }
 
-        if ($resourceClass === AbbreviatedFlightReportResource::class) {
+        if (self::matchesResource($resourceClass, AbbreviatedFlightReportResource::class)) {
             $columns = [
                 TextColumn::make('aircraft_identification')
                     ->label('Callsign')
@@ -572,7 +572,7 @@ class FlightsTable
             ];
         }
 
-        if ($resourceClass === PostOpsLogResource::class) {
+        if (self::matchesResource($resourceClass, PostOpsLogResource::class)) {
             $columns = [
                 TextColumn::make('tg')
                     ->label('T/G')
@@ -649,7 +649,7 @@ class FlightsTable
             ];
         }
 
-        if ($resourceClass === ActiveFlightResource::class) {
+        if (self::matchesResource($resourceClass, ActiveFlightResource::class)) {
             $activeColumns = [
                 TextInputColumn::make('time_airborne')
                     ->label('TAKE OFF TIME')
@@ -740,7 +740,7 @@ class FlightsTable
             $columns = $activeColumns;
         }
 
-        if ($resourceClass === AirborneFlightResource::class) {
+        if (self::matchesResource($resourceClass, AirborneFlightResource::class)) {
             $airborneColumns = [
                 TextInputColumn::make('time_touchdown')
                     ->label('TOUCHDOWN TIME')
@@ -819,7 +819,7 @@ class FlightsTable
             $columns = $airborneColumns;
         }
 
-        if ($resourceClass === LandedFlightResource::class) {
+        if (self::matchesResource($resourceClass, LandedFlightResource::class)) {
             $landedColumns = [
                 TextInputColumn::make('time_shutdown')
                     ->label('SHUTDOWN TIME')
@@ -896,7 +896,7 @@ class FlightsTable
             $columns = $landedColumns;
         }
 
-        if ($resourceClass === CompletedFlightResource::class) {
+        if (self::matchesResource($resourceClass, CompletedFlightResource::class)) {
             $completedColumns = [
                 ...self::pickColumns($columns, [
                     'aircraft_identification',
@@ -928,7 +928,7 @@ class FlightsTable
             $columns = $completedColumns;
         }
 
-        if ($resourceClass === RejectedFlightResource::class) {
+        if (self::matchesResource($resourceClass, RejectedFlightResource::class)) {
             $columns[] = TextColumn::make('rejected_by_wiresign')
                 ->label('ATMO')
                 ->alignCenter()
@@ -937,7 +937,7 @@ class FlightsTable
                 ->searchable();
         }
 
-        if ($resourceClass === ExpiredFlightResource::class) {
+        if (self::matchesResource($resourceClass, ExpiredFlightResource::class)) {
             $columns[] = TextColumn::make('expiration_reason')
                 ->label('Expired Reason')
                 ->state(fn (Flight $record): ?string => $record->expiration_reason)
@@ -946,32 +946,32 @@ class FlightsTable
 
         return $table
             ->when(
-                $isOperationalFlightTable || $resourceClass === FlightResource::class,
+                $isOperationalFlightTable || self::matchesResource($resourceClass, FlightResource::class),
                 fn (Table $table): Table => $table->poll('5s')
             )
             ->when(
-                filled($resourceClass) && $resourceClass !== ActiveFlightDataResource::class,
+                filled($resourceClass) && ! self::matchesResource($resourceClass, ActiveFlightDataResource::class),
                 fn (Table $table): Table => $table
                     ->recordUrl(fn (Flight $record): string => route('flights.view', $record))
                     ->openRecordUrlInNewTab()
             )
             ->modifyQueryUsing(fn (Builder $query): Builder => self::applyDefaultOrdering($query, $resourceClass, $isOperationalFlightTable))
-            ->recordClasses(fn (Flight $record): array => $resourceClass === FlightResource::class && $record->reviewed_at === null
+            ->recordClasses(fn (Flight $record): array => self::matchesResource($resourceClass, FlightResource::class) && $record->reviewed_at === null
                 ? ['echo-new-flight-row']
                 : [])
             ->columns($columns)
             ->filters(
                 $filters,
-                layout: in_array($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class], true)
+                layout: self::matchesAnyResource($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class])
                     ? FiltersLayout::Hidden
                     : null,
             )
             ->when(
-                in_array($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class], true),
+                self::matchesAnyResource($resourceClass, [AbbreviatedFlightReportResource::class, PostOpsLogResource::class]),
                 fn (Table $table): Table => $table
                     ->header(view('filament.tables.headers.abbreviated-flight-report-header', [
                         'dateOptions' => $reportDateOptions(),
-                        'reportUrl' => $resourceClass === AbbreviatedFlightReportResource::class
+                        'reportUrl' => self::matchesResource($resourceClass, AbbreviatedFlightReportResource::class)
                             ? route('reports.abbreviated.pdf')
                             : route('reports.post-ops-log.pdf'),
                         'showTestAction' => (static function (): bool {
@@ -987,6 +987,32 @@ class FlightsTable
                     ->hiddenFilterIndicators()
             )
             ->recordActions($isOperationalFlightTable ? [] : self::recordActions($resourceClass));
+    }
+
+    /**
+     * @param  array<class-string>  $resources
+     */
+    private static function matchesAnyResource(?string $resourceClass, array $resources): bool
+    {
+        if ($resourceClass === null) {
+            return false;
+        }
+
+        foreach ($resources as $resource) {
+            if (is_a($resourceClass, $resource, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  class-string  $resource
+     */
+    private static function matchesResource(?string $resourceClass, string $resource): bool
+    {
+        return $resourceClass !== null && is_a($resourceClass, $resource, true);
     }
 
     /**
@@ -1050,7 +1076,7 @@ class FlightsTable
                 ->orderByDesc('id');
         }
 
-        return $isOperationalFlightTable || $resourceClass === FlightResource::class
+        return $isOperationalFlightTable || self::matchesResource($resourceClass, FlightResource::class)
             ? $query
                 ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
                 ->orderBy('date_of_flight')

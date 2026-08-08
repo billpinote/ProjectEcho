@@ -2,11 +2,11 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Shared\Resources\AtcProfiles\AtcProfileResource;
-use App\Filament\Shared\Resources\AvsecProfiles\AvsecProfileResource;
-use App\Filament\Shared\Resources\DispatchProfiles\DispatchProfileResource;
-use App\Filament\Shared\Resources\Operators\OperatorResource;
-use App\Filament\Shared\Resources\PilotProfiles\PilotProfileResource;
+use App\Filament\Panels\Admin\Resources\AtcProfiles\AtcProfileResource;
+use App\Filament\Panels\Admin\Resources\AvsecProfiles\AvsecProfileResource;
+use App\Filament\Panels\Admin\Resources\DispatchProfiles\DispatchProfileResource;
+use App\Filament\Panels\Admin\Resources\Operators\OperatorResource;
+use App\Filament\Panels\Admin\Resources\PilotProfiles\PilotProfileResource;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Pages\Dashboard;
 use Filament\Panel;

@@ -15,14 +15,17 @@ Keep Eloquent models in `app/Models`. Domain services may use models, but model 
 
 Filament code lives under `app/Filament`.
 
-- `app/Filament/Panels/{PanelName}` contains UI that belongs to one panel only.
-- `app/Filament/Shared` contains pages, resources, widgets, schemas, or tables reused by more than one panel.
+- `app/Filament/Panels/{PanelName}` contains the route-facing pages, resources, and widgets registered by that panel provider.
+- `app/Filament/Shared` contains reusable implementations such as base resources, base pages, widgets, schemas, tables, and common behavior.
 
 When adding a new Filament class, ask:
 
-1. Is this only for Pilot, ATMO, ATS, Dispatch, Avsec, Admin, or Artisan?
-2. If yes, put it under that panel.
-3. If more than one panel uses it, put it under `Shared`.
+1. Which panel provider registers this page, resource, or widget?
+2. Put that route-facing class under `app/Filament/Panels/{PanelName}`.
+3. If the behavior is reused across panels, put the implementation under `app/Filament/Shared` and make the panel class extend it.
+4. If a new panel provider is added, add the matching `Panels/{PanelName}` folder at the same time.
+
+Current panel folders are `Admin`, `Artisan`, `Atmo`, `Ats`, `Avsec`, `Dispatch`, and `Pilot`.
 
 ## Providers
 
@@ -30,3 +33,4 @@ Panel providers remain under `app/Providers/Filament`.
 
 Each provider should explicitly register the pages, resources, and widgets used by that panel. This keeps panel ownership visible during onboarding and code review.
 
+Providers should import from their matching panel folder. Shared classes should stay behind panel-owned wrappers when they generate Filament routes.

@@ -2,11 +2,11 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Shared\Pages\ImportScanQr;
-use App\Filament\Shared\Resources\AcceptedFlights\AcceptedFlightResource;
-use App\Filament\Shared\Resources\ActiveFlights\ActiveFlightResource;
-use App\Filament\Shared\Resources\CompletedFlights\CompletedFlightResource;
-use App\Filament\Shared\Resources\LandedFlights\LandedFlightResource;
+use App\Filament\Panels\Dispatch\Pages\ImportScanQr;
+use App\Filament\Panels\Dispatch\Resources\AcceptedFlights\AcceptedFlightResource;
+use App\Filament\Panels\Dispatch\Resources\ActiveFlights\ActiveFlightResource;
+use App\Filament\Panels\Dispatch\Resources\CompletedFlights\CompletedFlightResource;
+use App\Filament\Panels\Dispatch\Resources\LandedFlights\LandedFlightResource;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
