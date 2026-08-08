@@ -77,6 +77,49 @@ class AdminUserResourceTest extends TestCase
         }
     }
 
+    public function test_admin_and_artisan_can_access_user_creation(): void
+    {
+        foreach ([UserRole::Admin, UserRole::Artisan] as $role) {
+            $actor = $this->user($role);
+
+            $this->actingAs($actor)
+                ->get(route('filament.admin.resources.users.create'))
+                ->assertOk();
+
+            Livewire::actingAs($actor)
+                ->test(CreateUser::class)
+                ->assertSuccessful();
+        }
+    }
+
+    public function test_artisan_can_create_core_user_account(): void
+    {
+        $artisan = $this->user(UserRole::Artisan);
+
+        Livewire::actingAs($artisan)
+            ->test(CreateUser::class)
+            ->fillForm([
+                'first_name' => 'Tech',
+                'last_name' => 'Created',
+                'email' => 'tech-created@example.test',
+                'role' => UserRole::Admin->value,
+                'is_active' => true,
+                'password' => 'StrongPass123!',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $created = User::where('email', 'tech-created@example.test')->firstOrFail();
+
+        $this->assertSame($artisan->id, $created->created_by_user_id);
+        $this->assertDatabaseHas('user_audit_logs', [
+            'user_id' => $created->id,
+            'performed_by_user_id' => $artisan->id,
+            'action' => 'user_created',
+            'source' => 'user_created',
+        ]);
+    }
+
     public function test_creating_pilot_user_creates_pilot_profile_and_canonical_operator_membership(): void
     {
         $admin = $this->user(UserRole::Admin);
