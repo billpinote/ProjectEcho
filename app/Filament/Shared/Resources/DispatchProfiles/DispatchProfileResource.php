@@ -6,6 +6,7 @@ use App\Filament\Shared\Resources\DispatchProfiles\Pages\CreateDispatchProfile;
 use App\Filament\Shared\Resources\DispatchProfiles\Pages\EditDispatchProfile;
 use App\Filament\Shared\Resources\DispatchProfiles\Pages\ListDispatchProfiles;
 use App\Models\DispatchProfile;
+use App\Models\Operator;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -37,6 +38,11 @@ class DispatchProfileResource extends Resource
                 ->relationship('user', 'name')
                 ->searchable()
                 ->required(),
+            Select::make('operator_id')
+                ->label('Operator')
+                ->options(fn (): array => Operator::query()->orderBy('name')->pluck('name', 'id')->all())
+                ->searchable()
+                ->default(fn ($record): ?int => $record?->user?->operator_id),
             TextInput::make('dispatcher_license_number')->label('Dispatcher License Number'),
             TextInput::make('dispatcher_certificate')->label('Dispatcher Certificate'),
             TextInput::make('department')->label('Department'),
@@ -54,6 +60,7 @@ class DispatchProfileResource extends Resource
             TextColumn::make('user.name')->label('User')->sortable()->searchable(),
             TextColumn::make('dispatcher_license_number')->label('License Number')->sortable(),
             TextColumn::make('dispatcher_certificate')->label('Certificate')->sortable(),
+            TextColumn::make('user.operator.name')->label('Operator')->sortable(),
             TextColumn::make('department')->sortable(),
             TextColumn::make('position')->sortable(),
         ]);

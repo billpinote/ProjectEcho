@@ -8,6 +8,7 @@ use App\Filament\Panels\Pilot\Pages\HelpPage;
 use App\Filament\Panels\Pilot\Pages\MyProfilePage;
 use App\Filament\Panels\Pilot\Pages\PreferencesPage;
 use App\Filament\Panels\Pilot\Pages\SecurityPage;
+use App\Models\Operator;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,6 +58,7 @@ class PilotProfilePageTest extends TestCase
             'last_name' => 'Pilot',
             'email' => 'bill@example.test',
             'station' => 'RPUS',
+            'operator_id' => Operator::factory()->create(['name' => 'Canonical Air'])->id,
         ]);
 
         $pilot->pilotProfile()->create([
@@ -64,7 +66,7 @@ class PilotProfilePageTest extends TestCase
             'ratings' => 'IR, ME',
             'license_expiry_date' => '2026-11-15',
             'medical_expiry_date' => '2026-10-20',
-            'operator' => 'RPUS',
+            'operator' => 'Legacy OPR',
             'remarks' => 'Ready for review.',
         ]);
 
@@ -77,7 +79,8 @@ class PilotProfilePageTest extends TestCase
             ->assertSeeText('IR, ME')
             ->assertSeeText('November 15, 2026')
             ->assertSeeText('October 20, 2026')
-            ->assertSeeText('RPUS')
+            ->assertSeeText('Canonical Air')
+            ->assertDontSeeText('Legacy OPR')
             ->assertSeeText('Ready for review.');
     }
 
@@ -143,7 +146,6 @@ class PilotProfilePageTest extends TestCase
                 'ratings' => 'ATPL',
                 'license_expiry_date' => '2027-01-04',
                 'medical_expiry_date' => '2027-02-05',
-                'operator' => 'RPLL',
                 'remarks' => 'Updated profile',
             ])
             ->call('save')
@@ -161,7 +163,7 @@ class PilotProfilePageTest extends TestCase
         $this->assertSame('ATPL', $pilot->pilotProfile?->ratings);
         $this->assertSame('2027-01-04', $pilot->pilotProfile?->license_expiry_date?->toDateString());
         $this->assertSame('2027-02-05', $pilot->pilotProfile?->medical_expiry_date?->toDateString());
-        $this->assertSame('RPLL', $pilot->pilotProfile?->operator);
+        $this->assertNull($pilot->pilotProfile?->operator);
         $this->assertSame('Updated profile', $pilot->pilotProfile?->remarks);
     }
 
@@ -316,7 +318,6 @@ class PilotProfilePageTest extends TestCase
                 'ratings' => 'IR',
                 'license_expiry_date' => null,
                 'medical_expiry_date' => null,
-                'operator' => null,
                 'remarks' => 'Changed intruder only',
             ])
             ->call('save')
@@ -364,4 +365,3 @@ class PilotProfilePageTest extends TestCase
         ]);
     }
 }
-

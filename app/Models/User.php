@@ -144,6 +144,19 @@ class User extends Authenticatable implements FilamentUser
         return implode(' ', $parts);
     }
 
+    public function flightPlanOperatorName(): ?string
+    {
+        $operator = $this->operator;
+
+        if ($operator === null) {
+            return null;
+        }
+
+        $name = trim((string) ($operator->short_name ?: $operator->name));
+
+        return $name === '' ? null : $name;
+    }
+
     public function isPilot(): bool
     {
         return $this->role === UserRole::Pilot;

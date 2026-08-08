@@ -46,7 +46,7 @@ class MyProfilePage extends Page
             'license_expiry_date' => $user->pilotProfile?->license_expiry_date?->format('F j, Y') ?? 'Not provided',
             'medical_expiry_date' => $user->pilotProfile?->medical_expiry_date?->format('F j, Y') ?? 'Not provided',
             'home_base' => $user->station ?: 'Not provided',
-            'operator' => $user->pilotProfile?->operator ?: 'Not provided',
+            'operator' => $user->operator?->name ?: 'Not provided',
             'remarks' => $user->pilotProfile?->remarks ?: 'Not provided',
         ];
     }

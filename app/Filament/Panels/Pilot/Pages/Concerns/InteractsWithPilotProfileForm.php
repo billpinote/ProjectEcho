@@ -34,9 +34,6 @@ trait InteractsWithPilotProfileForm
                 ->required()
                 ->maxLength(255)
                 ->unique(User::class, 'email', ignoreRecord: true),
-            TextInput::make('operator')
-                ->label('Operator (OPR)')
-                ->maxLength(255),
             TextInput::make('ratings')
                 ->label('Ratings')
                 ->maxLength(255),
@@ -73,7 +70,6 @@ trait InteractsWithPilotProfileForm
             'license_number' => $user->pilotProfile?->license_number,
             'ratings' => $user->pilotProfile?->ratings,
             'license_expiry_date' => $user->pilotProfile?->license_expiry_date?->toDateString(),
-            'operator' => $user->pilotProfile?->operator,
             'medical_expiry_date' => $user->pilotProfile?->medical_expiry_date?->toDateString(),
             'remarks' => $user->pilotProfile?->remarks,
         ];
@@ -107,7 +103,6 @@ trait InteractsWithPilotProfileForm
                 'ratings' => $this->normalizeNullableString($data['ratings'] ?? null),
                 'license_expiry_date' => $data['license_expiry_date'] ?: null,
                 'medical_expiry_date' => $data['medical_expiry_date'] ?: null,
-                'operator' => $this->normalizeNullableString($data['operator'] ?? null),
                 'remarks' => $this->normalizeNullableString($data['remarks'] ?? null),
             ])->save();
         });

@@ -56,6 +56,7 @@ class Flight extends Model
     protected $fillable = [
         'user_id',
         'filed_by_user_id',
+        'operator_id',
         'time_start_up',
         'time_shutdown',
         'time_block_off',
@@ -160,6 +161,11 @@ class Flight extends Model
     public function filedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'filed_by_user_id');
+    }
+
+    public function operator(): BelongsTo
+    {
+        return $this->belongsTo(Operator::class);
     }
 
     public function cancelledBy(): BelongsTo

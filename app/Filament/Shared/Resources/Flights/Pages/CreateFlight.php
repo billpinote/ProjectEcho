@@ -2,6 +2,7 @@
 
 namespace App\Filament\Shared\Resources\Flights\Pages;
 
+use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
@@ -46,14 +47,10 @@ class CreateFlight extends CreateRecord
             $data['filed_by_user_id'] = $user->id;
         }
 
+        $data = AuthenticatedOperatorFlightData::apply($data, $user);
+
         if ($user?->isPilot()) {
             $pilotProfile = $user->pilotProfile()->first();
-            $operator = trim((string) ($pilotProfile?->operator ?? ''));
-            $otherInformation = trim((string) ($data['other_information'] ?? ''));
-
-            if ($operator !== '') {
-                $otherInformation = trim($otherInformation === '' ? 'OPR/'.$operator : $otherInformation.' OPR/'.$operator);
-            }
 
             $data['user_id'] = $user->id;
             $data['pilot_id'] = $user->id;
@@ -61,7 +58,6 @@ class CreateFlight extends CreateRecord
             $data['pilot_license_no'] = $pilotProfile?->license_number ?: $data['pilot_license_no'] ?? null;
             $data['pilot_ratings'] = $pilotProfile?->ratings ?: $data['pilot_ratings'] ?? null;
             $data['license_expiry_date'] = $pilotProfile?->license_expiry_date?->toDateString() ?: $data['license_expiry_date'] ?? null;
-            $data['other_information'] = $otherInformation;
         }
 
         return FlightResource::normalizeFormData($data);
