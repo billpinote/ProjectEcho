@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Enums\UserRole;
-use App\Filament\Pages\EditMyProfilePage;
-use App\Filament\Pages\HelpPage;
-use App\Filament\Pages\MyProfilePage;
-use App\Filament\Pages\PreferencesPage;
-use App\Filament\Pages\SecurityPage;
+use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Pilot\Pages\EditMyProfilePage;
+use App\Filament\Panels\Pilot\Pages\HelpPage;
+use App\Filament\Panels\Pilot\Pages\MyProfilePage;
+use App\Filament\Panels\Pilot\Pages\PreferencesPage;
+use App\Filament\Panels\Pilot\Pages\SecurityPage;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,6 +118,18 @@ class PilotProfilePageTest extends TestCase
         $this->assertSame('2027-02-05', $pilot->pilotProfile?->medical_expiry_date?->toDateString());
         $this->assertSame('RPLL', $pilot->pilotProfile?->operator);
         $this->assertSame('Updated profile', $pilot->pilotProfile?->remarks);
+    }
+
+    public function test_edit_profile_page_renders_a_livewire_save_form(): void
+    {
+        $pilot = $this->pilot();
+
+        $this->actingAs($pilot)
+            ->get(EditMyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSee('id="profile-form"', escape: false)
+            ->assertSee('wire:submit="save"', escape: false)
+            ->assertSeeText('Save Profile');
     }
 
     public function test_profile_and_placeholder_pages_do_not_register_in_main_navigation(): void

@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\FlightPlanStatus;
-use App\Filament\Resources\Flights\Schemas\FlightForm;
-use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
-use App\Filament\Resources\Reports\PostOpsLogResource;
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
+use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
+use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
-use App\Rules\UtcFourDigitTime;
-use App\Services\FlightPlanMutationService;
-use App\Services\FlightPlanQrPayloadService;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 use Barryvdh\DomPDF\Facade\Pdf;

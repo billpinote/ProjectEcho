@@ -2,10 +2,10 @@
 
 namespace Tests\Feature;
 
-use App\Enums\UserRole;
+use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
 use App\Models\User;
-use App\Services\FlightPlanQrPayloadService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;

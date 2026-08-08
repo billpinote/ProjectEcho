@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Models\Flight;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;

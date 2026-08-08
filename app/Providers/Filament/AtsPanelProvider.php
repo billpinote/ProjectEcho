@@ -2,17 +2,17 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
-use App\Filament\Resources\ActiveFlights\ActiveFlightResource;
-use App\Filament\Resources\AirborneFlights\AirborneFlightResource;
-use App\Filament\Resources\AllFlightPlans\AllFlightResource;
-use App\Filament\Resources\CompletedFlights\CompletedFlightResource;
-use App\Filament\Resources\ExpiredFlights\ExpiredFlightResource;
-use App\Filament\Resources\LandedFlights\LandedFlightResource;
-use App\Filament\Resources\RejectedFlights\RejectedFlightResource;
-use App\Filament\Resources\Reports\AbbreviatedFlightReportResource;
-use App\Filament\Resources\Reports\ActiveFlightDataResource;
-use App\Filament\Resources\Reports\PostOpsLogResource;
+use App\Filament\Shared\Resources\AcceptedFlights\AcceptedFlightResource;
+use App\Filament\Shared\Resources\ActiveFlights\ActiveFlightResource;
+use App\Filament\Shared\Resources\AirborneFlights\AirborneFlightResource;
+use App\Filament\Shared\Resources\AllFlightPlans\AllFlightResource;
+use App\Filament\Shared\Resources\CompletedFlights\CompletedFlightResource;
+use App\Filament\Shared\Resources\ExpiredFlights\ExpiredFlightResource;
+use App\Filament\Shared\Resources\LandedFlights\LandedFlightResource;
+use App\Filament\Shared\Resources\RejectedFlights\RejectedFlightResource;
+use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
+use App\Filament\Shared\Resources\Reports\ActiveFlightDataResource;
+use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Pages\Dashboard;
 use Filament\Panel;

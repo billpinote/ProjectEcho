@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Enums\FlightPlanStatus;
-use App\Enums\UserRole;
-use App\Filament\Resources\AcceptedFlights\Pages\ListAcceptedFlights;
-use App\Filament\Resources\ActiveFlights\Pages\ListActiveFlights;
-use App\Filament\Resources\AirborneFlights\Pages\ListAirborneFlights;
-use App\Filament\Resources\CompletedFlights\CompletedFlightResource;
-use App\Filament\Resources\LandedFlights\Pages\ListLandedFlights;
-use App\Filament\Widgets\AlphaFlightsTable;
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\Users\Enums\UserRole;
+use App\Filament\Shared\Resources\AcceptedFlights\Pages\ListAcceptedFlights;
+use App\Filament\Shared\Resources\ActiveFlights\Pages\ListActiveFlights;
+use App\Filament\Shared\Resources\AirborneFlights\Pages\ListAirborneFlights;
+use App\Filament\Shared\Resources\CompletedFlights\CompletedFlightResource;
+use App\Filament\Shared\Resources\LandedFlights\Pages\ListLandedFlights;
+use App\Filament\Shared\Widgets\AlphaFlightsTable;
 use App\Models\Flight;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;

@@ -2,17 +2,18 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\EditMyProfilePage;
-use App\Filament\Pages\HelpPage;
-use App\Filament\Pages\MyProfilePage;
-use App\Filament\Pages\PreferencesPage;
-use App\Filament\Pages\SecurityPage;
-use App\Filament\Resources\Flights\FlightResource;
-use App\Filament\Resources\Flights\Pages\CreateFlight;
-use App\Filament\Resources\MyArchivedFlights\MyArchivedFlightResource;
-use App\Filament\Resources\MyCompletedFlights\MyCompletedFlightResource;
-use App\Filament\Resources\MyCurrentFlights\MyCurrentFlightResource;
-use App\Filament\Widgets\PilotDashboardWidget;
+use App\Filament\Panels\Pilot\Pages\EditMyProfilePage;
+use App\Filament\Panels\Pilot\Pages\HelpPage;
+use App\Filament\Panels\Pilot\Pages\MyProfilePage;
+use App\Filament\Panels\Pilot\Pages\PreferencesPage;
+use App\Filament\Panels\Pilot\Pages\SecurityPage;
+use App\Filament\Shared\Resources\Flights\FlightResource;
+use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
+use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
+use App\Filament\Panels\Pilot\Widgets\PilotDashboardWidget;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationBuilder;
@@ -41,6 +42,7 @@ class PilotPanelProvider extends PanelProvider
             ])
             ->resources([
                 FlightResource::class,
+                MyFlightPlansResource::class,
                 MyCurrentFlightResource::class,
                 MyCompletedFlightResource::class,
                 MyArchivedFlightResource::class,

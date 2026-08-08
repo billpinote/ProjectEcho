@@ -2,17 +2,18 @@
 
 namespace Tests\Feature;
 
-use App\Enums\FlightPlanStatus;
-use App\Enums\UserRole;
-use App\Filament\Resources\AcceptedFlights\AcceptedFlightResource;
-use App\Filament\Resources\Flights\FlightResource;
-use App\Filament\Resources\Flights\Pages\EditFlight;
-use App\Filament\Resources\MyArchivedFlights\Pages\ListMyArchivedFlights;
-use App\Filament\Resources\MyCompletedFlights\Pages\ListMyCompletedFlights;
-use App\Filament\Resources\MyCurrentFlights\Pages\ListMyCurrentFlights;
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\Pages\ListMyArchivedFlights;
+use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\Pages\ListMyCompletedFlights;
+use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\Pages\ListMyCurrentFlights;
+use App\Filament\Shared\Resources\AcceptedFlights\AcceptedFlightResource;
+use App\Filament\Shared\Resources\Flights\FlightResource;
+use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
+use App\Filament\Shared\Resources\Flights\Pages\EditFlight;
 use App\Models\Flight;
 use App\Models\User;
-use App\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -30,11 +31,40 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         $flight = $this->flight(['filed_by_user_id' => $pilot->id]);
 
         $this->assertTrue(Route::has('filament.pilot.resources.flights.edit'));
+        $this->assertTrue(Route::has('filament.pilot.resources.my-flight-plans.index'));
         $this->assertFalse(Route::has('filament.pilot.resources.my-current-flights.edit'));
 
         $this->actingAs($pilot)
             ->get(route('filament.pilot.resources.flights.edit', ['record' => $flight]))
             ->assertForbidden();
+    }
+
+    public function test_pilot_create_flight_redirects_to_pilot_current_flights_after_submission(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, [
+            'first_name' => 'Test',
+            'last_name' => 'Pilot',
+        ]);
+
+        $pilot->pilotProfile()->create([
+            'license_number' => 'LIC-123',
+            'ratings' => 'IR',
+            'operator' => 'RPUS',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->fillForm($this->validFlightPlanFormData())
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect(route('filament.pilot.resources.my-current-flights.index'));
+
+        $this->assertDatabaseHas('flights', [
+            'aircraft_identification' => 'N12345',
+            'filed_by_user_id' => $pilot->id,
+            'pilot_id' => $pilot->id,
+            'status' => FlightPlanStatus::Pending,
+        ]);
     }
 
     public function test_pilot_cannot_open_the_pending_flight_plans_queue(): void
@@ -406,5 +436,41 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             'route' => 'DCT',
             ...$attributes,
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validFlightPlanFormData(): array
+    {
+        $date = now('Asia/Manila')->addDay();
+
+        return [
+            'date_of_flight' => $date->toDateString(),
+            'aircraft_identification' => 'N12345',
+            'flight_rules' => 'I',
+            'type_of_flight' => 'S',
+            'number' => '1',
+            'type_of_aircraft' => 'B747',
+            'wake_turbulence_cat' => 'H',
+            'equipment_10a' => 'S',
+            'equipment_10b' => 'C',
+            'departure_aerodrome' => 'RPUS',
+            'proposed_time' => '1430',
+            'cruising_speed' => 'N450',
+            'level' => 'F350',
+            'route' => 'DCT',
+            'destination_aerodrome' => 'RPLL',
+            'total_eet' => '0230',
+            'endurance' => '0400',
+            'persons_on_board' => '2',
+            'other_information' => 'DOF/'.$date->format('Ymd'),
+            'pilot_in_command' => 'TEST PILOT',
+            'pilot_license_no' => 'LIC-123',
+            'pilot_ratings' => 'IR',
+            'license_expiry_date' => $date->addYear()->toDateString(),
+            'dinghies_enabled' => false,
+            'authorized_representative_enabled' => false,
+        ];
     }
 }

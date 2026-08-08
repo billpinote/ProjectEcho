@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Enums\UserRole;
+use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
 use App\Models\User;
 use Carbon\CarbonImmutable;

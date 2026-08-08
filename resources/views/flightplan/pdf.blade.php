@@ -239,7 +239,7 @@
             </div>
         @endif
 
-        @if(($flight->status ?? null) === \App\Enums\FlightPlanStatus::Rejected)
+        @if(($flight->status ?? null) === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Rejected)
             <div style="width: 794px; margin: 0 auto 12px;">
                 <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; background: #fff;">
                     <tr>
@@ -437,7 +437,7 @@
                             <span class="field-label">TIME</span>
                             <div style="padding: 4px; text-align: left;">
                                 @php
-                                    $time = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? '';
+                                    $time = \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? '';
                                 @endphp
                                 {!! $charBoxes(substr($time, 0, 4)) !!}
                             </div>
@@ -502,7 +502,7 @@
                             <span class="field-label">TOTAL EET</span>
                             <div style="padding: 4px; text-align: left;">
                                 @php
-                                    $eet = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->total_eet) ?? '';
+                                    $eet = \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->total_eet) ?? '';
                                 @endphp
                                 {!! $charBoxes(substr($eet, 0, 4)) !!}
                             </div>
@@ -584,7 +584,7 @@
                             <div style="padding: 4px; text-align: center;">
                                 <div style="text-align: left;">
                                     @php
-                                        $endur = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->endurance) ?? '';
+                                        $endur = \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->endurance) ?? '';
                                     @endphp
                                     <span class="char-box" style="border: 0">E</span>
                                     <span class="char-box" style="border: 0">/</span>
@@ -931,7 +931,7 @@
                                 @if($receivedDate || $receivedTime)
                                     {{ trim(collect([
                                         $receivedDate,
-                                        $receivedTime ? (\App\Rules\UtcFourDigitTime::formatForDisplay($receivedTime) ?? trim((string) $receivedTime)).' Z' : null,
+                                        $receivedTime ? (\App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($receivedTime) ?? trim((string) $receivedTime)).' Z' : null,
                                     ])->filter()->implode(' ')) }}
                                 @endif
                             </div>

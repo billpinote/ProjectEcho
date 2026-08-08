@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Enums\FlightPlanStatus;
-use App\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use Carbon\CarbonInterface;
 use Database\Factories\FlightFactory;
 use Illuminate\Database\Eloquent\Builder;

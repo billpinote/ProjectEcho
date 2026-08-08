@@ -2,15 +2,15 @@
 
 namespace App\Http\Requests;
 
-use App\Rules\FlightScheduleNotInPast;
-use App\Rules\IcaoAerodrome;
-use App\Rules\IcaoAircraftIdentification;
-use App\Rules\IcaoCruisingSpeed;
-use App\Rules\IcaoFlightLevel;
-use App\Rules\IcaoFlightRules;
-use App\Rules\IcaoTypeOfFlight;
-use App\Rules\IcaoWakeTurbulenceCategory;
-use App\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Rules\FlightScheduleNotInPast;
+use App\Domain\FlightPlans\Rules\IcaoAerodrome;
+use App\Domain\FlightPlans\Rules\IcaoAircraftIdentification;
+use App\Domain\FlightPlans\Rules\IcaoCruisingSpeed;
+use App\Domain\FlightPlans\Rules\IcaoFlightLevel;
+use App\Domain\FlightPlans\Rules\IcaoFlightRules;
+use App\Domain\FlightPlans\Rules\IcaoTypeOfFlight;
+use App\Domain\FlightPlans\Rules\IcaoWakeTurbulenceCategory;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;

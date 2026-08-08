@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use App\Enums\UserRole;
+use App\Domain\Users\Enums\UserRole;
 use App\Models\User;
 use Filament\Panel;
 use PHPUnit\Framework\Attributes\DataProvider;

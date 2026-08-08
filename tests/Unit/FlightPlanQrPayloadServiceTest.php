@@ -3,7 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\Flight;
-use App\Services\FlightPlanQrPayloadService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use Tests\TestCase;
 
 class FlightPlanQrPayloadServiceTest extends TestCase
