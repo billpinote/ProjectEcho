@@ -269,6 +269,7 @@ class FlightController extends Controller
     public function acceptFlightPlan(Flight $flight)
     {
         $this->ensureReviewerAccess();
+        abort_unless(Auth::user()?->can('accept', $flight) ?? false, 403);
 
         if ($flight->isPendingExpired()) {
             return redirect()
@@ -307,6 +308,7 @@ class FlightController extends Controller
     public function rejectFlightPlan(Request $request, Flight $flight)
     {
         $this->ensureReviewerAccess();
+        abort_unless(Auth::user()?->can('reject', $flight) ?? false, 403);
 
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:255'],
@@ -391,6 +393,10 @@ class FlightController extends Controller
         $flight = null;
         if (isset($preview['flight_id']) && is_numeric($preview['flight_id'])) {
             $flight = Flight::find((int) $preview['flight_id']);
+
+            if ($flight !== null && Auth::check()) {
+                abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
+            }
         }
 
         // Fall back to creating a flight from the snapshot data if no database record exists
@@ -881,6 +887,11 @@ class FlightController extends Controller
             }
 
             $flight = Flight::find((int) $parsedPayload['flight_id']);
+            $canOpen = $flight === null
+                ? ! Auth::check()
+                : (Auth::check()
+                    ? (Auth::user()?->can('view', $flight) ?? false)
+                    : $this->sessionCanAccessFlight($request, $flight));
             $status = $flight?->status instanceof FlightPlanStatus
                 ? $flight->status
                 : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
@@ -904,7 +915,7 @@ class FlightController extends Controller
                 'status_label' => $status?->label() ?? 'Valid QR. Needs ATC Review.',
                 'status_color' => $status?->filamentColor() ?? 'info',
                 'view_url' => route('flightplan.scan-qr.preview', ['token' => $previewToken]),
-                'can_open' => true,
+                'can_open' => $canOpen,
             ];
         }
 
@@ -918,7 +929,9 @@ class FlightController extends Controller
             ? $flight->status
             : FlightPlanStatus::tryFrom((string) $flight->status);
 
-        $canOpen = Auth::check() || $this->sessionCanAccessFlight($request, $flight);
+        $canOpen = Auth::check()
+            ? (Auth::user()?->can('view', $flight) ?? false)
+            : $this->sessionCanAccessFlight($request, $flight);
 
         return [
             'id' => $flight->getKey(),

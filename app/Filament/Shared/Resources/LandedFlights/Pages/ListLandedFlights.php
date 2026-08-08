@@ -17,9 +17,8 @@ class ListLandedFlights extends ListRecords
 
     public function confirmShutdownNow(string|int $recordId): void
     {
-        abort_unless(auth()->user()?->canUpdateFlightShutdownTime() ?? false, 403);
-
         $record = Flight::query()->findOrFail($recordId);
+        abort_unless(auth()->user()?->can('updateShutdownTime', $record) ?? false, 403);
 
         $record->forceFill([
             'time_shutdown' => now('UTC')->format('H:i'),

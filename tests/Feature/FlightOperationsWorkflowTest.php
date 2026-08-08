@@ -11,6 +11,7 @@ use App\Filament\Shared\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Shared\Resources\LandedFlights\Pages\ListLandedFlights;
 use App\Filament\Shared\Widgets\AlphaFlightsTable;
 use App\Models\Flight;
+use App\Models\Operator;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -274,9 +275,13 @@ class FlightOperationsWorkflowTest extends TestCase
     {
         Storage::fake('public');
 
+        $operator = Operator::factory()->create();
         $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS', 'wiresign' => 'AT']);
-        $dispatch = $this->user(UserRole::Dispatch);
-        $flight = $this->flight(['status' => FlightPlanStatus::Pending]);
+        $dispatch = $this->user(UserRole::Dispatch, ['operator_id' => $operator->id]);
+        $flight = $this->flight([
+            'status' => FlightPlanStatus::Pending,
+            'operator_id' => $operator->id,
+        ]);
 
         $this->actingAs($atmo)
             ->post(route('flights.accept', $flight))

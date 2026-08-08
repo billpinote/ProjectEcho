@@ -11,6 +11,7 @@ use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use UnitEnum;
@@ -123,6 +124,22 @@ class ImportScanQr extends Page
             }
 
             $flight = Flight::find((int) $parsedPayload['flight_id']);
+
+            if ($flight !== null && ! (Auth::user()?->can('view', $flight) ?? false)) {
+                $this->matchedFlight = null;
+                $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
+
+                if ($notifyOnFailure) {
+                    Notification::make()
+                        ->title('Flight plan access denied')
+                        ->body('This QR payload belongs to a flight outside your authorized records.')
+                        ->danger()
+                        ->send();
+                }
+
+                return;
+            }
+
             $status = $flight?->status instanceof FlightPlanStatus
                 ? $flight->status
                 : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
@@ -164,14 +181,16 @@ class ImportScanQr extends Page
 
         $flight = Flight::find((int) $parsedPayload['flight_id']);
 
-        if (! $flight) {
+        if (! $flight || ! (Auth::user()?->can('view', $flight) ?? false)) {
             $this->matchedFlight = null;
             $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
 
             if ($notifyOnFailure) {
                 Notification::make()
-                    ->title('Flight not found')
-                    ->body('No saved flight plan matches that QR payload.')
+                    ->title($flight ? 'Flight plan access denied' : 'Flight not found')
+                    ->body($flight
+                        ? 'This QR payload belongs to a flight outside your authorized records.'
+                        : 'No saved flight plan matches that QR payload.')
                     ->danger()
                     ->send();
             }

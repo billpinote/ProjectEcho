@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Models\Flight;
 use App\Models\User;
 
@@ -20,11 +21,7 @@ class FlightPolicy
      */
     public function view(User $user, Flight $flight): bool
     {
-        if (! $user->isPilot() && $user->canViewFlightPlans()) {
-            return true;
-        }
-
-        return $flight->isOwnedBy($user);
+        return FlightAccess::canView($user, $flight);
     }
 
     /**
@@ -40,11 +37,7 @@ class FlightPolicy
      */
     public function update(User $user, Flight $flight): bool
     {
-        if ($user->hasFullFlightAccess()) {
-            return true;
-        }
-
-        return false;
+        return $user->is_active && $user->hasFullFlightAccess();
     }
 
     /**
@@ -76,7 +69,7 @@ class FlightPolicy
      */
     public function accept(User $user, Flight $flight): bool
     {
-        return $user->canReviewFlightPlans();
+        return $user->canReviewFlightPlans() && FlightAccess::canView($user, $flight);
     }
 
     /**
@@ -84,7 +77,32 @@ class FlightPolicy
      */
     public function reject(User $user, Flight $flight): bool
     {
-        return $user->canReviewFlightPlans();
+        return $user->canReviewFlightPlans() && FlightAccess::canView($user, $flight);
+    }
+
+    public function updateStartUpTime(User $user, Flight $flight): bool
+    {
+        return $user->canUpdateFlightStartUpTime() && FlightAccess::canOperationallyUpdate($user, $flight);
+    }
+
+    public function updateBlockOffTime(User $user, Flight $flight): bool
+    {
+        return $user->canUpdateFlightBlockOffTime() && FlightAccess::canOperationallyUpdate($user, $flight);
+    }
+
+    public function updateAirborneTime(User $user, Flight $flight): bool
+    {
+        return $user->canUpdateFlightPlans() && FlightAccess::canOperationallyUpdate($user, $flight);
+    }
+
+    public function updateTouchdownTime(User $user, Flight $flight): bool
+    {
+        return $user->canUpdateFlightPlans() && FlightAccess::canOperationallyUpdate($user, $flight);
+    }
+
+    public function updateShutdownTime(User $user, Flight $flight): bool
+    {
+        return $user->canUpdateFlightShutdownTime() && FlightAccess::canOperationallyUpdate($user, $flight);
     }
 
     public function delay(User $user, Flight $flight): bool

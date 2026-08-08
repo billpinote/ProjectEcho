@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use Carbon\CarbonInterface;
 use Database\Factories\FlightFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -306,6 +307,11 @@ class Flight extends Model
                 ->orWhere(fn (Builder $query): Builder => $query->rejected())
                 ->orWhere('status', FlightPlanStatus::Cancelled);
         });
+    }
+
+    public function scopeVisibleTo(Builder $query, ?User $user): Builder
+    {
+        return FlightAccess::restrictQueryToVisibleFlights($query, $user);
     }
 
     public function scopePendingUnreviewed(Builder $query): Builder

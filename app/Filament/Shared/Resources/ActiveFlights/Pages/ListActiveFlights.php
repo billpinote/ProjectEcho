@@ -17,9 +17,8 @@ class ListActiveFlights extends ListRecords
 
     public function confirmAirborneNow(string|int $recordId): void
     {
-        abort_unless(auth()->user()?->canUpdateFlightPlans() ?? false, 403);
-
         $record = Flight::query()->findOrFail($recordId);
+        abort_unless(auth()->user()?->can('updateAirborneTime', $record) ?? false, 403);
 
         $record->forceFill([
             'time_airborne' => now('UTC')->format('H:i'),

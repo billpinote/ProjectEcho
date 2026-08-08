@@ -17,9 +17,8 @@ class ListAirborneFlights extends ListRecords
 
     public function confirmTouchdownNow(string|int $recordId): void
     {
-        abort_unless(auth()->user()?->canUpdateFlightPlans() ?? false, 403);
-
         $record = Flight::query()->findOrFail($recordId);
+        abort_unless(auth()->user()?->can('updateTouchdownTime', $record) ?? false, 403);
 
         $record->forceFill([
             'time_touchdown' => now('UTC')->format('H:i'),

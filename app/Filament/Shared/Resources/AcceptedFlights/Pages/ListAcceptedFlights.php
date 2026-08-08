@@ -17,9 +17,8 @@ class ListAcceptedFlights extends ListRecords
 
     public function confirmStartUpNow(string|int $recordId): void
     {
-        abort_unless(auth()->user()?->canUpdateFlightStartUpTime() ?? false, 403);
-
         $record = Flight::query()->findOrFail($recordId);
+        abort_unless(auth()->user()?->can('updateStartUpTime', $record) ?? false, 403);
 
         $record->forceFill([
             'time_start_up' => now('UTC')->format('H:i'),
@@ -28,9 +27,8 @@ class ListAcceptedFlights extends ListRecords
 
     public function confirmBlockOffNow(string|int $recordId): void
     {
-        abort_unless(auth()->user()?->canUpdateFlightBlockOffTime() ?? false, 403);
-
         $record = Flight::query()->findOrFail($recordId);
+        abort_unless(auth()->user()?->can('updateBlockOffTime', $record) ?? false, 403);
 
         $record->forceFill([
             'time_block_off' => now('UTC')->format('H:i'),

@@ -287,7 +287,7 @@ class FlightsTable
                     ->label('START-UP TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_start_up))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
-                        abort_unless(Auth::user()?->canUpdateFlightStartUpTime() ?? false, 403);
+                        abort_unless(Auth::user()?->can('updateStartUpTime', $record) ?? false, 403);
 
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
@@ -309,7 +309,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
-                    ->disabled(! $canUpdateStartUpTime)
+                    ->disabled(fn (Flight $record): bool => ! (Auth::user()?->can('updateStartUpTime', $record) ?? false))
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -347,7 +347,7 @@ class FlightsTable
                     ->label('OFF-BLOCK TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_block_off))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
-                        abort_unless(Auth::user()?->canUpdateFlightBlockOffTime() ?? false, 403);
+                        abort_unless(Auth::user()?->can('updateBlockOffTime', $record) ?? false, 403);
 
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
@@ -369,7 +369,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
-                    ->disabled(! $canUpdateBlockOffTime)
+                    ->disabled(fn (Flight $record): bool => ! (Auth::user()?->can('updateBlockOffTime', $record) ?? false))
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -655,7 +655,7 @@ class FlightsTable
                     ->label('TAKE OFF TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_airborne))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
-                        abort_unless(Auth::user()?->canUpdateFlightPlans() ?? false, 403);
+                        abort_unless(Auth::user()?->can('updateAirborneTime', $record) ?? false, 403);
 
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
@@ -677,7 +677,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
-                    ->disabled(! $canUpdateFlights)
+                    ->disabled(fn (Flight $record): bool => ! (Auth::user()?->can('updateAirborneTime', $record) ?? false))
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -746,7 +746,7 @@ class FlightsTable
                     ->label('TOUCHDOWN TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_touchdown))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
-                        abort_unless(Auth::user()?->canUpdateFlightPlans() ?? false, 403);
+                        abort_unless(Auth::user()?->can('updateTouchdownTime', $record) ?? false, 403);
 
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
@@ -768,7 +768,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
-                    ->disabled(! $canUpdateFlights)
+                    ->disabled(fn (Flight $record): bool => ! (Auth::user()?->can('updateTouchdownTime', $record) ?? false))
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,
@@ -825,7 +825,7 @@ class FlightsTable
                     ->label('SHUTDOWN TIME')
                     ->getStateUsing(fn (Flight $record): ?string => FlightForm::formatTimeForForm($record->time_shutdown))
                     ->updateStateUsing(function (Flight $record, mixed $state, LivewireComponent $livewire): ?string {
-                        abort_unless(Auth::user()?->canUpdateFlightShutdownTime() ?? false, 403);
+                        abort_unless(Auth::user()?->can('updateShutdownTime', $record) ?? false, 403);
 
                         if (filled($state) && ! UtcFourDigitTime::isValid($state)) {
                             $livewire->dispatch(
@@ -847,7 +847,7 @@ class FlightsTable
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
-                    ->disabled(! $canUpdateShutdownTime)
+                    ->disabled(fn (Flight $record): bool => ! (Auth::user()?->can('updateShutdownTime', $record) ?? false))
                     ->inputMode('numeric')
                     ->extraInputAttributes(fn (Flight $record): array => [
                         'maxlength' => 4,

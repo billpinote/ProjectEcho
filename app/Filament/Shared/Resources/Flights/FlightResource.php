@@ -79,7 +79,7 @@ class FlightResource extends Resource
 
     protected static function getFlightPlanBaseQuery(): Builder
     {
-        return parent::getEloquentQuery();
+        return parent::getEloquentQuery()->visibleTo(Auth::user());
     }
 
     protected static function hasStatusColumn(): bool
@@ -94,13 +94,6 @@ class FlightResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $user = Auth::user();
-
-        if ($user?->isPilot()) {
-            return static::getFlightPlanBaseQuery()
-                ->where('filed_by_user_id', $user->id);
-        }
-
         if (! static::hasStatusColumn()) {
             return static::getFlightPlanBaseQuery()->whereNull('accepted_by_user_id');
         }
@@ -162,7 +155,7 @@ class FlightResource extends Resource
      */
     protected static function getPendingNavigationCounts(): array
     {
-        $query = static::getModel()::query();
+        $query = static::getModel()::query()->visibleTo(Auth::user());
 
         $total = static::hasStatusColumn()
             ? (clone $query)->pendingActive()->count()
