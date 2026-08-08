@@ -3,7 +3,6 @@
 namespace App\Filament\Shared\Resources\AvsecProfiles\Pages;
 
 use App\Filament\Shared\Resources\AvsecProfiles\AvsecProfileResource;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListAvsecProfiles extends ListRecords
@@ -12,9 +11,6 @@ class ListAvsecProfiles extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [
-            CreateAction::make()
-                ->label('Create AVSEC Profile'),
-        ];
+        return [];
     }
 }

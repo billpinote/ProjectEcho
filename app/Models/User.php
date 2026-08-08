@@ -25,6 +25,7 @@ class User extends Authenticatable implements FilamentUser
      */
     protected $fillable = [
         'name',
+        'created_by_user_id',
         'first_name',
         'middle_name',
         'last_name',
@@ -76,6 +77,21 @@ class User extends Authenticatable implements FilamentUser
     public function authAccounts(): HasMany
     {
         return $this->hasMany(AuthAccount::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(UserAuditLog::class);
+    }
+
+    public function kycDocuments(): HasMany
+    {
+        return $this->hasMany(UserKycDocument::class);
     }
 
     public function operator(): BelongsTo

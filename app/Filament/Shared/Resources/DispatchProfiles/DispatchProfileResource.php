@@ -30,6 +30,11 @@ class DispatchProfileResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->columns(1)->components([

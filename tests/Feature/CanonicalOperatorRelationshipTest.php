@@ -4,8 +4,7 @@ namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\Users\Enums\UserRole;
-use App\Filament\Panels\Admin\Resources\DispatchProfiles\Pages\CreateDispatchProfile;
-use App\Filament\Panels\Admin\Resources\PilotProfiles\Pages\CreatePilotProfile;
+use App\Filament\Panels\Admin\Resources\Users\Pages\CreateUser;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Models\Flight;
 use App\Models\Operator;
@@ -48,54 +47,53 @@ class CanonicalOperatorRelationshipTest extends TestCase
         $this->assertNull($this->flight()->operator_id);
     }
 
-    public function test_admin_pilot_profile_form_assigns_user_operator_without_touching_legacy_operator_text(): void
+    public function test_admin_user_form_assigns_pilot_operator_without_touching_legacy_operator_text(): void
     {
         $admin = $this->user(UserRole::Admin);
-        $pilot = $this->user(UserRole::Pilot);
         $operator = Operator::factory()->create(['name' => 'Profile Air', 'short_name' => 'PRF']);
 
         Livewire::actingAs($admin)
-            ->test(CreatePilotProfile::class)
+            ->test(CreateUser::class)
             ->fillForm([
-                'user_id' => $pilot->id,
+                'first_name' => 'Profile',
+                'last_name' => 'Pilot',
+                'email' => 'profile-pilot@example.test',
+                'role' => UserRole::Pilot->value,
                 'operator_id' => $operator->id,
-                'license_number' => 'PILOT-1',
-                'ratings' => 'IR',
-                'license_expiry_date' => null,
-                'medical_expiry_date' => null,
-                'remarks' => null,
+                'password' => 'StrongPass123!',
+                'pilot_license_number' => 'PILOT-1',
+                'pilot_ratings' => 'IR',
             ])
             ->call('create')
             ->assertHasNoFormErrors();
 
-        $pilot->refresh();
+        $pilot = User::where('email', 'profile-pilot@example.test')->firstOrFail();
 
         $this->assertSame($operator->id, $pilot->operator_id);
         $this->assertNull($pilot->pilotProfile?->operator);
     }
 
-    public function test_admin_dispatch_profile_form_assigns_user_operator(): void
+    public function test_admin_user_form_assigns_dispatch_operator(): void
     {
         $admin = $this->user(UserRole::Admin);
-        $dispatch = $this->user(UserRole::Dispatch);
         $operator = Operator::factory()->create(['name' => 'Dispatch Air', 'short_name' => 'DSP']);
 
         Livewire::actingAs($admin)
-            ->test(CreateDispatchProfile::class)
+            ->test(CreateUser::class)
             ->fillForm([
-                'user_id' => $dispatch->id,
+                'first_name' => 'Profile',
+                'last_name' => 'Dispatcher',
+                'email' => 'profile-dispatch@example.test',
+                'role' => UserRole::Dispatch->value,
                 'operator_id' => $operator->id,
-                'dispatcher_license_number' => 'DISP-1',
-                'dispatcher_certificate' => 'CERT-1',
-                'department' => 'Operations',
-                'position' => 'Dispatcher',
-                'office_phone' => null,
-                'mobile_number' => null,
-                'shift' => null,
-                'remarks' => null,
+                'password' => 'StrongPass123!',
+                'dispatch_dispatcher_license_number' => 'DISP-1',
+                'dispatch_dispatcher_certificate' => 'CERT-1',
             ])
             ->call('create')
             ->assertHasNoFormErrors();
+
+        $dispatch = User::where('email', 'profile-dispatch@example.test')->firstOrFail();
 
         $this->assertSame($operator->id, $dispatch->refresh()->operator_id);
     }
