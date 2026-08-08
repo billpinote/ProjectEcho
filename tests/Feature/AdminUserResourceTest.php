@@ -83,6 +83,12 @@ class AdminUserResourceTest extends TestCase
             $actor = $this->user($role);
 
             $this->actingAs($actor)
+                ->get(route('filament.admin.resources.users.index'))
+                ->assertOk()
+                ->assertSeeText('Create User')
+                ->assertSee(route('filament.admin.resources.users.create'), false);
+
+            $this->actingAs($actor)
                 ->get(route('filament.admin.resources.users.create'))
                 ->assertOk();
 

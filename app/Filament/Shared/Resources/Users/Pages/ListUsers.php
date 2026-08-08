@@ -3,7 +3,7 @@
 namespace App\Filament\Shared\Resources\Users\Pages;
 
 use App\Filament\Shared\Resources\Users\UserResource;
-use Filament\Actions\CreateAction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 
 class ListUsers extends ListRecords
@@ -13,8 +13,10 @@ class ListUsers extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
-                ->label('Create User'),
+            Action::make('createUser')
+                ->label('Create User')
+                ->icon('heroicon-o-plus')
+                ->url(fn (): string => static::getResource()::getUrl('create')),
         ];
     }
 }
