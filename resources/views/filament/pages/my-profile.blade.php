@@ -26,4 +26,36 @@
             @endforeach
         </dl>
     </x-filament::section>
+
+    <x-filament::section
+        heading="Profile Update Requests"
+        description="Requests you submitted for Admin review."
+    >
+        @if (empty($profileData['update_requests']))
+            <p class="text-sm text-gray-600">No profile update requests submitted.</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-gray-500">
+                            <th class="py-2 pr-4">Submitted</th>
+                            <th class="py-2 pr-4">Status</th>
+                            <th class="py-2 pr-4">Reason</th>
+                            <th class="py-2 pr-4">Reviewer Remarks</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($profileData['update_requests'] as $request)
+                            <tr class="border-t border-gray-200">
+                                <td class="py-2 pr-4">{{ $request['submitted_at'] }}</td>
+                                <td class="py-2 pr-4">{{ $request['status'] }}</td>
+                                <td class="py-2 pr-4">{{ $request['reason'] }}</td>
+                                <td class="py-2 pr-4">{{ $request['reviewer_remarks'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </x-filament::section>
 </x-filament-panels::page>

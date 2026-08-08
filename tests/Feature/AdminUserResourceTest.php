@@ -63,7 +63,8 @@ class AdminUserResourceTest extends TestCase
         $this->assertDatabaseHas('user_audit_logs', [
             'user_id' => $user->id,
             'performed_by_user_id' => $admin->id,
-            'action' => 'created',
+            'action' => 'user_created',
+            'source' => 'user_created',
         ]);
     }
 

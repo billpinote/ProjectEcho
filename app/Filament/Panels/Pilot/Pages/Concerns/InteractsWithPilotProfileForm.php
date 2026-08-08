@@ -2,19 +2,19 @@
 
 namespace App\Filament\Panels\Pilot\Pages\Concerns;
 
-use App\Models\User;
+use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
 
 trait InteractsWithPilotProfileForm
 {
     use ResolvesPilotPanelProfileUser;
 
     /**
-     * @return array<int, TextInput|DatePicker|Textarea>
+     * @return array<int, TextInput|DatePicker|Textarea|FileUpload>
      */
     protected function getPilotProfileFormComponents(): array
     {
@@ -28,12 +28,6 @@ trait InteractsWithPilotProfileForm
             TextInput::make('last_name')
                 ->label('Last Name')
                 ->maxLength(255),
-            TextInput::make('email')
-                ->label('Email')
-                ->email()
-                ->required()
-                ->maxLength(255)
-                ->unique(User::class, 'email', ignoreRecord: true),
             TextInput::make('ratings')
                 ->label('Ratings')
                 ->maxLength(255),
@@ -52,6 +46,20 @@ trait InteractsWithPilotProfileForm
                 ->label('Remarks')
                 ->rows(4)
                 ->columnSpanFull(),
+            Textarea::make('reason')
+                ->label('Reason / Explanation')
+                ->required()
+                ->rows(4)
+                ->columnSpanFull(),
+            FileUpload::make('supporting_documents')
+                ->label('Supporting Documents')
+                ->disk('local')
+                ->directory('profile-update-request-documents')
+                ->visibility('private')
+                ->multiple()
+                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                ->maxSize(5120)
+                ->columnSpanFull(),
         ];
     }
 
@@ -66,52 +74,39 @@ trait InteractsWithPilotProfileForm
             'first_name' => $user->first_name,
             'middle_name' => $user->middle_name,
             'last_name' => $user->last_name,
-            'email' => $user->email,
             'license_number' => $user->pilotProfile?->license_number,
             'ratings' => $user->pilotProfile?->ratings,
             'license_expiry_date' => $user->pilotProfile?->license_expiry_date?->toDateString(),
             'medical_expiry_date' => $user->pilotProfile?->medical_expiry_date?->toDateString(),
             'remarks' => $user->pilotProfile?->remarks,
+            'reason' => null,
+            'supporting_documents' => [],
         ];
     }
 
     /**
      * @param  array<string, mixed>  $data
      */
-    protected function persistPilotProfileFormData(array $data): void
+    protected function submitPilotProfileUpdateRequest(array $data): void
     {
         $user = $this->getProfileUser();
 
-        DB::transaction(function () use ($data, $user): void {
-            $user->forceFill([
-                'first_name' => $this->normalizeNullableString($data['first_name'] ?? null),
-                'middle_name' => $this->normalizeNullableString($data['middle_name'] ?? null),
-                'last_name' => $this->normalizeNullableString($data['last_name'] ?? null),
-                'email' => trim((string) ($data['email'] ?? '')),
-                'name' => $this->buildFullName(
-                    $data['first_name'] ?? null,
-                    $data['middle_name'] ?? null,
-                    $data['last_name'] ?? null,
-                    $user->suffix,
-                ),
-            ])->save();
-
-            $profile = $user->pilotProfile()->firstOrCreate([]);
-
-            $profile->forceFill([
-                'license_number' => $this->normalizeNullableString($data['license_number'] ?? null),
-                'ratings' => $this->normalizeNullableString($data['ratings'] ?? null),
-                'license_expiry_date' => $data['license_expiry_date'] ?: null,
-                'medical_expiry_date' => $data['medical_expiry_date'] ?: null,
-                'remarks' => $this->normalizeNullableString($data['remarks'] ?? null),
-            ])->save();
-        });
+        app(ProfileUpdateRequestService::class)->submit($user, [
+            'user.first_name' => $data['first_name'] ?? null,
+            'user.middle_name' => $data['middle_name'] ?? null,
+            'user.last_name' => $data['last_name'] ?? null,
+            'pilot_profile.license_number' => $data['license_number'] ?? null,
+            'pilot_profile.ratings' => $data['ratings'] ?? null,
+            'pilot_profile.license_expiry_date' => $data['license_expiry_date'] ?? null,
+            'pilot_profile.medical_expiry_date' => $data['medical_expiry_date'] ?? null,
+            'pilot_profile.remarks' => $data['remarks'] ?? null,
+        ], $data['reason'] ?? null, $data['supporting_documents'] ?? []);
     }
 
-    protected function sendProfileUpdatedNotification(): void
+    protected function sendProfileUpdateRequestedNotification(): void
     {
         Notification::make()
-            ->title('Profile updated successfully.')
+            ->title('Profile update request submitted.')
             ->success()
             ->send();
     }

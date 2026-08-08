@@ -341,7 +341,9 @@ class UserResource extends Resource
         }
 
         $rows = $documents->map(function (UserKycDocument $document): string {
-            $attachment = filled($document->file_path) ? 'Stored privately' : 'None';
+            $attachment = filled($document->file_path)
+                ? sprintf('<a href="%s">Download</a>', e(route('user-kyc-documents.download', $document)))
+                : 'None';
 
             return sprintf(
                 '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
@@ -350,7 +352,7 @@ class UserResource extends Resource
                 e($document->verifiedBy?->name ?? 'System'),
                 e($document->verified_at?->timezone(config('app.timezone'))->format('d M Y H:i') ?? ''),
                 e($document->remarks ?? ''),
-                e($attachment),
+                $attachment,
             );
         })->implode('');
 
@@ -374,18 +376,32 @@ class UserResource extends Resource
             return '<p>No account history recorded.</p>';
         }
 
+        $creation = $record->createdBy !== null
+            ? sprintf(
+                '<p class="mb-3 text-sm">Created by %s on %s.</p>',
+                e($record->createdBy->name),
+                e($record->created_at?->timezone(config('app.timezone'))->format('d M Y H:i') ?? ''),
+            )
+            : sprintf(
+                '<p class="mb-3 text-sm">Created by legacy/unknown source on %s.</p>',
+                e($record->created_at?->timezone(config('app.timezone'))->format('d M Y H:i') ?? ''),
+            );
+
         $rows = $logs->map(function ($log): string {
             return sprintf(
-                '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
+                '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
                 e($log->created_at?->timezone(config('app.timezone'))->format('d M Y H:i') ?? ''),
                 e(str((string) $log->action)->replace('_', ' ')->headline()->toString()),
                 e($log->performedBy?->name ?? 'System'),
-                e(class_basename((string) ($log->auditable_type ?: User::class))),
-                e($log->description ?: self::auditChangesSummary($log->changes ?? [])),
+                e($log->field ? str((string) $log->field)->replace(['.', '_'], ' ')->headline()->toString() : class_basename((string) ($log->auditable_type ?: User::class))),
+                e($log->old_value ?? ''),
+                e($log->new_value ?? ''),
+                e($log->source ? str((string) $log->source)->replace('_', ' ')->headline()->toString() : ''),
+                e($log->remarks ?: $log->description ?: self::auditChangesSummary($log->changes ?? [])),
             );
         })->implode('');
 
-        return '<table class="fi-ta-table w-full text-sm"><thead><tr><th>Date / Time</th><th>Action</th><th>Performed By</th><th>Record</th><th>Changes / Details</th></tr></thead><tbody>'.$rows.'</tbody></table>';
+        return $creation.'<table class="fi-ta-table w-full text-sm"><thead><tr><th>Date / Time</th><th>Action</th><th>Changed By</th><th>Field</th><th>Previous Value</th><th>New Value</th><th>Source</th><th>Remarks</th></tr></thead><tbody>'.$rows.'</tbody></table>';
     }
 
     /**

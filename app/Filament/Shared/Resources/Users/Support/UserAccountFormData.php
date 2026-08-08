@@ -182,7 +182,7 @@ class UserAccountFormData
 
     public static function recordCreated(User $user, ?User $actor): void
     {
-        self::recordAudit($user, $actor, 'created', $user, [], 'User account created.');
+        self::recordAudit($user, $actor, 'user_created', 'user_created', $user, [], 'User account created.');
     }
 
     /**
@@ -206,6 +206,7 @@ class UserAccountFormData
             $user,
             $actor,
             $action,
+            'admin_direct_change',
             $user,
             $changes,
             self::describeChanges($changes),
@@ -225,6 +226,7 @@ class UserAccountFormData
             $user,
             $actor,
             $created ? 'profile_created' : 'updated',
+            'admin_direct_change',
             $profile,
             $changes,
             $created ? class_basename($profile).' created.' : self::describeChanges($changes),
@@ -254,6 +256,7 @@ class UserAccountFormData
                 $user,
                 $actor,
                 'kyc_recorded',
+                'kyc_verified',
                 $document,
                 [
                     'document_type' => [
@@ -364,6 +367,7 @@ class UserAccountFormData
         User $user,
         ?User $actor,
         string $action,
+        ?string $source,
         ?Model $auditable,
         array $changes,
         ?string $description,
@@ -371,6 +375,7 @@ class UserAccountFormData
         return $user->auditLogs()->create([
             'performed_by_user_id' => $actor?->getKey(),
             'action' => $action,
+            'source' => $source,
             'auditable_type' => $auditable?->getMorphClass(),
             'auditable_id' => $auditable?->getKey(),
             'changes' => $changes === [] ? null : $changes,

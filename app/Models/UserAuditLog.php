@@ -14,10 +14,18 @@ class UserAuditLog extends Model
         'user_id',
         'performed_by_user_id',
         'action',
+        'source',
+        'field',
+        'old_value',
+        'new_value',
         'auditable_type',
         'auditable_id',
+        'profile_update_request_id',
         'changes',
         'description',
+        'remarks',
+        'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [

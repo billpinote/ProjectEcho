@@ -111,7 +111,7 @@ class PilotProfilePageTest extends TestCase
         $this->assertFalse($artisan->pilotProfile()->exists());
     }
 
-    public function test_view_profile_page_links_to_the_edit_page(): void
+    public function test_view_profile_page_links_to_the_request_page(): void
     {
         $pilot = $this->pilot();
 
@@ -119,13 +119,14 @@ class PilotProfilePageTest extends TestCase
             ->get(MyProfilePage::getUrl(panel: 'pilot'))
             ->assertOk()
             ->assertSee(EditMyProfilePage::getUrl(panel: 'pilot'), escape: false)
-            ->assertSeeText('Update Profile');
+            ->assertSeeText('Request Profile Update');
     }
 
-    public function test_updating_the_profile_persists_changes_and_redirects_to_view_profile(): void
+    public function test_requesting_profile_update_does_not_immediately_change_profile(): void
     {
         $pilot = $this->pilot([
             'first_name' => 'Old',
+            'middle_name' => null,
             'last_name' => 'Name',
             'email' => 'old@example.test',
             'suffix' => null,
@@ -141,12 +142,12 @@ class PilotProfilePageTest extends TestCase
                 'first_name' => 'New',
                 'middle_name' => 'M',
                 'last_name' => 'Pilot',
-                'email' => 'new@example.test',
                 'license_number' => 'NEW-900',
                 'ratings' => 'ATPL',
                 'license_expiry_date' => '2027-01-04',
                 'medical_expiry_date' => '2027-02-05',
                 'remarks' => 'Updated profile',
+                'reason' => 'KYC details have changed.',
             ])
             ->call('save')
             ->assertRedirect(MyProfilePage::getUrl(panel: 'pilot'));
@@ -154,20 +155,28 @@ class PilotProfilePageTest extends TestCase
         $pilot->refresh();
         $pilot->load('pilotProfile');
 
-        $this->assertSame('New', $pilot->first_name);
-        $this->assertSame('M', $pilot->middle_name);
-        $this->assertSame('Pilot', $pilot->last_name);
-        $this->assertSame('new@example.test', $pilot->email);
-        $this->assertSame('New M Pilot', $pilot->name);
-        $this->assertSame('NEW-900', $pilot->pilotProfile?->license_number);
-        $this->assertSame('ATPL', $pilot->pilotProfile?->ratings);
-        $this->assertSame('2027-01-04', $pilot->pilotProfile?->license_expiry_date?->toDateString());
-        $this->assertSame('2027-02-05', $pilot->pilotProfile?->medical_expiry_date?->toDateString());
+        $this->assertSame('Old', $pilot->first_name);
+        $this->assertNull($pilot->middle_name);
+        $this->assertSame('Name', $pilot->last_name);
+        $this->assertSame('old@example.test', $pilot->email);
+        $this->assertSame('OLD-100', $pilot->pilotProfile?->license_number);
+        $this->assertNull($pilot->pilotProfile?->ratings);
+        $this->assertNull($pilot->pilotProfile?->license_expiry_date);
+        $this->assertNull($pilot->pilotProfile?->medical_expiry_date);
         $this->assertNull($pilot->pilotProfile?->operator);
-        $this->assertSame('Updated profile', $pilot->pilotProfile?->remarks);
+        $this->assertNull($pilot->pilotProfile?->remarks);
+
+        $request = $pilot->profileUpdateRequests()->firstOrFail();
+
+        $this->assertSame('pending', $request->status->value);
+        $this->assertSame('KYC details have changed.', $request->reason);
+        $this->assertSame('Old', $request->requested_changes['user.first_name']['old']);
+        $this->assertSame('New', $request->requested_changes['user.first_name']['new']);
+        $this->assertSame('OLD-100', $request->requested_changes['pilot_profile.license_number']['old']);
+        $this->assertSame('NEW-900', $request->requested_changes['pilot_profile.license_number']['new']);
     }
 
-    public function test_edit_profile_page_renders_a_livewire_save_form(): void
+    public function test_request_profile_page_renders_a_livewire_submission_form(): void
     {
         $pilot = $this->pilot();
 
@@ -176,7 +185,7 @@ class PilotProfilePageTest extends TestCase
             ->assertOk()
             ->assertSee('id="profile-form"', escape: false)
             ->assertSee('wire:submit="save"', escape: false)
-            ->assertSeeText('Save Profile');
+            ->assertSeeText('Submit Request');
     }
 
     public function test_profile_and_placeholder_pages_do_not_register_in_main_navigation(): void
@@ -313,12 +322,12 @@ class PilotProfilePageTest extends TestCase
                 'first_name' => 'Still',
                 'middle_name' => null,
                 'last_name' => 'Intruder',
-                'email' => 'still-intruder@example.test',
                 'license_number' => 'INTRUDER-2',
                 'ratings' => 'IR',
                 'license_expiry_date' => null,
                 'medical_expiry_date' => null,
                 'remarks' => 'Changed intruder only',
+                'reason' => 'Correct my own profile.',
             ])
             ->call('save')
             ->assertRedirect(MyProfilePage::getUrl(panel: 'pilot'));
@@ -332,9 +341,10 @@ class PilotProfilePageTest extends TestCase
         $this->assertSame('owner@example.test', $owner->email);
         $this->assertSame('OWNER-1', $owner->pilotProfile?->license_number);
 
-        $this->assertSame('Still', $intruder->first_name);
-        $this->assertSame('still-intruder@example.test', $intruder->email);
-        $this->assertSame('INTRUDER-2', $intruder->pilotProfile?->license_number);
+        $this->assertSame('Intruder', $intruder->first_name);
+        $this->assertSame('intruder@example.test', $intruder->email);
+        $this->assertSame('INTRUDER-1', $intruder->pilotProfile?->license_number);
+        $this->assertSame(1, $intruder->profileUpdateRequests()->count());
     }
 
     /**

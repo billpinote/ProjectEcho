@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FlightController;
+use App\Http\Controllers\ProfileUpdateRequests\ProfileDocumentController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'flightplan.form');
@@ -27,3 +28,9 @@ Route::get('/reports/abbreviated/pdf', [FlightController::class, 'downloadAbbrev
 Route::get('/reports/post-ops-log/pdf', [FlightController::class, 'downloadPostOpsLogPdf'])
     ->middleware('auth')
     ->name('reports.post-ops-log.pdf');
+Route::get('/profile-update-request-documents/{document}', [ProfileDocumentController::class, 'downloadUpdateRequestDocument'])
+    ->middleware('auth')
+    ->name('profile-update-request-documents.download');
+Route::get('/user-kyc-documents/{document}', [ProfileDocumentController::class, 'downloadKycDocument'])
+    ->middleware('auth')
+    ->name('user-kyc-documents.download');

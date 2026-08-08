@@ -27,8 +27,8 @@ class MyProfilePage extends Page
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('updateProfile')
-                ->label('Update Profile')
+            Action::make('requestProfileUpdate')
+                ->label('Request Profile Update')
                 ->icon(Heroicon::OutlinedPencilSquare)
                 ->url(EditMyProfilePage::getUrl(panel: 'pilot')),
         ];
@@ -49,5 +49,18 @@ class MyProfilePage extends Page
             'operator' => $user->operator?->name ?: 'Not provided',
             'remarks' => $user->pilotProfile?->remarks ?: 'Not provided',
         ];
+
+        $this->profileData['update_requests'] = $user->profileUpdateRequests()
+            ->latest('submitted_at')
+            ->latest('id')
+            ->limit(10)
+            ->get()
+            ->map(fn ($request): array => [
+                'submitted_at' => $request->submitted_at?->timezone(config('app.timezone'))->format('d M Y H:i') ?? '',
+                'status' => $request->status?->label() ?? '',
+                'reason' => $request->reason ?: '',
+                'reviewer_remarks' => $request->reviewer_remarks ?: $request->rejection_reason ?: '',
+            ])
+            ->all();
     }
 }

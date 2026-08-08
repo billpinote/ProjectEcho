@@ -89,6 +89,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(UserAuditLog::class);
     }
 
+    public function profileUpdateRequests(): HasMany
+    {
+        return $this->hasMany(ProfileUpdateRequest::class);
+    }
+
     public function kycDocuments(): HasMany
     {
         return $this->hasMany(UserKycDocument::class);
