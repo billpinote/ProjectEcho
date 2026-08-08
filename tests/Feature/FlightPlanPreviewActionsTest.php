@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class FlightPlanPreviewActionsTest extends TestCase
@@ -66,15 +68,24 @@ class FlightPlanPreviewActionsTest extends TestCase
     {
         Storage::fake('public');
 
-        $flightData = $this->previewFlightPlanData();
+        $pilot = User::factory()->create([
+            'role' => UserRole::Pilot,
+            'is_active' => true,
+        ]);
+
+        $flightData = $this->previewFlightPlanData([
+            'departure_aerodrome' => 'RPUS',
+        ]);
 
         $response = $this
+            ->actingAs($pilot)
             ->withSession(['flight_plan_preview' => $flightData])
             ->post(route('flightplan.approve'));
 
         $this->assertDatabaseHas('flights', [
             'aircraft_identification' => 'N12345',
             'flight_rules' => 'I',
+            'filed_by_user_id' => $pilot->id,
         ]);
 
         $flight = Flight::firstOrFail();
@@ -106,12 +117,99 @@ class FlightPlanPreviewActionsTest extends TestCase
         $this->actingAs($pilot)
             ->withSession(['flight_plan_preview' => $flightData])
             ->post(route('flightplan.approve'))
+            ->assertForbidden();
+
+        $flightData['departure_aerodrome'] = 'RPUS';
+
+        $this->actingAs($pilot)
+            ->withSession(['flight_plan_preview' => $flightData])
+            ->post(route('flightplan.approve'))
             ->assertRedirect();
 
         $this->assertDatabaseHas('flights', [
             'aircraft_identification' => 'N12345',
             'filed_by_user_id' => $pilot->id,
         ]);
+    }
+
+    public function test_non_rpus_departure_previews_as_pdf_only_without_qr_actions(): void
+    {
+        $response = $this
+            ->withSession(['flight_plan_preview' => $this->previewFlightPlanData([
+                'departure_aerodrome' => 'RPLL',
+            ])])
+            ->get(route('flightplan.preview'));
+
+        $response
+            ->assertOk()
+            ->assertSee('PDF ONLY - NOT FILED WITH RPUS')
+            ->assertSee('Creates a printable flight plan only. This will not be filed with RPUS and no QR code will be generated.')
+            ->assertSee(route('flightplan.pdf-only'), false)
+            ->assertDontSee('QR will be generated')
+            ->assertDontSee('data:image/svg+xml;base64,', false);
+
+        $this->assertDatabaseCount('flights', 0);
+    }
+
+    public function test_pdf_only_generation_streams_pdf_without_creating_flight_or_qr_payload(): void
+    {
+        Storage::fake('public');
+
+        $this->mock(FlightPlanQrPayloadService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('buildPayload')->never();
+        });
+
+        $response = $this
+            ->withSession(['flight_plan_preview' => $this->previewFlightPlanData([
+                'departure_aerodrome' => 'RPLL',
+            ])])
+            ->post(route('flightplan.pdf-only'));
+
+        $response
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf');
+
+        $this->assertDatabaseCount('flights', 0);
+        $this->assertSame(0, Flight::query()->pendingActive()->count());
+        $this->assertEmpty(Storage::disk('public')->allFiles('flight-plans'));
+        $this->assertStringContainsString('PDF ONLY', $response->getContent());
+        $this->assertStringContainsString('NOT FILED WITH RPUS', $response->getContent());
+    }
+
+    public function test_pdf_only_generation_rejects_rpus_preview(): void
+    {
+        $this
+            ->withSession(['flight_plan_preview' => $this->previewFlightPlanData([
+                'departure_aerodrome' => 'RPUS',
+            ])])
+            ->post(route('flightplan.pdf-only'))
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('flights', 0);
+    }
+
+    public function test_unauthorized_users_cannot_post_directly_to_operational_filing(): void
+    {
+        $this
+            ->withSession(['flight_plan_preview' => $this->previewFlightPlanData([
+                'departure_aerodrome' => 'RPUS',
+            ])])
+            ->post(route('flightplan.approve'))
+            ->assertForbidden();
+
+        $avsec = User::factory()->create([
+            'role' => UserRole::Avsec,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($avsec)
+            ->withSession(['flight_plan_preview' => $this->previewFlightPlanData([
+                'departure_aerodrome' => 'RPUS',
+            ])])
+            ->post(route('flightplan.approve'))
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('flights', 0);
     }
 
     public function test_qr_page_shows_large_qr_and_pdf_download_button(): void

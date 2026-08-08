@@ -10,6 +10,7 @@ use App\Models\Flight;
 use App\Models\Operator;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -149,22 +150,23 @@ class CanonicalOperatorRelationshipTest extends TestCase
         $this->assertSame('DSP', $flight->other_info_opr);
     }
 
-    public function test_public_flight_plan_flow_keeps_operator_id_null_and_preserves_opr_text(): void
+    public function test_public_pdf_only_flow_keeps_operator_id_out_of_operational_records(): void
     {
+        Storage::fake('public');
+
         $response = $this->post(route('flightplan.store'), $this->validFlightPlanFormData([
+            'departure_aerodrome' => 'RPLL',
             'other_information' => 'DOF/'.now('Asia/Manila')->addDay()->format('Ymd').' OPR/Public Operator',
             'operator_id' => Operator::factory()->create()->id,
         ]));
 
         $response->assertRedirect(route('flightplan.preview'));
 
-        $this->post(route('flightplan.approve'))
-            ->assertRedirect();
+        $this->post(route('flightplan.pdf-only'))
+            ->assertOk();
 
-        $flight = Flight::latest('id')->firstOrFail();
-
-        $this->assertNull($flight->operator_id);
-        $this->assertSame('PUBLIC OPERATOR', $flight->other_info_opr);
+        $this->assertDatabaseCount('flights', 0);
+        $this->assertEmpty(Storage::disk('public')->allFiles('flight-plans'));
     }
 
     public function test_legacy_pilot_profile_operator_backfill_matches_only_exact_unambiguous_operator_names(): void

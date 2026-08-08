@@ -15,6 +15,7 @@ Route::post('/flightplan/edit-from-qr', [FlightController::class, 'editFromQr'])
 Route::get('/flightplan/scan-qr/preview/{token}', [FlightController::class, 'previewScannedFlightPlan'])->name('flightplan.scan-qr.preview');
 Route::get('/flightplan/preview', [FlightController::class, 'previewFlightPlan'])->name('flightplan.preview');
 Route::post('/flightplan/approve', [FlightController::class, 'approveFlightPlan'])->name('flightplan.approve');
+Route::post('/flightplan/pdf-only', [FlightController::class, 'generatePdfOnly'])->name('flightplan.pdf-only');
 Route::post('/flightplan/edit-preview', [FlightController::class, 'editPreview'])->name('flightplan.edit-preview');
 Route::post('/flightplan/discard-preview', [FlightController::class, 'discardPreview'])->name('flightplan.discard-preview');
 Route::get('/flights/{flight}/qr', [FlightController::class, 'showQr'])->name('flights.qr');

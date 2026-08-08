@@ -195,6 +195,7 @@
 </head>
 <body class="{{ isset($isPreview) ? 'preview' : '' }}">
     @php
+        $isPdfOnly = (bool) ($isPdfOnly ?? false);
         $charBoxes = function (mixed $value): \Illuminate\Support\HtmlString {
             if ((string) $value === '') {
                 return new \Illuminate\Support\HtmlString('');
@@ -215,6 +216,12 @@
             return new \Illuminate\Support\HtmlString('<span class="char-field" style="width: '.$fieldWidth.'px;">'.$cells.'</span>');
         };
     @endphp
+
+    @if($isPdfOnly)
+        <div style="width: 794px; margin: 0 auto 10px; padding: 7px 10px; border: 1px solid #92400e; background: #fffbeb; color: #92400e; font-size: 11px; font-weight: bold; text-align: center;">
+            PDF ONLY - NOT FILED WITH RPUS
+        </div>
+    @endif
 
     @if(isset($isPreview))
         @if(!(($showPreviewActions ?? true)))
@@ -714,7 +721,7 @@
             <td colspan="2">
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="width: 80%; vertical-align: top;">
+                        <td style="width: {{ $isPdfOnly ? '100%' : '80%' }}; vertical-align: top;">
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr>
                                     <td style="width: 100%; text-align: left;">
@@ -805,19 +812,21 @@
                                 </tr>
                             </table>
                         </td>
-                        <!-- QR Code Section -->
-                        <td style="width: 20%; padding-left: 0px; vertical-align: top; text-align: center;">
-                            <span class="field-label" style="margin-bottom: 46px;"></span>
-                            <div style="padding: 1px; border: 1px solid #000;">
-                                @if(isset($qrCodeBase64))
-                                    <img src="{{ $qrCodeBase64 }}" style="width: 140px; height: 140px;" />
-                                @elseif(isset($isPreview) && ($showPreviewActions ?? true))
-                                    <div style="width: 120px; height: 120px; border: 1px dashed #666; display: flex; align-items: center; justify-content: center; margin: 0 auto; padding: 8px; box-sizing: border-box; font-size: 9px; line-height: 1.3; text-align: center; color: #444;">
-                                        QR will be generated when the PDF is generated.
-                                    </div>
-                                @endif
-                            </div>
-                        </td>
+                        @unless($isPdfOnly)
+                            <!-- QR Code Section -->
+                            <td style="width: 20%; padding-left: 0px; vertical-align: top; text-align: center;">
+                                <span class="field-label" style="margin-bottom: 46px;"></span>
+                                <div style="padding: 1px; border: 1px solid #000;">
+                                    @if(isset($qrCodeBase64))
+                                        <img src="{{ $qrCodeBase64 }}" style="width: 140px; height: 140px;" />
+                                    @elseif(isset($isPreview) && ($showPreviewActions ?? true))
+                                        <div style="width: 120px; height: 120px; border: 1px dashed #666; display: flex; align-items: center; justify-content: center; margin: 0 auto; padding: 8px; box-sizing: border-box; font-size: 9px; line-height: 1.3; text-align: center; color: #444;">
+                                            QR will be generated when the flight plan is filed.
+                                        </div>
+                                    @endif
+                                </div>
+                            </td>
+                        @endunless
                     </tr>
                 </table>
             </td>
@@ -954,10 +963,17 @@
     @endif
 
     @if(isset($isPreview) && ($showPreviewActions ?? true))
-    <div style="display:flex; justify-content:center; gap:12px; margin-top:10px;">
-        <form method="POST" action="{{ route('flightplan.approve') }}">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:10px;">
+        @if($previewActionHelp ?? null)
+            <div style="width: 794px; text-align:center; color:#444; font-size:11px;">
+                {{ $previewActionHelp }}
+            </div>
+        @endif
+
+        <div style="display:flex; justify-content:center; gap:12px;">
+        <form method="POST" action="{{ $previewActionUrl ?? route('flightplan.approve') }}">
             @csrf
-            <button type="submit">GENERATE PDF</button>
+            <button type="submit">{{ $previewActionLabel ?? 'GENERATE PDF' }}</button>
         </form>
 
         <form method="POST" action="{{ route('flightplan.edit-preview') }}">
@@ -969,6 +985,7 @@
             @csrf
             <button type="submit">DISCARD</button>
         </form>
+        </div>
     </div>
     @endif
 

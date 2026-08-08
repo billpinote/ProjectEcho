@@ -8,10 +8,10 @@ use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Http\Requests\StoreFlightPlanRequest;
-use App\Models\Flight;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
+use App\Models\Flight;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -365,11 +365,47 @@ class FlightController extends Controller
 
         // Convert array → model (important!)
         $flight = new Flight($flightData);
+        $isPdfOnly = ! $this->isRpusOperationalFlightData($flightData);
 
         return view('flightplan.pdf', [
             'flight' => $flight,
-            'qrCodeBase64' => $this->generateFlightPlanQrCodeBase64($flight),
+            'qrCodeBase64' => $isPdfOnly ? null : $this->generateFlightPlanQrCodeBase64($flight),
             'isPreview' => true,
+            'isPdfOnly' => $isPdfOnly,
+            'previewActionLabel' => $isPdfOnly ? 'GENERATE PDF' : 'FILE FLIGHT PLAN',
+            'previewActionHelp' => $isPdfOnly
+                ? 'Creates a printable flight plan only. This will not be filed with RPUS and no QR code will be generated.'
+                : 'Submit this flight plan to the RPUS Echo system for processing.',
+            'previewActionUrl' => $isPdfOnly
+                ? route('flightplan.pdf-only')
+                : route('flightplan.approve'),
+        ]);
+    }
+
+    /**
+     * Generate a PDF-only flight plan from the existing session preview without storing an operational record.
+     */
+    public function generatePdfOnly(Request $request)
+    {
+        $flightData = $request->session()->get('flight_plan_preview');
+
+        if (! $flightData) {
+            return redirect()->route('flightplan');
+        }
+
+        abort_if($this->isRpusOperationalFlightData($flightData), 403);
+
+        $flight = new Flight($flightData);
+
+        $pdf = Pdf::loadView('flightplan.pdf', [
+            'flight' => $flight,
+            'qrCodeBase64' => null,
+            'isPdfOnly' => true,
+        ])->setPaper('a4', 'portrait');
+
+        return response($pdf->output()."\n% PDF ONLY - NOT FILED WITH RPUS\n", 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$this->buildPdfOnlyFileName($flight).'"',
         ]);
     }
 
@@ -428,13 +464,19 @@ class FlightController extends Controller
 
         $user = Auth::user();
 
-        if ($user !== null) {
-            $flightData['filed_by_user_id'] = $user->id;
+        abort_unless(
+            $this->isRpusOperationalFlightData($flightData)
+            && $user !== null
+            && $user->is_active
+            && $user->canCreateFlightPlans(),
+            403
+        );
 
-            if ($user->isPilot()) {
-                $flightData['user_id'] = $user->id;
-                $flightData['pilot_id'] = $flightData['pilot_id'] ?? $user->id;
-            }
+        $flightData['filed_by_user_id'] = $user->id;
+
+        if ($user->isPilot()) {
+            $flightData['user_id'] = $user->id;
+            $flightData['pilot_id'] = $flightData['pilot_id'] ?? $user->id;
         }
 
         $flightData = AuthenticatedOperatorFlightData::apply($flightData, $user);
@@ -505,6 +547,25 @@ class FlightController extends Controller
         }
 
         return $flightData;
+    }
+
+    /**
+     * @param  array<string, mixed>  $flightData
+     */
+    private function isRpusOperationalFlightData(array $flightData): bool
+    {
+        return strtoupper(trim((string) ($flightData['departure_aerodrome'] ?? ''))) === 'RPUS';
+    }
+
+    private function buildPdfOnlyFileName(Flight $flight): string
+    {
+        $baseName = $this->buildFlightPlanPdfBaseName($flight);
+
+        if ($baseName === '') {
+            $baseName = 'FLIGHTPLAN'.now('UTC')->format('YmdHi');
+        }
+
+        return $baseName.'-PDF-ONLY.pdf';
     }
 
     /**
