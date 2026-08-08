@@ -3,7 +3,8 @@
 namespace App\Providers;
 
 use App\Auth\AuthAccountUserProvider;
-use Illuminate\Auth\AuthManager;
+use App\Http\Responses\SignedOutLogoutResponse;
+use Filament\Auth\Http\Responses\Contracts\LogoutResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(LogoutResponse::class, SignedOutLogoutResponse::class);
     }
 
     /**

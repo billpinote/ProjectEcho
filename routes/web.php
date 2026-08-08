@@ -4,7 +4,8 @@ use App\Http\Controllers\FlightController;
 use App\Http\Controllers\ProfileUpdateRequests\ProfileDocumentController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'flightplan.form');
+Route::view('/', 'access-gateway')->name('gateway');
+Route::view('/signed-out', 'signed-out')->name('signed-out');
 
 Route::get('/flightplan', [FlightController::class, 'flightplan'])->name('flightplan');
 Route::post('/flightplan', [FlightController::class, 'store'])->name('flightplan.store');
