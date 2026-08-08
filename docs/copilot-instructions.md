@@ -31,6 +31,8 @@ Custom validation rules in `app/Rules/` replace generic string validation:
   - Shared Filament behavior lives in `app/Filament/Shared/` for reusable forms, tables, schemas, base resources, and base pages
   - `Reports` → active flight data aggregation
 
+Artisan is the technical maintenance panel. Artisan users may access all operational panels, but operational workflows should not be duplicated inside Artisan. Use the real operational panel when testing or supporting an operational workflow.
+
 ## Critical Development Patterns
 
 ### Time Field Handling
@@ -144,6 +146,7 @@ Each route-facing resource lives under the panel that registers it. Shared resou
 - `app/Filament/Panels/Dispatch/Resources/AcceptedFlights/AcceptedFlightResource.php` registers Dispatch accepted-flight routes.
 - `app/Filament/Shared/Resources/Flights/Tables/FlightsTable.php` keeps shared table actions, buttons, and column behavior.
 - Filtered resources (e.g., `ActiveFlights`) use `getEloquentQuery()` to scope by status
+- Do not add Artisan wrappers for operational resources. Artisan should use the real ATMO, ATS, Dispatch, AVSEC, Pilot, or Admin panel routes for support.
 
 ## Common Workflows & Gotchas
 

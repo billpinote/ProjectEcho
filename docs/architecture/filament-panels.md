@@ -21,6 +21,21 @@ Examples:
 - Admin profile-management resources registered by `AdminPanelProvider` belong in `app/Filament/Panels/Admin`.
 - Dispatch operational resources registered by `DispatchPanelProvider` belong in `app/Filament/Panels/Dispatch`.
 
+## Artisan Panel
+
+Artisan is the technical maintenance panel. Artisan users may access all operational panels, but operational workflows should not be duplicated inside the Artisan panel.
+
+Use the real operational panel when testing or supporting an operational workflow:
+
+- Use ATMO for ATMO flight review, Alpha, Coordinator, and reports.
+- Use ATS for ATS operational queues and reports.
+- Use Dispatch for Dispatch flight queues.
+- Use AVSEC for AVSEC scan and flight visibility workflows.
+- Use Pilot for Pilot filing and profile workflows.
+- Use Admin for normal business/user administration.
+
+Artisan should primarily contain technical and system-maintenance surfaces such as diagnostics, system health, audit tooling, application settings, feature flags, cache/queue visibility, QR signing-key status, and account repair. Do not create Artisan-specific wrappers for operational resources unless Artisan genuinely needs unique technical behavior.
+
 ## Shared Code
 
 Shared Filament code belongs under `app/Filament/Shared`.
@@ -45,4 +60,4 @@ Each provider should import and register classes from its matching `app/Filament
 
 Put the route-facing class under the panel folder. Put the reusable implementation under `Shared`.
 
-If ATS, Dispatch, Avsec, Admin, Artisan, ATMO, or Pilot all need the same table or form behavior, keep that behavior shared and expose it through panel-owned wrappers. This keeps ownership visible while preserving one source of truth for policies, buttons, filters, and form logic.
+If ATS, Dispatch, Avsec, Admin, ATMO, or Pilot all need the same table or form behavior, keep that behavior shared and expose it through panel-owned wrappers. This keeps ownership visible while preserving one source of truth for policies, buttons, filters, and form logic. Artisan should use those real panel routes for operational support instead of adding another wrapper layer.

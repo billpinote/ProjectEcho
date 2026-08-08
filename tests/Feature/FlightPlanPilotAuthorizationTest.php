@@ -335,7 +335,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         }
     }
 
-    public function test_admin_and_artisan_retain_general_edit_access(): void
+    public function test_admin_and_artisan_retain_general_edit_access_through_real_operational_panel(): void
     {
         $flight = $this->flight();
         $admin = $this->user(UserRole::Admin);
@@ -344,7 +344,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         $this->assertTrue($admin->can('update', $flight));
 
         $this->actingAs($artisan)
-            ->get(route('filament.artisan.resources.flights.edit', ['record' => $flight]))
+            ->get(route('filament.atmo.resources.flights.edit', ['record' => $flight]))
             ->assertOk();
     }
 

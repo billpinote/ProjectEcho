@@ -27,6 +27,10 @@ When adding a new Filament class, ask:
 
 Current panel folders are `Admin`, `Artisan`, `Atmo`, `Ats`, `Avsec`, `Dispatch`, and `Pilot`.
 
+Artisan is different from the operational panels. It is the technical maintenance panel. Artisan users may access all operational panels, but operational workflows should not be duplicated inside `app/Filament/Panels/Artisan`. Use the real operational panel when testing or supporting an operational workflow.
+
+Keep Artisan focused on technical/system concerns such as diagnostics, system health, audit tooling, application settings, feature flags, cache/queue visibility, QR signing-key status, and account repair.
+
 ## Providers
 
 Panel providers remain under `app/Providers/Filament`.
