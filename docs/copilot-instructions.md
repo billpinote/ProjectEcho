@@ -25,10 +25,13 @@ Custom validation rules in `app/Rules/` replace generic string validation:
 
 ### Dual Admin Interface
 - **Web forms** in `resources/views/flightplan/` for public flight plan entry
-- **Filament resources** in `app/Filament/Resources/` with filtered views:
+- **Filament panel route classes** in `app/Filament/Panels/{PanelName}/` with filtered views:
   - `FlightResource` → all flights
   - `ActiveFlights`, `AcceptedFlights`, `RejectedFlights`, `ExpiredFlights`, `LandedFlights` (filtered/custom resources)
+  - Shared Filament behavior lives in `app/Filament/Shared/` for reusable forms, tables, schemas, base resources, and base pages
   - `Reports` → active flight data aggregation
+
+Artisan is the technical maintenance panel. Artisan users may access all operational panels, but operational workflows should not be duplicated inside Artisan. Use the real operational panel when testing or supporting an operational workflow.
 
 ## Critical Development Patterns
 
@@ -73,7 +76,8 @@ public function store(StoreFlightPlanRequest $request) {
 - **Services:** `app/Services/FlightPlanICAOFormatter.php` (QR payload generation)
 - **Enums:** `app/Enums/FlightPlanStatus.php`
 - **Views:** `resources/views/flightplan/` (form, preview, PDF, QR views)
-- **Filament:** `app/Filament/Resources/{ResourceName}/` (Pages/, Schemas/)
+- **Filament panel routes:** `app/Filament/Panels/{PanelName}/` (Resources/, Pages/, Widgets/)
+- **Filament shared behavior:** `app/Filament/Shared/` (base Resources/, Pages/, Widgets/, Schemas/, Tables/)
 
 ### Migrations
 Name convention: `YYYY_MM_DD_HHMMSS_action.php`
@@ -137,9 +141,12 @@ php artisan pint                # Laravel Pint (PSR-12 enforcer)
 - **QR encoding:** `generateFlightPlanQrCodeBase64()` uses `FlightPlanICAOFormatter::toICAOMessage()` → payload format: `ECHOFPL|1|DB|{flight_id}`
 
 ### Filament Resource Filtering
-Each resource resource is accessed via route/middleware; custom Pages/ override defaults:
-- `ListFlights.php`, `EditFlight.php`, `CreateFlight.php` in `Flights` resource
+Each route-facing resource lives under the panel that registers it. Shared resources and pages provide common behavior, while panel resources/pages extend those classes and override `getPages()` or `$resource` as needed.
+- `app/Filament/Panels/Atmo/Resources/Flights/FlightResource.php` registers ATMO flight routes.
+- `app/Filament/Panels/Dispatch/Resources/AcceptedFlights/AcceptedFlightResource.php` registers Dispatch accepted-flight routes.
+- `app/Filament/Shared/Resources/Flights/Tables/FlightsTable.php` keeps shared table actions, buttons, and column behavior.
 - Filtered resources (e.g., `ActiveFlights`) use `getEloquentQuery()` to scope by status
+- Do not add Artisan wrappers for operational resources. Artisan should use the real ATMO, ATS, Dispatch, AVSEC, Pilot, or Admin panel routes for support.
 
 ## Common Workflows & Gotchas
 
@@ -206,7 +213,7 @@ ProjectEcho/
 │   ├── Rules/                         # 8 ICAO validation rules
 │   ├── Enums/FlightPlanStatus.php
 │   ├── Services/FlightPlanICAOFormatter.php
-│   └── Filament/Resources/            # Admin UI (Flights, Active, Rejected, etc.)
+│   └── Filament/                     # Panels/ route classes and Shared/ behavior
 ├── database/
 │   ├── migrations/                    # 12+ migration files (2026 dated)
 │   └── factories/UserFactory.php

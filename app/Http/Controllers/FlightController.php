@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
+use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
+use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
-use App\Rules\UtcFourDigitTime;
-use App\Services\FlightPlanQrPayloadService;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -14,6 +18,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -46,17 +51,8 @@ class FlightController extends Controller
      */
     public function flightplan()
     {
-        $aircraftWtcMap = DB::table('aircraft_types_wtc')
-            ->whereNotNull('icao_legacy_wtc')
-            ->whereNotNull('icao_type_designator')
-            ->pluck('icao_legacy_wtc', 'icao_type_designator')
-            ->mapWithKeys(fn (mixed $wtc, mixed $designator): array => [
-                strtoupper(trim((string) $designator)) => strtoupper(trim((string) $wtc)),
-            ])
-            ->all();
-
         return view('flightplan.form', [
-            'aircraftWtcMap' => $aircraftWtcMap,
+            'aircraftWtcMap' => $this->getAircraftWtcMap(),
             'prefilled' => [],
         ]);
     }
@@ -66,6 +62,8 @@ class FlightController extends Controller
      */
     public function scanQr()
     {
+        $this->ensurePilotCannotScanQr();
+
         return view('flightplan.scan-qr', [
             'payload' => old('payload', ''),
             'matchedFlight' => null,
@@ -77,6 +75,8 @@ class FlightController extends Controller
      */
     public function lookupScanQr(Request $request)
     {
+        $this->ensurePilotCannotScanQr();
+
         $validated = $request->validate([
             'payload' => ['required', 'string', 'max:20000'],
         ], [
@@ -91,7 +91,7 @@ class FlightController extends Controller
         if ($matchedFlight === null) {
             return back()
                 ->withErrors([
-                    'payload' => 'Expected a valid Echo QR payload. V2 signed offline payloads and legacy V1 database payloads are supported.',
+                    'payload' => $this->qrPayloads()->invalidPayloadMessage((string) $validated['payload']),
                 ])
                 ->withInput();
         }
@@ -107,6 +107,8 @@ class FlightController extends Controller
      */
     public function editFromQr(Request $request)
     {
+        $this->ensurePilotCannotScanQr();
+
         $validated = $request->validate([
             'payload' => ['required', 'string', 'max:20000'],
         ], [
@@ -178,6 +180,7 @@ class FlightController extends Controller
     public function showFlightPlanView(Request $request, Flight $flight)
     {
         $this->ensureFlightUserAccess();
+        abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
 
         if (Auth::user()?->canReviewFlightPlans() && $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
             $flight->markAsReviewed();
@@ -198,6 +201,64 @@ class FlightController extends Controller
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->resolveAtcWiresign(),
         ]);
+    }
+
+    /**
+     * Stream the abbreviated RPUS report as an inline A4 landscape PDF.
+     */
+    public function downloadAbbreviatedReportPdf(Request $request)
+    {
+        $this->ensureReviewerAccess();
+
+        $generatedAt = now('UTC');
+        $selectedDate = (string) ($request->query('date') ?: now('UTC')->toDateString());
+        $flights = AbbreviatedFlightReportResource::getEloquentQuery()
+            ->whereDate('date_of_flight', $selectedDate)
+            ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
+            ->orderBy('date_of_flight')
+            ->orderByRaw('case when proposed_time is null then 1 else 0 end')
+            ->orderBy('proposed_time')
+            ->orderBy('id')
+            ->get();
+
+        $pdf = Pdf::loadView('reports.abbreviated-flight-report-pdf', [
+            'flights' => $flights,
+            'generatedAt' => $generatedAt,
+            'selectedDate' => $selectedDate,
+            'generatedBy' => $this->resolveAtcWiresign(),
+            'formatTime' => static fn (?string $time): ?string => FlightForm::formatTimeForForm($time),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->stream('abbreviated-flight-report-'.$generatedAt->format('Y-m-d-His').'.pdf');
+    }
+
+    /**
+     * Stream the post operations log as an inline A4 landscape PDF.
+     */
+    public function downloadPostOpsLogPdf(Request $request)
+    {
+        $this->ensureReviewerAccess();
+
+        $generatedAt = now('UTC');
+        $selectedDate = (string) ($request->query('date') ?: now('UTC')->toDateString());
+        $flights = PostOpsLogResource::getEloquentQuery()
+            ->whereDate('date_of_flight', $selectedDate)
+            ->orderByRaw('case when date_of_flight is null then 1 else 0 end')
+            ->orderBy('date_of_flight')
+            ->orderByRaw('case when proposed_time is null then 1 else 0 end')
+            ->orderBy('proposed_time')
+            ->orderBy('id')
+            ->get();
+
+        $pdf = Pdf::loadView('reports.post-ops-log-pdf', [
+            'flights' => $flights,
+            'generatedAt' => $generatedAt,
+            'selectedDate' => $selectedDate,
+            'generatedBy' => $this->resolveAtcWiresign(),
+            'formatTime' => static fn (?string $time): ?string => FlightForm::formatTimeForForm($time),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->stream('post-ops-log-'.$generatedAt->format('Y-m-d-His').'.pdf');
     }
 
     /**
@@ -313,6 +374,8 @@ class FlightController extends Controller
      */
     public function previewScannedFlightPlan(Request $request, string $token)
     {
+        $this->ensurePilotCannotScanQr();
+
         $preview = $request->session()->get('scanned_flight_plan_previews.'.$token);
 
         if (! is_array($preview) || ! isset($preview['snapshot']) || ! is_array($preview['snapshot'])) {
@@ -355,8 +418,24 @@ class FlightController extends Controller
             return redirect()->route('flightplan');
         }
 
-        // Create the Flight record
-        $flight = Flight::create($flightData);
+        $user = Auth::user();
+
+        if ($user !== null) {
+            $flightData['filed_by_user_id'] = $user->id;
+
+            if ($user->isPilot()) {
+                $flightData['user_id'] = $user->id;
+                $flightData['pilot_id'] = $flightData['pilot_id'] ?? $user->id;
+            }
+        }
+
+        $flight = DB::transaction(function () use ($flightData, $user) {
+            $flight = Flight::create($flightData);
+
+            app(FlightPlanMutationService::class)->recordSubmission($flight, $user);
+
+            return $flight;
+        });
 
         // Generate PDF and QR code
         $storedPdfPath = $this->storeFlightPlanPdf($flight);
@@ -510,6 +589,25 @@ class FlightController extends Controller
         }
 
         return $validated;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function getAircraftWtcMap(): array
+    {
+        if (! Schema::hasTable('aircraft_types_wtc')) {
+            return [];
+        }
+
+        return DB::table('aircraft_types_wtc')
+            ->whereNotNull('icao_legacy_wtc')
+            ->whereNotNull('icao_type_designator')
+            ->pluck('icao_legacy_wtc', 'icao_type_designator')
+            ->mapWithKeys(fn (mixed $wtc, mixed $designator): array => [
+                strtoupper(trim((string) $designator)) => strtoupper(trim((string) $wtc)),
+            ])
+            ->all();
     }
 
     /**
@@ -798,8 +896,8 @@ class FlightController extends Controller
                 'proposed_time' => UtcFourDigitTime::formatForDisplay($snapshot['proposed_time'] ?? null) ?? 'N/A',
                 'departure_aerodrome' => (string) ($snapshot['departure_aerodrome'] ?? 'N/A'),
                 'destination_aerodrome' => (string) ($snapshot['destination_aerodrome'] ?? 'N/A'),
-                'status' => $status?->value ?? 'signed_offline_payload',
-                'status_label' => $status?->label() ?? 'Signed Offline Payload',
+                'status' => $status?->value ?? 'verified_qr_only',
+                'status_label' => $status?->label() ?? 'Valid QR. Needs ATC Review.',
                 'status_color' => $status?->filamentColor() ?? 'info',
                 'view_url' => route('flightplan.scan-qr.preview', ['token' => $previewToken]),
                 'can_open' => true,
@@ -890,6 +988,13 @@ class FlightController extends Controller
         );
     }
 
+    private function ensurePilotCannotScanQr(): void
+    {
+        $user = Auth::user();
+
+        abort_if($user?->isPilot(), 403);
+    }
+
     private function ensureFlightUserAccess(): void
     {
         $user = Auth::user();
@@ -906,6 +1011,7 @@ class FlightController extends Controller
     {
         if (Auth::check()) {
             $this->ensureFlightUserAccess();
+            abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
 
             return;
         }

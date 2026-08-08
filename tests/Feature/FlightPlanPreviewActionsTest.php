@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
+use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -88,6 +90,28 @@ class FlightPlanPreviewActionsTest extends TestCase
             ->assertSessionMissing('pdf_download_url');
 
         Storage::disk('public')->assertExists($expectedFile);
+    }
+
+    public function test_authenticated_pilot_filing_records_filed_by_user_id(): void
+    {
+        Storage::fake('public');
+
+        $pilot = User::factory()->create([
+            'role' => UserRole::Pilot,
+            'is_active' => true,
+        ]);
+
+        $flightData = $this->previewFlightPlanData();
+
+        $this->actingAs($pilot)
+            ->withSession(['flight_plan_preview' => $flightData])
+            ->post(route('flightplan.approve'))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('flights', [
+            'aircraft_identification' => 'N12345',
+            'filed_by_user_id' => $pilot->id,
+        ]);
     }
 
     public function test_qr_page_shows_large_qr_and_pdf_download_button(): void

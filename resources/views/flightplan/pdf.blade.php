@@ -18,8 +18,8 @@
         @page {
             margin-top: 4mm;
             margin-bottom: 0;
-            margin-left: 10mm;
-            margin-right: 10mm;
+            margin-left: 6mm;
+            margin-right: 6mm;
         }
 
         body {
@@ -84,6 +84,31 @@
             color: #000;
         }
 
+        .char-field {
+            display: inline-block;
+            height: 15px;
+            border: 1px solid #666;
+            border-radius: 0;
+            line-height: 15px;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        .char-field .char-box {
+            border: 0;
+            border-radius: 0;
+            margin: 0;
+            line-height: 15px;
+        }
+
+        .char-divider {
+            display: inline-block;
+            width: 0;
+            height: 8px;
+            border-left: 1px solid #666;
+            vertical-align: bottom;
+        }
+
 
         /* Field boxes for string entry */
         .string-box {
@@ -103,6 +128,21 @@
 
         .string-box-left {
             text-align: left;
+        }
+
+        .multi-line-box {
+            display: block;
+            width: 100%;
+            min-height: 45px;
+            border: 1px solid #666;
+            box-sizing: border-box;
+            padding: 2px 4px;
+            font-size: 11px;
+            font-weight: bold;
+            line-height: 15px;
+            text-align: left;
+            white-space: normal;
+            word-wrap: break-word;
         }
 
         .checkbox {
@@ -154,6 +194,27 @@
     </style>
 </head>
 <body class="{{ isset($isPreview) ? 'preview' : '' }}">
+    @php
+        $charBoxes = function (mixed $value): \Illuminate\Support\HtmlString {
+            if ((string) $value === '') {
+                return new \Illuminate\Support\HtmlString('');
+            }
+
+            $characters = str_split((string) $value, 1);
+            $fieldWidth = (count($characters) * 15) + max(count($characters) - 1, 0);
+            $cells = '';
+
+            foreach ($characters as $index => $char) {
+                $cells .= '<span class="char-box">'.($char === ' ' ? '&nbsp;' : e($char)).'</span>';
+
+                if ($index < count($characters) - 1) {
+                    $cells .= '<span class="char-divider"></span>';
+                }
+            }
+
+            return new \Illuminate\Support\HtmlString('<span class="char-field" style="width: '.$fieldWidth.'px;">'.$cells.'</span>');
+        };
+    @endphp
 
     @if(isset($isPreview))
         @if(!(($showPreviewActions ?? true)))
@@ -178,7 +239,7 @@
             </div>
         @endif
 
-        @if(($flight->status ?? null) === \App\Enums\FlightPlanStatus::Rejected)
+        @if(($flight->status ?? null) === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Rejected)
             <div style="width: 794px; margin: 0 auto 12px;">
                 <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; background: #fff;">
                     <tr>
@@ -256,9 +317,7 @@
                                 @php
                                     $originator = str_pad(substr($flight->originator ?? '', 0, 8), 8, ' ');
                                 @endphp
-                                @foreach(str_split($originator, 1) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($originator) !!}
                             </div>
                         </td>
                     </tr>
@@ -294,21 +353,19 @@
                         <td style="width: 40%; padding: 2px;">
                             <span class="field-label">7. AIRCRAFT IDENTIFICATION</span>
                             <div style="text-align: left; padding: 4px; margin-left: 10px;">
-                                @foreach(str_split($flight->aircraft_identification ?? '', 1) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($flight->aircraft_identification ?? '') !!}
                             </div>
                         </td>
                         <td style="width: 17.5%; ">
                             <span class="field-label">8. FLIGHT RULES</span>
                             <div style="text-align: left; padding: 4px; margin-left: 30px;">
-                                <span class="char-box">{{ substr($flight->flight_rules ?? '', 0, 1) }}</span>
+                                {!! $charBoxes(str_pad(substr($flight->flight_rules ?? '', 0, 1), 1, ' ')) !!}
                             </div>
                         </td>
                         <td style="width: 17.5%; ">
                             <span class="field-label">TYPE OF FLIGHT</span>
                             <div style="text-align: left; padding: 4px; margin-left: 30px;">
-                                <span class="char-box">{{ substr($flight->type_of_flight ?? '', 0, 1) }}</span>
+                                {!! $charBoxes(str_pad(substr($flight->type_of_flight ?? '', 0, 1), 1, ' ')) !!}
                             </div>
                         </td>
                     </tr>
@@ -325,20 +382,9 @@
                             <span class="field-label">9. NUMBER</span>
                             <div style="padding: 4px;  text-align: left; margin-left: 10px;">
                                 @php
-                                    $rawNumber = $flight->number ?? '';
-                                    if ($rawNumber === '') {
-                                        $number = '';
-                                    } elseif (strlen($rawNumber) === 1) {
-                                        $number = str_pad($rawNumber, 2, '0', STR_PAD_LEFT);
-                                    } else {
-                                        $number = substr($rawNumber, 0, 2);
-                                    }
+                                    $number = str_pad(substr($flight->number ?? '', 0, 1), 1, ' ');
                                 @endphp
-                                @if($number !== '')
-                                    @foreach(str_split($number, 1) as $char)
-                                        <span class="char-box">{{ $char }}</span>
-                                    @endforeach
-                                @endif
+                                {!! $charBoxes($number) !!}
                             </div>
                         </td>
                         <td style="width: 20%;">
@@ -347,15 +393,13 @@
                                 @php
                                     $aircraft = str_pad(substr($flight->type_of_aircraft ?? '', 0, 4), 4, ' ');
                                 @endphp
-                                @foreach(str_split($aircraft, 1) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($aircraft) !!}
                             </div>
                         </td>
                         <td style="width: 20%;">
                             <span class="field-label">WAKE TURBULENCE CAT.</span>
                             <div style="padding: 4px; text-align: left; margin-left: 35px;">
-                                <span class="char-box">{{ substr($flight->wake_turbulence_cat ?? '', 0, 1) }}</span>
+                                {!! $charBoxes(str_pad(substr($flight->wake_turbulence_cat ?? '', 0, 1), 1, ' ')) !!}
                             </div>
                         </td>
                         <td style="width: 50%; padding-left: 4px;">
@@ -385,29 +429,20 @@
                         <td style="width: 25%;">
                             <span class="field-label">13. DEPARTURE AERODROME</span>
                             <div style="padding: 4px; text-align: center;">
-                                @foreach(str_split($flight->departure_aerodrome ?? 'RPUS') as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($flight->departure_aerodrome ?? 'RPUS') !!}
                             </div>
                         </td>
-                        <td style="width: 10%;">
-                            <span class="field-label">&nbsp;</span>
-                            <div style="padding: 4px; text-align: center;">
-                                &nbsp;
-                            </div>
-                        </td>
-                        <td style="width: 20%;">
+                        
+                        <td style="width: 15%;">
                             <span class="field-label">TIME</span>
                             <div style="padding: 4px; text-align: left;">
                                 @php
-                                    $time = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? '';
+                                    $time = \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? '';
                                 @endphp
-                                @foreach(str_split(substr($time, 0, 4)) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes(substr($time, 0, 4)) !!}
                             </div>
                         </td>
-                        <td style="width: 55%;">
+                        <td style="width: 65%;">
                             <span class="field-label">&nbsp;</span>
                             <div style="padding: 4px; text-align: center;">
                                 &nbsp;
@@ -423,37 +458,28 @@
             <td colspan="2">
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="width: 20%;">
+                        <td style="width: 15%;">
                             <span class="field-label">15. CRUISING SPEED</span>
                             <div style="padding: 4px;  text-align: left; margin-left: 10px;">
                                 @php
                                     $cruispeed = str_pad(substr($flight->cruising_speed ?? '', 0, 5), 5, ' ');
                                 @endphp
-                                @foreach(str_split($cruispeed, 1) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($cruispeed) !!}
                             </div>
                         </td>
-                        <td style="width: 20%;">
+                        <td style="width: 15%;">
                             <span class="field-label">LEVEL</span>
                             <div style="padding: 4px;  text-align: left; margin-left: -1px;">
                                 @php
                                     $lvl = str_pad(substr($flight->level ?? '', 0, 4), 4, ' ');
                                 @endphp
-                                @foreach(str_split($lvl, 1) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($lvl) !!}
                             </div>
                         </td>
-                        <td style="width: 60%;">
+                        <td style="width: 70%;">
                             <span class="field-label">ROUTE</span>
                             <div style="padding: 4px; text-align: left;">
-                                @php
-                                    $routeWords = preg_split('/\s+/', trim((string) ($flight->route ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                                @endphp
-                                @foreach($routeWords as $routeWord)
-                                    <span class="string-box">{{ $routeWord }}</span>
-                                @endforeach
+                                <div class="multi-line-box">{{ $flight->route ?? '' }}</div>
                             </div>
                         </td>
                     </tr>
@@ -469,36 +495,28 @@
                         <td style="width: 25%;">
                             <span class="field-label">16. DESTINATION AERODROME</span>
                             <div style="padding: 4px; text-align: left; margin-left: 10px;">
-                                @foreach(str_split($flight->destination_aerodrome ?? '') as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($flight->destination_aerodrome ?? '') !!}
                             </div>
                         </td>
                         <td style="width: 20%;">
                             <span class="field-label">TOTAL EET</span>
                             <div style="padding: 4px; text-align: left;">
                                 @php
-                                    $eet = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->total_eet) ?? '';
+                                    $eet = \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->total_eet) ?? '';
                                 @endphp
-                                @foreach(str_split(substr($eet, 0, 4)) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes(substr($eet, 0, 4)) !!}
                             </div>
                         </td>
                         <td style="width: 25%;">
                             <span class="field-label">ALTN. AERODROME</span>
                             <div style="padding: 4px; text-align: left;">
-                                @foreach(str_split($flight->altn_aerodrome_1 ?? '') as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($flight->altn_aerodrome_1 ?? '') !!}
                             </div>
                         </td>
                         <td style="width: 30%;">
                             <span class="field-label">2nd ALTN. AERODROME</span>
                             <div style="padding: 4px; text-align: left;">
-                                @foreach(str_split($flight->altn_aerodrome_2 ?? '') as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes(str_pad(substr($flight->altn_aerodrome_2 ?? '', 0, 4), 4, ' ')) !!}
                             </div>
                         </td>
                     </tr>
@@ -540,15 +558,8 @@
                                         }
                                     }
                                 @endphp
-                                @foreach($tagPairs as $tagPair)
-                                    <span class="string-box">{{ $tagPair }}</span>
-                                @endforeach
+                                <div class="multi-line-box">{{ implode(' ', $tagPairs) }}</div>
                             </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            &nbsp;
                         </td>
                     </tr>
                 </table>
@@ -573,13 +584,11 @@
                             <div style="padding: 4px; text-align: center;">
                                 <div style="text-align: left;">
                                     @php
-                                        $endur = \App\Rules\UtcFourDigitTime::formatForDisplay($flight->endurance) ?? '';
+                                        $endur = \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->endurance) ?? '';
                                     @endphp
                                     <span class="char-box" style="border: 0">E</span>
                                     <span class="char-box" style="border: 0">/</span>
-                                    @foreach(str_split(substr($endur, 0, 4)) as $char)
-                                        <span class="char-box">{{ $char }}</span>
-                                    @endforeach
+                                    {!! $charBoxes(substr($endur, 0, 4)) !!}
                                 </div>
                             </div>
                         </td>
@@ -592,9 +601,7 @@
                                 @endphp
                                 <span class="char-box" style="border: 0">P</span>
                                 <span class="char-box" style="border: 0">/</span>
-                                @foreach(str_split($pob) as $char)
-                                    <span class="char-box">{{ $char }}</span>
-                                @endforeach
+                                {!! $charBoxes($pob) !!}
                             </div>
                         </td>
                         <td style="width: 30%; text-align: left;">
@@ -740,9 +747,7 @@
                                                         $dingnum = 'XX';
                                                     }
                                                 @endphp
-                                                @foreach(str_split($dingnum) as $char)
-                                                    <span class="char-box">{{ $char }}</span>
-                                                @endforeach
+                                                {!! $charBoxes($dingnum) !!}
                                             <span class="char-box" style="border: 0">&nbsp;</span>
                                             <span class="char-box" style="border: 0">&nbsp;</span>
                                                 @php
@@ -752,12 +757,10 @@
                                                         $dingcap = 'XXX';
                                                     }
                                                 @endphp
-                                                @foreach(str_split($dingcap) as $char)
-                                                    <span class="char-box">{{ $char }}</span>
-                                                @endforeach
+                                                {!! $charBoxes($dingcap) !!}
                                             <span class="char-box" style="border: 0">&nbsp;</span>
                                             <span class="char-box" style="border: 0">&nbsp;</span>
-                                            <span class="char-box">{{ $flight->dinghies_enabled ? ($flight->dinghies_cover ?? 'X') : 'X' }}</span>
+                                            {!! $charBoxes($flight->dinghies_enabled ? ($flight->dinghies_cover ?? 'X') : 'X') !!}
                                             <span class="char-box" style="border: 0">&nbsp;</span>
                                             <span class="char-box" style="border: 0">&nbsp;</span>
                                             <span class="string-box">{{ $flight->dinghies_enabled ? ($flight->dinghies_color ?? 'X') : 'X' }}</span>
@@ -803,11 +806,11 @@
                             </table>
                         </td>
                         <!-- QR Code Section -->
-                        <td style="width: 20%; padding-left: 4px; vertical-align: top; text-align: center;">
+                        <td style="width: 20%; padding-left: 0px; vertical-align: top; text-align: center;">
                             <span class="field-label" style="margin-bottom: 46px;"></span>
-                            <div style="padding: 4px; border: 1px solid #000;">
+                            <div style="padding: 1px; border: 1px solid #000;">
                                 @if(isset($qrCodeBase64))
-                                    <img src="{{ $qrCodeBase64 }}" style="width: 120px; height: 120px;" />
+                                    <img src="{{ $qrCodeBase64 }}" style="width: 140px; height: 140px;" />
                                 @elseif(isset($isPreview) && ($showPreviewActions ?? true))
                                     <div style="width: 120px; height: 120px; border: 1px dashed #666; display: flex; align-items: center; justify-content: center; margin: 0 auto; padding: 8px; box-sizing: border-box; font-size: 9px; line-height: 1.3; text-align: center; color: #444;">
                                         QR will be generated when the PDF is generated.
@@ -928,7 +931,7 @@
                                 @if($receivedDate || $receivedTime)
                                     {{ trim(collect([
                                         $receivedDate,
-                                        $receivedTime ? (\App\Rules\UtcFourDigitTime::formatForDisplay($receivedTime) ?? trim((string) $receivedTime)).' Z' : null,
+                                        $receivedTime ? (\App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($receivedTime) ?? trim((string) $receivedTime)).' Z' : null,
                                     ])->filter()->implode(' ')) }}
                                 @endif
                             </div>

@@ -2,11 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
-use App\Services\FlightPlanQrPayloadService;
+use App\Models\User;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -153,5 +155,29 @@ class EditFromQrPrefillTest extends TestCase
             ->assertOk()
             ->assertSee('RMK/TEST REMARK', false)
             ->assertSee('DEP/MANILA BAY', false);
+    }
+
+    public function test_pilot_cannot_access_public_qr_scan_or_edit_from_qr_flow(): void
+    {
+        $pilot = User::factory()->create([
+            'role' => UserRole::Pilot,
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(route('flightplan.scan-qr'))
+            ->assertForbidden();
+
+        $this->actingAs($pilot)
+            ->post(route('flightplan.scan-qr.lookup'), [
+                'payload' => 'TEST',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($pilot)
+            ->post(route('flightplan.edit-from-qr'), [
+                'payload' => 'TEST',
+            ])
+            ->assertForbidden();
     }
 }

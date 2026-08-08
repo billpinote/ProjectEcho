@@ -1,0 +1,46 @@
+<?php
+
+namespace App\Filament\Shared\Resources\Reports;
+
+use App\Filament\Shared\Resources\Flights\FlightResource;
+use App\Filament\Shared\Resources\Reports\Pages\ListActiveFlightData;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Builder;
+
+class ActiveFlightDataResource extends FlightResource
+{
+    protected static ?string $navigationParentItem = 'Coordinator';
+
+    protected static string|\UnitEnum|null $navigationGroup = null;
+
+    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentChartBar;
+
+    protected static ?string $navigationLabel = 'Active Flight Data';
+
+    protected static ?string $modelLabel = 'active flight data record';
+
+    protected static ?string $pluralModelLabel = 'active flight data';
+
+    protected static ?int $navigationSort = 3;
+
+    public static function getEloquentQuery(): Builder
+    {
+        if (! static::hasStatusColumn()) {
+            return static::getFlightPlanBaseQuery()->whereNotNull('accepted_by_user_id');
+        }
+
+        return static::getFlightPlanBaseQuery()->accepted();
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return null;
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => ListActiveFlightData::route('/'),
+        ];
+    }
+}

@@ -262,7 +262,7 @@
         }
     </style>
 
-    <div id="import-scan-qr-page">
+    <div id="import-scan-qr-page" data-admin-qr-page="true">
         <section class="echo-import-hero">
             <div class="echo-import-hero-grid">
                 <div>
@@ -284,7 +284,7 @@
                     </div>
                 </div>
 
-                <form wire:submit="submit" class="echo-import-stack" style="margin-top: 1.25rem;">
+                <form id="scan-qr-lookup-form" wire:submit="submit" class="echo-import-stack" style="margin-top: 1.25rem;">
                     
                     <div class="echo-camera-card">
                         <div class="echo-camera-header">
@@ -343,7 +343,13 @@
                             class="echo-payload-textarea echo-mono"
                         ></textarea>
                         @error('payload')
-                            <p class="echo-help" style="margin: 0.75rem 0 0; color: var(--color-echo-rejected);">{{ $message }}</p>
+                            <p
+                                id="qr-payload-error"
+                                class="echo-help"
+                                role="alert"
+                                tabindex="-1"
+                                style="margin: 0.75rem 0 0; color: var(--color-echo-rejected);"
+                            >{{ $message }}</p>
                         @enderror
                     </div>
 
@@ -453,55 +459,74 @@
 
     @vite('resources/js/app.js')
     <script>
+        const scrollToPayloadError = () => {
+            const payloadError = document.getElementById('qr-payload-error');
+
+            if (!payloadError) {
+                return false;
+            }
+
+            payloadError.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+            payloadError.focus({ preventScroll: true });
+
+            return true;
+        };
+
+        const scrollElementIntoView = (element) => {
+            element.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            });
+
+            if (typeof element.focus === 'function') {
+                element.focus({ preventScroll: true });
+            }
+        };
+
         const scrollToMatchedFlight = () => {
-            setTimeout(() => {
+            const tryScroll = () => {
+                if (scrollToPayloadError()) {
+                    return true;
+                }
+
                 const matchedFlightPanel = document.getElementById('matched-flight-plan');
 
-                console.log('Scroll triggered', matchedFlightPanel);
-
                 if (!matchedFlightPanel || !matchedFlightPanel.classList.contains('echo-import-summary')) {
-                    console.log('Element not found or wrong class');
-                    return;
+                    return false;
                 }
 
-                console.log('Found matched flight panel, scrolling...');
+                scrollElementIntoView(matchedFlightPanel);
 
-                // Try direct scrollIntoView
-                try {
-                    matchedFlightPanel.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center',
-                    });
-                } catch (e) {
-                    console.log('scrollIntoView failed:', e);
-                }
+                return true;
+            };
 
-                // Scroll window to element position
-                const rect = matchedFlightPanel.getBoundingClientRect();
-                const absoluteTop = rect.top + window.scrollY;
-                window.scrollTo({
-                    top: absoluteTop - 100,
-                    behavior: 'smooth',
-                });
-
-                // Also check for parent scrollable containers
-                let parent = matchedFlightPanel.parentElement;
-                while (parent) {
-                    const style = window.getComputedStyle(parent);
-                    if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-                        console.log('Found scrollable parent:', parent);
-                        parent.scrollTop = matchedFlightPanel.offsetTop - 100;
-                        break;
-                    }
-                    parent = parent.parentElement;
-                }
-            }, 300);
+            [50, 200, 500, 900].forEach((delay) => {
+                setTimeout(tryScroll, delay);
+            });
         };
 
         window.initImportScanQrPage?.();
         window.setTimeout(() => window.initImportScanQrPage?.(), 250);
+        scrollToPayloadError();
         scrollToMatchedFlight();
 
-        document.addEventListener('livewire:updated', scrollToMatchedFlight);
+        document.addEventListener('livewire:updated', () => {
+            if (!scrollToPayloadError()) {
+                scrollToMatchedFlight();
+            }
+        });
+
+        document.addEventListener('echo:qr-payload-loaded', scrollToMatchedFlight);
+
+        document.addEventListener('livewire:init', () => {
+            Livewire.hook('morph.updated', () => {
+                if (!scrollToPayloadError()) {
+                    scrollToMatchedFlight();
+                }
+            });
+        });
     </script>
 </x-filament-panels::page>

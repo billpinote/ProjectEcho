@@ -2,15 +2,15 @@
 
 namespace Tests\Unit;
 
-use App\Rules\IcaoAerodrome;
-use App\Rules\IcaoAircraftIdentification;
-use App\Rules\IcaoCruisingSpeed;
-use App\Rules\IcaoFlightLevel;
-use App\Rules\IcaoFlightPlanRules;
-use App\Rules\IcaoFlightRules;
-use App\Rules\IcaoTypeOfFlight;
-use App\Rules\IcaoWakeTurbulenceCategory;
-use App\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Rules\IcaoAerodrome;
+use App\Domain\FlightPlans\Rules\IcaoAircraftIdentification;
+use App\Domain\FlightPlans\Rules\IcaoCruisingSpeed;
+use App\Domain\FlightPlans\Rules\IcaoFlightLevel;
+use App\Domain\FlightPlans\Rules\IcaoFlightPlanRules;
+use App\Domain\FlightPlans\Rules\IcaoFlightRules;
+use App\Domain\FlightPlans\Rules\IcaoTypeOfFlight;
+use App\Domain\FlightPlans\Rules\IcaoWakeTurbulenceCategory;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use PHPUnit\Framework\TestCase;
 
 class IcaoValidationRulesTest extends TestCase

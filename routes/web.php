@@ -21,3 +21,9 @@ Route::get('/flights/{flight}/view', [FlightController::class, 'showFlightPlanVi
 Route::post('/flights/{flight}/accept', [FlightController::class, 'acceptFlightPlan'])->name('flights.accept');
 Route::post('/flights/{flight}/reject', [FlightController::class, 'rejectFlightPlan'])->name('flights.reject');
 Route::get('/flights/{flight}/pdf', [FlightController::class, 'downloadPdf'])->name('flights.pdf.download');
+Route::get('/reports/abbreviated/pdf', [FlightController::class, 'downloadAbbreviatedReportPdf'])
+    ->middleware('auth')
+    ->name('reports.abbreviated.pdf');
+Route::get('/reports/post-ops-log/pdf', [FlightController::class, 'downloadPostOpsLogPdf'])
+    ->middleware('auth')
+    ->name('reports.post-ops-log.pdf');
