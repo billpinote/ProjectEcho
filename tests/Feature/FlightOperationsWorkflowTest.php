@@ -39,11 +39,13 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->assertTrue(Route::has('filament.atmo.resources.reports.post-ops-logs.index'));
         $this->assertTrue(Route::has('filament.atmo.pages.coordinator'));
         $this->assertTrue(Route::has('filament.atmo.pages.import-scan-qr'));
+        $this->assertTrue(Route::has('filament.avsec.pages.import-scan-qr'));
 
         $this->assertTrue(Route::has('filament.dispatch.resources.accepted-flights.index'));
         $this->assertTrue(Route::has('filament.dispatch.resources.active-flights.index'));
         $this->assertTrue(Route::has('filament.dispatch.resources.landed-flights.index'));
         $this->assertTrue(Route::has('filament.dispatch.resources.completed-flights.index'));
+        $this->assertFalse(Route::has('filament.dispatch.pages.import-scan-qr'));
 
         foreach (['pilot', 'dispatch', 'avsec'] as $panel) {
             $this->assertFalse(Route::has("filament.{$panel}.resources.reports.abbreviated-flight-reports.index"));
@@ -103,7 +105,7 @@ class FlightOperationsWorkflowTest extends TestCase
             ->assertSeeText('Active Flights')
             ->assertSeeText('Landed Flights')
             ->assertSeeText('Completed Flights')
-            ->assertSeeText('QR Import')
+            ->assertDontSeeText('QR Import')
             ->assertDontSeeText('Pending Flight Plans')
             ->assertDontSeeText('Airborne Flights')
             ->assertDontSeeText('Rejected Flights')
@@ -140,10 +142,27 @@ class FlightOperationsWorkflowTest extends TestCase
             '/dispatch/active-flights',
             '/dispatch/landed-flights',
             '/dispatch/completed-flights',
-            '/dispatch/import-scan-qr',
         ] as $url) {
             $this->actingAs($dispatch)->get($url)->assertOk();
         }
+
+        $this->actingAs($dispatch)
+            ->get('/dispatch/import-scan-qr')
+            ->assertNotFound();
+    }
+
+    public function test_qr_import_is_available_to_atmo_avsec_and_artisan_but_not_dispatch(): void
+    {
+        $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
+        $avsec = $this->user(UserRole::Avsec);
+        $artisan = $this->user(UserRole::Artisan);
+        $dispatch = $this->user(UserRole::Dispatch);
+
+        $this->actingAs($atmo)->get('/atmo/import-scan-qr')->assertOk();
+        $this->actingAs($avsec)->get('/avsec/import-scan-qr')->assertOk();
+        $this->actingAs($artisan)->get('/atmo/import-scan-qr')->assertOk();
+        $this->actingAs($artisan)->get('/avsec/import-scan-qr')->assertOk();
+        $this->actingAs($dispatch)->get('/dispatch/import-scan-qr')->assertNotFound();
     }
 
     public function test_artisan_can_open_atmo_report_pages(): void
