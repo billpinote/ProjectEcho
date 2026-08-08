@@ -16,12 +16,14 @@ class OperatorFactory extends Factory
     {
         return [
             'name' => fake()->company(),
+            'short_name' => fake()->unique()->bothify('OP###'),
             'icao_code' => fake()->unique()->bothify('R###'),
             'certificate_number' => fake()->bothify('CERT-####'),
             'address' => fake()->address(),
             'contact_number' => fake()->phoneNumber(),
             'email' => fake()->companyEmail(),
             'remarks' => fake()->optional()->sentence(),
+            'is_active' => true,
         ];
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Shared\Resources\PilotProfiles;
 use App\Filament\Shared\Resources\PilotProfiles\Pages\CreatePilotProfile;
 use App\Filament\Shared\Resources\PilotProfiles\Pages\EditPilotProfile;
 use App\Filament\Shared\Resources\PilotProfiles\Pages\ListPilotProfiles;
+use App\Models\Operator;
 use App\Models\PilotProfile;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -29,6 +30,11 @@ class PilotProfileResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->columns(1)->components([
@@ -41,7 +47,11 @@ class PilotProfileResource extends Resource
             TextInput::make('ratings')->label('Ratings'),
             TextInput::make('license_expiry_date')->label('License Expiry Date'),
             TextInput::make('medical_expiry_date')->label('Medical Expiry Date'),
-            TextInput::make('operator')->label('Operator (OPR)'),
+            Select::make('operator_id')
+                ->label('Operator')
+                ->options(fn (): array => Operator::query()->orderBy('name')->pluck('name', 'id')->all())
+                ->searchable()
+                ->default(fn ($record): ?int => $record?->user?->operator_id),
             Textarea::make('remarks')->label('Remarks'),
         ]);
     }
@@ -54,7 +64,7 @@ class PilotProfileResource extends Resource
             TextColumn::make('ratings')->sortable(),
             TextColumn::make('license_expiry_date')->label('License Expiry')->sortable(),
             TextColumn::make('medical_expiry_date')->label('Medical Expiry')->sortable(),
-            TextColumn::make('operator')->label('Operator (OPR)')->sortable(),
+            TextColumn::make('user.operator.name')->label('Operator')->sortable(),
         ]);
     }
 

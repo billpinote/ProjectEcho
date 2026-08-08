@@ -25,6 +25,7 @@ class User extends Authenticatable implements FilamentUser
      */
     protected $fillable = [
         'name',
+        'created_by_user_id',
         'first_name',
         'middle_name',
         'last_name',
@@ -76,6 +77,26 @@ class User extends Authenticatable implements FilamentUser
     public function authAccounts(): HasMany
     {
         return $this->hasMany(AuthAccount::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(UserAuditLog::class);
+    }
+
+    public function profileUpdateRequests(): HasMany
+    {
+        return $this->hasMany(ProfileUpdateRequest::class);
+    }
+
+    public function kycDocuments(): HasMany
+    {
+        return $this->hasMany(UserKycDocument::class);
     }
 
     public function operator(): BelongsTo
@@ -142,6 +163,19 @@ class User extends Authenticatable implements FilamentUser
         ]);
 
         return implode(' ', $parts);
+    }
+
+    public function flightPlanOperatorName(): ?string
+    {
+        $operator = $this->operator;
+
+        if ($operator === null) {
+            return null;
+        }
+
+        $name = trim((string) ($operator->short_name ?: $operator->name));
+
+        return $name === '' ? null : $name;
     }
 
     public function isPilot(): bool

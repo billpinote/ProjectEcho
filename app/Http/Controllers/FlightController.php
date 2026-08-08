@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
@@ -39,6 +40,7 @@ class FlightController extends Controller
         $validated['date_of_filing'] = $validated['date_of_filing'] ?? now('UTC')->toDateString();
         $validated = $this->uppercaseStringFlightFields($validated);
         $validated = $this->normalizeNumericFlightFields($validated);
+        $validated = AuthenticatedOperatorFlightData::apply($validated, Auth::user());
 
         // Store validated data in session instead of creating DB record
         $request->session()->put('flight_plan_preview', $validated);
@@ -428,6 +430,8 @@ class FlightController extends Controller
                 $flightData['pilot_id'] = $flightData['pilot_id'] ?? $user->id;
             }
         }
+
+        $flightData = AuthenticatedOperatorFlightData::apply($flightData, $user);
 
         $flight = DB::transaction(function () use ($flightData, $user) {
             $flight = Flight::create($flightData);

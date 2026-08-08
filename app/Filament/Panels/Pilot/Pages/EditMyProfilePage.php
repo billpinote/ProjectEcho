@@ -16,7 +16,7 @@ class EditMyProfilePage extends Page
 {
     use InteractsWithPilotProfileForm;
 
-    protected static ?string $title = 'Update Profile';
+    protected static ?string $title = 'Request Profile Update';
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -65,7 +65,7 @@ class EditMyProfilePage extends Page
                             ->color('gray')
                             ->url(MyProfilePage::getUrl(panel: 'pilot')),
                         Action::make('save')
-                            ->label('Save Profile')
+                            ->label('Submit Request')
                             ->submit('profile-form'),
                     ])->alignEnd(),
                 ]),
@@ -88,8 +88,8 @@ class EditMyProfilePage extends Page
         /** @var array<string, mixed> $data */
         $data = $this->form->getState();
 
-        $this->persistPilotProfileFormData($data);
-        $this->sendProfileUpdatedNotification();
+        $this->submitPilotProfileUpdateRequest($data);
+        $this->sendProfileUpdateRequestedNotification();
 
         $this->redirect(MyProfilePage::getUrl(panel: 'pilot'), navigate: true);
     }

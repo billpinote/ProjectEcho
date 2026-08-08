@@ -7,6 +7,8 @@ use App\Filament\Panels\Admin\Resources\AvsecProfiles\AvsecProfileResource;
 use App\Filament\Panels\Admin\Resources\DispatchProfiles\DispatchProfileResource;
 use App\Filament\Panels\Admin\Resources\Operators\OperatorResource;
 use App\Filament\Panels\Admin\Resources\PilotProfiles\PilotProfileResource;
+use App\Filament\Panels\Admin\Resources\ProfileUpdateRequests\ProfileUpdateRequestResource;
+use App\Filament\Panels\Admin\Resources\Users\UserResource;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
@@ -24,6 +26,8 @@ class AdminPanelProvider extends PanelProvider
                 Dashboard::class,
             ])
             ->resources([
+                UserResource::class,
+                ProfileUpdateRequestResource::class,
                 OperatorResource::class,
                 PilotProfileResource::class,
                 AtcProfileResource::class,

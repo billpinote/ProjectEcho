@@ -328,7 +328,7 @@ class FlightForm
         $user = Auth::user();
 
         if ($user?->isPilot()) {
-            $operator = trim((string) ($user->pilotProfile?->operator ?? ''));
+            $operator = trim((string) ($user->flightPlanOperatorName() ?? ''));
 
             if ($operator !== '') {
                 $parts[] = 'OPR/' . $operator;
