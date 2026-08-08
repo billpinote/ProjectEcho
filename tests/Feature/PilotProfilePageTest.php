@@ -18,6 +18,24 @@ class PilotProfilePageTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_active_pilot_can_access_pilot_panel(): void
+    {
+        $pilot = $this->pilot();
+
+        $this->actingAs($pilot)
+            ->get('/pilot')
+            ->assertOk();
+    }
+
+    public function test_active_artisan_can_access_pilot_panel(): void
+    {
+        $artisan = $this->artisanUser();
+
+        $this->actingAs($artisan)
+            ->get('/pilot')
+            ->assertOk();
+    }
+
     public function test_profile_pages_require_authentication(): void
     {
         foreach ([
@@ -61,6 +79,33 @@ class PilotProfilePageTest extends TestCase
             ->assertSeeText('October 20, 2026')
             ->assertSeeText('RPUS')
             ->assertSeeText('Ready for review.');
+    }
+
+    public function test_artisan_cannot_view_or_edit_pilot_profile_pages(): void
+    {
+        $artisan = $this->artisanUser();
+
+        $this->actingAs($artisan)
+            ->get(MyProfilePage::getUrl(panel: 'pilot'))
+            ->assertForbidden();
+
+        $this->actingAs($artisan)
+            ->get(EditMyProfilePage::getUrl(panel: 'pilot'))
+            ->assertForbidden();
+    }
+
+    public function test_artisan_profile_access_attempt_does_not_create_pilot_profile(): void
+    {
+        $artisan = $this->artisanUser();
+
+        $this->assertDatabaseCount('pilot_profiles', 0);
+
+        $this->actingAs($artisan)
+            ->get(EditMyProfilePage::getUrl(panel: 'pilot'))
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('pilot_profiles', 0);
+        $this->assertFalse($artisan->pilotProfile()->exists());
     }
 
     public function test_view_profile_page_links_to_the_edit_page(): void
@@ -163,6 +208,69 @@ class PilotProfilePageTest extends TestCase
         $this->assertContains(HelpPage::getUrl(panel: 'pilot'), $urls);
     }
 
+    public function test_pilot_panel_user_menu_hides_profile_item_for_artisan(): void
+    {
+        $artisan = $this->artisanUser();
+
+        $this->actingAs($artisan);
+        Filament::setCurrentPanel('pilot');
+
+        $items = Filament::getUserMenuItems();
+        $labels = array_map(fn ($item): string => (string) $item->getLabel(), $items);
+        $urls = array_map(fn ($item): ?string => $item->getUrl(), $items);
+
+        $this->assertNotContains('View Profile', $labels);
+        $this->assertNotContains(MyProfilePage::getUrl(panel: 'pilot'), $urls);
+        $this->assertContains('Preferences', $labels);
+        $this->assertContains('Security', $labels);
+        $this->assertContains('Help', $labels);
+    }
+
+    public function test_active_artisan_can_access_generic_pilot_support_pages(): void
+    {
+        $artisan = $this->artisanUser();
+
+        foreach ([
+            PreferencesPage::getUrl(panel: 'pilot'),
+            SecurityPage::getUrl(panel: 'pilot'),
+            HelpPage::getUrl(panel: 'pilot'),
+        ] as $url) {
+            $this->actingAs($artisan)
+                ->get($url)
+                ->assertOk();
+        }
+    }
+
+    public function test_normal_role_restrictions_for_pilot_panel_remain_unchanged(): void
+    {
+        foreach ([
+            UserRole::Admin,
+            UserRole::Atmo,
+            UserRole::Dispatch,
+            UserRole::Avsec,
+            UserRole::AtsHq,
+        ] as $role) {
+            $user = $this->user($role, [
+                'station' => $role === UserRole::Atmo ? 'RPUS' : null,
+            ]);
+
+            $this->actingAs($user)
+                ->get('/pilot')
+                ->assertForbidden();
+        }
+    }
+
+    public function test_artisan_can_still_access_other_authorized_panels(): void
+    {
+        $artisan = $this->artisanUser();
+
+        foreach (['/admin', '/atmo', '/ats', '/dispatch', '/avsec', '/pilot', '/artisan'] as $path) {
+            $this->actingAs($artisan)
+                ->get($path)
+                ->assertOk();
+        }
+    }
+
     public function test_users_cannot_view_or_modify_another_users_profile(): void
     {
         $owner = $this->pilot([
@@ -233,10 +341,27 @@ class PilotProfilePageTest extends TestCase
      */
     private function pilot(array $attributes = []): User
     {
+        return $this->user(UserRole::Pilot, $attributes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function artisanUser(array $attributes = []): User
+    {
+        return $this->user(UserRole::Artisan, $attributes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function user(UserRole $role, array $attributes = []): User
+    {
         return User::factory()->create([
-            'role' => UserRole::Pilot,
+            'role' => $role,
             'is_active' => true,
             ...$attributes,
         ]);
     }
 }
+
