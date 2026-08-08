@@ -403,7 +403,7 @@ class FlightController extends Controller
             'isPdfOnly' => true,
         ])->setPaper('a4', 'portrait');
 
-        return response($pdf->output()."\n% PDF ONLY - NOT FILED WITH RPUS\n", 200, [
+        return response($pdf->output(), 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$this->buildPdfOnlyFileName($flight).'"',
         ]);

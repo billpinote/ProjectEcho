@@ -217,7 +217,7 @@
         };
     @endphp
 
-    @if($isPdfOnly)
+    @if($isPdfOnly && isset($isPreview))
         <div style="width: 794px; margin: 0 auto 10px; padding: 7px 10px; border: 1px solid #92400e; background: #fffbeb; color: #92400e; font-size: 11px; font-weight: bold; text-align: center;">
             PDF ONLY - NOT FILED WITH RPUS
         </div>

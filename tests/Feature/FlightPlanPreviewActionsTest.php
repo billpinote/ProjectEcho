@@ -172,8 +172,8 @@ class FlightPlanPreviewActionsTest extends TestCase
         $this->assertDatabaseCount('flights', 0);
         $this->assertSame(0, Flight::query()->pendingActive()->count());
         $this->assertEmpty(Storage::disk('public')->allFiles('flight-plans'));
-        $this->assertStringContainsString('PDF ONLY', $response->getContent());
-        $this->assertStringContainsString('NOT FILED WITH RPUS', $response->getContent());
+        $this->assertStringNotContainsString('PDF ONLY', $response->getContent());
+        $this->assertStringNotContainsString('NOT FILED WITH RPUS', $response->getContent());
     }
 
     public function test_pdf_only_generation_rejects_rpus_preview(): void
