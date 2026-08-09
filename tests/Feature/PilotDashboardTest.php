@@ -38,6 +38,11 @@ class PilotDashboardTest extends TestCase
                 'description' => 'Cessna 172',
             ],
             [
+                'category' => PilotQualificationCategory::AircraftRating,
+                'code' => 'C208',
+                'description' => 'Cessna 208',
+            ],
+            [
                 'category' => PilotQualificationCategory::InstrumentRating,
                 'code' => 'IR',
                 'description' => 'Instrument Rating',
@@ -60,7 +65,9 @@ class PilotDashboardTest extends TestCase
             ->assertSeeText('Licence')
             ->assertSeeText('Medical')
             ->assertSeeText('Valid')
-            ->assertSeeText('2 Active')
+            ->assertSeeText('C172')
+            ->assertSeeText('C208')
+            ->assertSeeText('IR')
             ->assertSee(route('filament.pilot.resources.flights.create'), false)
             ->assertDontSeeText('Flight Instructor');
     }
@@ -71,6 +78,11 @@ class PilotDashboardTest extends TestCase
 
         $this->assertSame('Dashboard', $dashboard->getTitle());
         $this->assertNull($dashboard->getHeading());
+
+        $this->actingAs($this->pilot())
+            ->get('/pilot')
+            ->assertOk()
+            ->assertDontSee('fi-header-heading', false);
     }
 
     public function test_dashboard_greeting_falls_back_to_first_name(): void
@@ -109,32 +121,40 @@ class PilotDashboardTest extends TestCase
     {
         $pilot = $this->pilot();
 
-        $this->actingAs($pilot)
+        $response = $this->actingAs($pilot)
             ->get('/pilot')
             ->assertOk()
-            ->assertSeeText('No pending flight plans.')
-            ->assertSeeText('No accepted flights ready for departure.')
-            ->assertSeeText('No active flights right now.')
+            ->assertSeeText('No current flights.')
             ->assertSeeText('No flights yet. File your first flight plan when you are ready.')
-            ->assertSeeText('File Flight Plan');
+            ->assertSeeText('File Flight Plan')
+            ->assertDontSeeText('No pending flight plans.')
+            ->assertDontSeeText('No accepted flights ready for departure.')
+            ->assertDontSeeText('No active flights right now.');
+
+        $this->assertStringNotContainsString('Pending</h3>', $response->getContent());
+        $this->assertStringNotContainsString('Accepted</h3>', $response->getContent());
+        $this->assertStringNotContainsString('Active</h3>', $response->getContent());
     }
 
-    public function test_dashboard_ticket_cards_render_current_and_recent_flight_statuses(): void
+    public function test_dashboard_ticket_cards_render_current_and_recent_flight_statuses_without_group_headings(): void
     {
         $pilot = $this->pilot();
 
-        $pending = $this->flight($pilot, [
-            'aircraft_identification' => 'PEND01',
-            'status' => FlightPlanStatus::Pending,
-        ]);
         $accepted = $this->flight($pilot, [
             'aircraft_identification' => 'ACPT01',
             'status' => FlightPlanStatus::Accepted,
+            'proposed_time' => '0830',
         ]);
         $active = $this->flight($pilot, [
             'aircraft_identification' => 'ACTV01',
             'status' => FlightPlanStatus::Accepted,
+            'proposed_time' => '0820',
             'time_start_up' => '08:10',
+        ]);
+        $thirdCurrent = $this->flight($pilot, [
+            'aircraft_identification' => 'THRD01',
+            'status' => FlightPlanStatus::Pending,
+            'proposed_time' => '0840',
         ]);
         $completed = $this->flight($pilot, [
             'aircraft_identification' => 'DONE01',
@@ -146,28 +166,31 @@ class PilotDashboardTest extends TestCase
             'time_shutdown' => '09:25',
         ]);
 
-        $this->actingAs($pilot)
+        $response = $this->actingAs($pilot)
             ->get('/pilot')
             ->assertOk()
             ->assertSeeText('Current Flights')
             ->assertSeeText('Recent Flights')
-            ->assertSeeText('PEND01')
-            ->assertSeeText('Awaiting Approval')
             ->assertSeeText('ACPT01')
             ->assertSeeText('Approved')
             ->assertSeeText('ACTV01')
             ->assertSeeText('Preparing for Departure')
+            ->assertDontSeeText('THRD01')
             ->assertSeeText('DONE01')
             ->assertSeeText('Flight Complete')
-            ->assertSee(route('flights.view', $pending), false)
             ->assertSee(route('flights.qr', $accepted), false)
             ->assertSee(route('flights.view', $active), false)
+            ->assertDontSee(route('flights.view', $thirdCurrent), false)
             ->assertSee(route('flights.view', $completed), false)
             ->assertSeeText('RPUS')
             ->assertSeeText('RPLL')
             ->assertSeeText('0830Z')
             ->assertSeeText('C208')
             ->assertSeeText('V');
+
+        $this->assertStringNotContainsString('Pending</h3>', $response->getContent());
+        $this->assertStringNotContainsString('Accepted</h3>', $response->getContent());
+        $this->assertStringNotContainsString('Active</h3>', $response->getContent());
     }
 
     public function test_dashboard_does_not_leak_other_pilots_flights(): void

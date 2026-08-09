@@ -2,6 +2,7 @@
 
 namespace App\Filament\Panels\Pilot\Widgets;
 
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Models\Flight;
 use App\Models\User;
@@ -13,7 +14,9 @@ class PilotDashboardWidget extends Widget
 {
     private const EXPIRING_SOON_DAYS = 30;
 
-    private const FLIGHT_CARD_LIMIT = 3;
+    private const CURRENT_FLIGHT_CARD_LIMIT = 2;
+
+    private const RECENT_FLIGHT_CARD_LIMIT = 4;
 
     protected string $view = 'filament.widgets.pilot-dashboard';
 
@@ -38,7 +41,7 @@ class PilotDashboardWidget extends Widget
 
         return [
             'readiness' => $this->readinessData($user),
-            'flightSections' => $this->flightSections($user),
+            'currentFlights' => $this->currentFlights($user),
             'recentFlights' => $this->recentFlights($user),
             'fileFlightPlanUrl' => route('filament.pilot.resources.flights.create'),
             'allFlightsUrl' => route('filament.pilot.resources.my-flight-plans.index'),
@@ -62,9 +65,13 @@ class PilotDashboardWidget extends Widget
             'operator' => $user?->operator?->name ?: 'No operator assigned',
             'licence_status' => $licenceStatus,
             'medical_status' => $medicalStatus,
-            'active_qualifications' => $profile?->qualifications
+            'qualification_codes' => $profile?->qualifications
                 ->filter(fn ($qualification): bool => $qualification->expiry_date === null || Carbon::parse($qualification->expiry_date)->startOfDay()->gte($today))
-                ->count() ?? 0,
+                ->sortBy(fn ($qualification): string => ($qualification->category?->value ?? '').'|'.$qualification->code)
+                ->pluck('code')
+                ->filter()
+                ->values()
+                ->all() ?? [],
             'attention' => array_values(array_filter([
                 $licenceStatus['message'] ?? null,
                 $medicalStatus['message'] ?? null,
@@ -132,58 +139,24 @@ class PilotDashboardWidget extends Widget
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function flightSections(?User $user): array
+    private function currentFlights(?User $user): array
     {
         if ($user === null) {
             return [];
         }
 
-        return [
-            [
-                'key' => 'pending',
-                'heading' => 'Pending',
-                'empty' => 'No pending flight plans.',
-                'flights' => $this->flightQuery($user)
-                    ->pendingActive()
-                    ->orderBy('date_of_flight')
-                    ->orderBy('proposed_time')
-                    ->limit(self::FLIGHT_CARD_LIMIT)
-                    ->get()
-                    ->map(fn (Flight $flight): array => $this->flightCard($flight, 'View', route('flights.view', $flight)))
-                    ->all(),
-            ],
-            [
-                'key' => 'accepted',
-                'heading' => 'Accepted',
-                'empty' => 'No accepted flights ready for departure.',
-                'flights' => $this->flightQuery($user)
-                    ->ready()
-                    ->orderBy('date_of_flight')
-                    ->orderBy('proposed_time')
-                    ->limit(self::FLIGHT_CARD_LIMIT)
-                    ->get()
-                    ->map(fn (Flight $flight): array => $this->flightCard($flight, 'Show QR', route('flights.qr', $flight)))
-                    ->all(),
-            ],
-            [
-                'key' => 'active',
-                'heading' => 'Active',
-                'empty' => 'No active flights right now.',
-                'flights' => $this->flightQuery($user)
-                    ->where(function (Builder $query): void {
-                        $query
-                            ->active()
-                            ->orWhere(fn (Builder $query): Builder => $query->airborne())
-                            ->orWhere(fn (Builder $query): Builder => $query->landed());
-                    })
-                    ->orderBy('date_of_flight')
-                    ->orderBy('proposed_time')
-                    ->limit(self::FLIGHT_CARD_LIMIT)
-                    ->get()
-                    ->map(fn (Flight $flight): array => $this->flightCard($flight, 'View', route('flights.view', $flight)))
-                    ->all(),
-            ],
-        ];
+        return $this->flightQuery($user)
+            ->currentForPilot()
+            ->orderBy('date_of_flight')
+            ->orderBy('proposed_time')
+            ->limit(self::CURRENT_FLIGHT_CARD_LIMIT)
+            ->get()
+            ->map(fn (Flight $flight): array => $this->flightCard(
+                $flight,
+                $this->isReady($flight) ? 'Show QR' : 'View',
+                $this->isReady($flight) ? route('flights.qr', $flight) : route('flights.view', $flight),
+            ))
+            ->all();
     }
 
     /**
@@ -199,7 +172,7 @@ class PilotDashboardWidget extends Widget
             ->completed()
             ->orderByDesc('date_of_flight')
             ->orderByDesc('proposed_time')
-            ->limit(self::FLIGHT_CARD_LIMIT)
+            ->limit(self::RECENT_FLIGHT_CARD_LIMIT)
             ->get()
             ->map(fn (Flight $flight): array => $this->flightCard($flight, 'View', route('flights.view', $flight), subdued: true))
             ->all();
@@ -227,6 +200,17 @@ class PilotDashboardWidget extends Widget
                 'time_shutdown',
             ])
             ->where('filed_by_user_id', $user->id);
+    }
+
+    private function isReady(Flight $flight): bool
+    {
+        return $flight->status === FlightPlanStatus::Accepted
+            && $flight->time_start_up === null
+            && $flight->time_block_off === null
+            && $flight->time_airborne === null
+            && $flight->time_touchdown === null
+            && $flight->time_block_on === null
+            && $flight->time_shutdown === null;
     }
 
     /**
