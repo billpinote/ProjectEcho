@@ -152,6 +152,10 @@ class ProfileFieldRegistry
 
     public static function labelForValue(string $key, mixed $value): ?string
     {
+        if (str_starts_with($key, 'pilot_qualification.')) {
+            return $value === null ? null : (string) $value;
+        }
+
         $type = self::fields()[$key]['type'] ?? null;
 
         if ($type === 'operator' && filled($value)) {

@@ -58,6 +58,7 @@ class PilotPanelProvider extends PanelProvider
                     ->label('Preferences')
                     ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
                     ->url(fn (): string => PreferencesPage::getUrl(panel: 'pilot'))
+                    ->visible(fn (): bool => Filament::auth()->user()?->isPilot() ?? false)
                     ->sort(10),
                 MenuItem::make()
                     ->label('Security')

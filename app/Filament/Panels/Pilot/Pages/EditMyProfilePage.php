@@ -4,6 +4,7 @@ namespace App\Filament\Panels\Pilot\Pages;
 
 use App\Filament\Panels\Pilot\Pages\Concerns\InteractsWithPilotProfileForm;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
@@ -42,7 +43,7 @@ class EditMyProfilePage extends Page
             ->model($this->getProfileUser())
             ->operation('edit')
             ->statePath('data')
-            ->columns(2);
+            ->columns(1);
     }
 
     public function form(Schema $schema): Schema
@@ -65,7 +66,7 @@ class EditMyProfilePage extends Page
                             ->color('gray')
                             ->url(MyProfilePage::getUrl(panel: 'pilot')),
                         Action::make('save')
-                            ->label('Submit Request')
+                            ->label('Submit Update Request')
                             ->submit('profile-form'),
                     ])->alignEnd(),
                 ]),
@@ -88,7 +89,18 @@ class EditMyProfilePage extends Page
         /** @var array<string, mixed> $data */
         $data = $this->form->getState();
 
-        $this->submitPilotProfileUpdateRequest($data);
+        try {
+            $this->submitPilotProfileUpdateRequest($data);
+        } catch (\InvalidArgumentException $exception) {
+            Notification::make()
+                ->title('No profile changes to submit.')
+                ->body('Update at least one verified profile field before submitting the request.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         $this->sendProfileUpdateRequestedNotification();
 
         $this->redirect(MyProfilePage::getUrl(panel: 'pilot'), navigate: true);

@@ -16,6 +16,8 @@ use App\Models\UserAuditLog;
 use App\Models\UserKycDocument;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -335,6 +337,108 @@ class PilotProfilePageTest extends TestCase
             ->assertSeeText('Request Profile Update');
     }
 
+    public function test_pilot_can_open_preferences_page(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Jesse',
+            'middle_name' => 'James',
+            'last_name' => 'Superales',
+            'display_name' => 'Jess',
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(PreferencesPage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('Personalization')
+            ->assertSeeText('Display Name')
+            ->assertSeeText('Verified name')
+            ->assertSeeText('Jesse James Superales')
+            ->assertDontSeeText('First Name')
+            ->assertDontSeeText('Last Name')
+            ->assertDontSeeText('Email');
+    }
+
+    public function test_pilot_can_change_display_name_directly_without_profile_update_request(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Jesse',
+            'last_name' => 'Superales',
+            'display_name' => 'Jesse James',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(PreferencesPage::class)
+            ->fillForm([
+                'display_name' => '  Jesse  ',
+            ])
+            ->call('save')
+            ->assertRedirect(MyProfilePage::getUrl(panel: 'pilot'));
+
+        $pilot->refresh();
+
+        $this->assertSame('Jesse', $pilot->display_name);
+        $this->assertSame('Jesse', $pilot->first_name);
+        $this->assertSame('Superales', $pilot->last_name);
+        $this->assertSame(0, $pilot->profileUpdateRequests()->count());
+    }
+
+    public function test_pilot_can_clear_display_name_and_dashboard_falls_back_to_first_name(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Jesse',
+            'last_name' => 'Superales',
+            'display_name' => 'Captain Jesse',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(PreferencesPage::class)
+            ->fillForm([
+                'display_name' => '   ',
+            ])
+            ->call('save')
+            ->assertRedirect(MyProfilePage::getUrl(panel: 'pilot'));
+
+        $this->assertNull($pilot->refresh()->display_name);
+
+        $this->actingAs($pilot)
+            ->get('/pilot')
+            ->assertOk()
+            ->assertSeeText('Jesse')
+            ->assertDontSeeText('Captain Jesse');
+    }
+
+    public function test_display_name_does_not_replace_official_legal_identity(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Jesse',
+            'middle_name' => 'James',
+            'last_name' => 'Superales',
+            'display_name' => 'J',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(PreferencesPage::class)
+            ->fillForm([
+                'display_name' => 'Jesse',
+                'first_name' => 'Fake',
+                'last_name' => 'Name',
+            ])
+            ->call('save');
+
+        $pilot->refresh();
+
+        $this->assertSame('Jesse', $pilot->display_name);
+        $this->assertSame('Jesse', $pilot->first_name);
+        $this->assertSame('James', $pilot->middle_name);
+        $this->assertSame('Superales', $pilot->last_name);
+
+        $this->actingAs($pilot)
+            ->get(MyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('Jesse James Superales')
+            ->assertDontSeeText('Fake Name');
+    }
+
     public function test_requesting_profile_update_does_not_immediately_change_profile(): void
     {
         $pilot = $this->pilot([
@@ -360,7 +464,6 @@ class PilotProfilePageTest extends TestCase
                 'license_number' => 'NEW-900',
                 'license_expiry_date' => '2027-01-04',
                 'medical_expiry_date' => '2027-02-05',
-                'remarks' => 'Updated profile',
                 'reason' => 'KYC details have changed.',
             ])
             ->call('save')
@@ -391,6 +494,7 @@ class PilotProfilePageTest extends TestCase
         $this->assertSame(PilotLicenseType::AirlineTransportPilot->value, $request->requested_changes['pilot_profile.license_type']['new']);
         $this->assertSame('OLD-100', $request->requested_changes['pilot_profile.license_number']['old']);
         $this->assertSame('NEW-900', $request->requested_changes['pilot_profile.license_number']['new']);
+        $this->assertArrayNotHasKey('pilot_profile.remarks', $request->requested_changes);
     }
 
     public function test_request_profile_page_renders_a_livewire_submission_form(): void
@@ -402,7 +506,254 @@ class PilotProfilePageTest extends TestCase
             ->assertOk()
             ->assertSee('id="profile-form"', escape: false)
             ->assertSee('wire:submit="save"', escape: false)
-            ->assertSeeText('Submit Request');
+            ->assertSeeText('Request Profile Update')
+            ->assertSeeText('Update Name')
+            ->assertSeeText('Update Licence & Medical')
+            ->assertSeeText('Update Ratings & Qualifications')
+            ->assertSeeText('About This Update')
+            ->assertSeeText('No changes yet.')
+            ->assertSeeText('Submit Update Request')
+            ->assertDontSeeText('Display Name');
+    }
+
+    public function test_existing_verified_values_are_prefilled_and_displayed_on_request_page(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Jesse',
+            'middle_name' => 'James',
+            'last_name' => 'Superales',
+            'suffix' => 'Jr',
+        ]);
+        $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '987654',
+            'license_expiry_date' => '2027-01-04',
+            'medical_expiry_date' => '2027-02-05',
+            'remarks' => 'Internal only',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(EditMyProfilePage::class)
+            ->assertFormSet([
+                'first_name' => 'Jesse',
+                'middle_name' => 'James',
+                'last_name' => 'Superales',
+                'suffix' => 'Jr',
+                'license_type' => PilotLicenseType::CommercialPilot->value,
+                'license_number' => '987654',
+                'license_expiry_date' => '2027-01-04',
+                'medical_expiry_date' => '2027-02-05',
+            ]);
+
+        $this->actingAs($pilot)
+            ->get(EditMyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('Current: Jesse James Superales Jr')
+            ->assertSeeText('Current licence: CPL-987654')
+            ->assertSeeText('Current medical: Expires February 5, 2027')
+            ->assertDontSeeText('Internal only');
+    }
+
+    public function test_request_profile_page_displays_qualifications(): void
+    {
+        $pilot = $this->pilot();
+        $profile = $pilot->pilotProfile()->create();
+        $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::AircraftRating,
+            'code' => 'C172',
+            'description' => 'Cessna 172',
+            'expiry_date' => '2027-06-30',
+        ]);
+        $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::InstrumentRating,
+            'code' => 'IR',
+            'description' => 'Instrument Rating',
+            'expiry_date' => '2027-12-31',
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(EditMyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('Currently verified')
+            ->assertSeeText('C172')
+            ->assertSeeText('IR')
+            ->assertSeeText('Update qualification')
+            ->assertSeeText('Remove qualification');
+    }
+
+    public function test_pilot_can_request_legal_name_licence_and_medical_changes_only(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Old',
+            'middle_name' => null,
+            'last_name' => 'Pilot',
+            'suffix' => null,
+            'display_name' => 'Friendly',
+        ]);
+        $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::PrivatePilot,
+            'license_number' => '111',
+            'license_expiry_date' => '2026-01-01',
+            'medical_expiry_date' => '2026-02-01',
+            'remarks' => 'Admin note',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(EditMyProfilePage::class)
+            ->fillForm([
+                'first_name' => 'New',
+                'middle_name' => 'Middle',
+                'last_name' => 'Pilot',
+                'suffix' => 'Sr',
+                'license_type' => PilotLicenseType::CommercialPilot->value,
+                'license_number' => '222',
+                'license_expiry_date' => '2027-01-01',
+                'medical_expiry_date' => '2027-02-01',
+                'reason' => 'Updated verified documents.',
+            ])
+            ->call('save')
+            ->assertRedirect(MyProfilePage::getUrl(panel: 'pilot'));
+
+        $request = $pilot->profileUpdateRequests()->firstOrFail();
+
+        $this->assertSame([
+            'user.first_name',
+            'user.middle_name',
+            'user.suffix',
+            'pilot_profile.license_type',
+            'pilot_profile.license_number',
+            'pilot_profile.license_expiry_date',
+            'pilot_profile.medical_expiry_date',
+        ], array_keys($request->requested_changes));
+        $this->assertSame('Friendly', $pilot->refresh()->display_name);
+        $this->assertSame('Old', $pilot->first_name);
+        $this->assertSame('Admin note', $pilot->pilotProfile()->first()?->remarks);
+    }
+
+    public function test_reason_is_required_for_profile_update_request(): void
+    {
+        $pilot = $this->pilot(['first_name' => 'Old']);
+
+        Livewire::actingAs($pilot)
+            ->test(EditMyProfilePage::class)
+            ->fillForm([
+                'first_name' => 'New',
+                'reason' => null,
+            ])
+            ->call('save')
+            ->assertHasFormErrors(['reason' => 'required']);
+
+        $this->assertSame(0, $pilot->profileUpdateRequests()->count());
+    }
+
+    public function test_supporting_documents_for_profile_update_requests_remain_private(): void
+    {
+        Storage::fake('local');
+
+        $pilot = $this->pilot(['first_name' => 'Old']);
+        $document = UploadedFile::fake()->image('license.png');
+
+        Livewire::actingAs($pilot)
+            ->test(EditMyProfilePage::class)
+            ->fillForm([
+                'first_name' => 'New',
+                'reason' => 'Updated ID.',
+                'supporting_documents' => [$document],
+            ])
+            ->call('save')
+            ->assertRedirect(MyProfilePage::getUrl(panel: 'pilot'));
+
+        $request = $pilot->profileUpdateRequests()->with('documents')->firstOrFail();
+        $storedDocument = $request->documents->first();
+
+        $this->assertNotNull($storedDocument);
+        $this->assertStringStartsWith('profile-update-request-documents/', $storedDocument->stored_path);
+        Storage::disk('local')->assertExists($storedDocument->stored_path);
+    }
+
+    public function test_unchanged_fields_are_filtered_and_empty_requests_are_rejected_gracefully(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Jesse',
+            'last_name' => 'Pilot',
+        ]);
+        $pilot->pilotProfile()->create([
+            'license_number' => 'LIC-100',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(EditMyProfilePage::class)
+            ->fillForm([
+                'first_name' => 'Jesse',
+                'last_name' => 'Pilot',
+                'license_number' => 'LIC-100',
+                'reason' => 'No actual change.',
+            ])
+            ->call('save')
+            ->assertNoRedirect();
+
+        $this->assertSame(0, $pilot->profileUpdateRequests()->count());
+    }
+
+    public function test_only_changed_verified_fields_are_submitted(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Jesse',
+            'middle_name' => 'James',
+            'last_name' => 'Pilot',
+        ]);
+        $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '123',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(EditMyProfilePage::class)
+            ->fillForm([
+                'first_name' => 'Jesse',
+                'middle_name' => 'James',
+                'last_name' => 'Pilot',
+                'license_type' => PilotLicenseType::CommercialPilot->value,
+                'license_number' => '456',
+                'reason' => 'Licence number corrected.',
+            ])
+            ->call('save');
+
+        $request = $pilot->profileUpdateRequests()->firstOrFail();
+
+        $this->assertSame(['pilot_profile.license_number'], array_keys($request->requested_changes));
+    }
+
+    public function test_unchanged_qualifications_are_excluded_from_profile_update_request(): void
+    {
+        $pilot = $this->pilot();
+        $profile = $pilot->pilotProfile()->create();
+        $qualification = $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::AircraftRating,
+            'code' => 'C172',
+            'description' => 'Cessna 172',
+            'expiry_date' => '2027-06-30',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(EditMyProfilePage::class)
+            ->fillForm([
+                'qualification_updates' => [[
+                    'id' => $qualification->id,
+                    'request_update' => false,
+                    'request_removal' => false,
+                    'category' => PilotQualificationCategory::AircraftRating->value,
+                    'code' => 'C172',
+                    'description' => 'Cessna 172',
+                    'expiry_date' => '2027-06-30',
+                    'remarks' => null,
+                ]],
+                'reason' => 'No actual qualification change.',
+            ])
+            ->call('save')
+            ->assertNoRedirect();
+
+        $this->assertSame(0, $pilot->profileUpdateRequests()->count());
     }
 
     public function test_profile_and_placeholder_pages_do_not_register_in_main_navigation(): void
@@ -449,7 +800,8 @@ class PilotProfilePageTest extends TestCase
 
         $this->assertNotContains('View Profile', $labels);
         $this->assertNotContains(MyProfilePage::getUrl(panel: 'pilot'), $urls);
-        $this->assertContains('Preferences', $labels);
+        $this->assertNotContains('Preferences', $labels);
+        $this->assertNotContains(PreferencesPage::getUrl(panel: 'pilot'), $urls);
         $this->assertContains('Security', $labels);
         $this->assertContains('Help', $labels);
     }
@@ -459,7 +811,6 @@ class PilotProfilePageTest extends TestCase
         $artisan = $this->artisanUser();
 
         foreach ([
-            PreferencesPage::getUrl(panel: 'pilot'),
             SecurityPage::getUrl(panel: 'pilot'),
             HelpPage::getUrl(panel: 'pilot'),
         ] as $url) {
@@ -543,7 +894,6 @@ class PilotProfilePageTest extends TestCase
                 'license_number' => 'INTRUDER-2',
                 'license_expiry_date' => null,
                 'medical_expiry_date' => null,
-                'remarks' => 'Changed intruder only',
                 'reason' => 'Correct my own profile.',
             ])
             ->call('save')

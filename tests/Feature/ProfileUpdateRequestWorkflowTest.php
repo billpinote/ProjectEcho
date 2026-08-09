@@ -2,12 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Admin\Resources\ProfileUpdateRequests\Pages\EditProfileUpdateRequest;
 use App\Filament\Panels\Admin\Resources\ProfileUpdateRequests\Pages\ListProfileUpdateRequests;
 use App\Filament\Panels\Admin\Resources\Users\Pages\EditUser;
 use App\Models\Operator;
-use App\Models\ProfileUpdateRequest;
 use App\Models\User;
 use App\Services\ProfileUpdates\ArtisanProfileOverrideService;
 use App\Services\ProfileUpdates\ProfileUpdateRequestService;
@@ -165,6 +165,141 @@ class ProfileUpdateRequestWorkflowTest extends TestCase
         $this->assertSame('rejected', $request->status->value);
         $this->assertSame('Document mismatch.', $request->rejection_reason);
         $this->assertSame('Old', $pilot->refresh()->first_name);
+    }
+
+    public function test_pilot_can_request_qualification_addition_and_approval_applies_it_with_audit(): void
+    {
+        $admin = $this->user(UserRole::Admin);
+        $pilot = $this->user(UserRole::Pilot);
+        $pilot->pilotProfile()->create();
+
+        $request = app(ProfileUpdateRequestService::class)->submit($pilot, [], 'New type rating.', [], [[
+            'operation' => 'add',
+            'values' => [
+                'category' => PilotQualificationCategory::AircraftRating->value,
+                'code' => 'B737',
+                'description' => 'Boeing 737',
+                'expiry_date' => '2027-12-31',
+            ],
+        ]]);
+
+        $this->assertSame(0, $pilot->pilotProfile->qualifications()->count());
+        $this->assertSame('add', $request->requested_changes[ProfileUpdateRequestService::QUALIFICATION_CHANGES_KEY]['operations'][0]['operation']);
+
+        app(ProfileUpdateRequestService::class)->approve($request, $admin, 'Verified rating.');
+
+        $qualification = $pilot->pilotProfile()->first()->qualifications()->firstOrFail();
+
+        $this->assertSame('B737', $qualification->code);
+        $this->assertSame(PilotQualificationCategory::AircraftRating, $qualification->category);
+        $this->assertDatabaseHas('user_audit_logs', [
+            'user_id' => $pilot->id,
+            'field' => 'pilot_qualification.add',
+            'new_value' => 'Aircraft Rating B737',
+        ]);
+    }
+
+    public function test_pilot_can_request_qualification_update_and_rejection_applies_nothing(): void
+    {
+        $admin = $this->user(UserRole::Admin);
+        $pilot = $this->user(UserRole::Pilot);
+        $profile = $pilot->pilotProfile()->create();
+        $qualification = $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::InstrumentRating,
+            'code' => 'IR',
+            'description' => 'Instrument Rating',
+            'expiry_date' => '2027-12-31',
+        ]);
+
+        $request = app(ProfileUpdateRequestService::class)->submit($pilot, [], 'Renewed rating.', [], [[
+            'operation' => 'update',
+            'qualification_id' => $qualification->id,
+            'values' => [
+                'category' => PilotQualificationCategory::InstrumentRating->value,
+                'code' => 'IR',
+                'description' => 'Instrument Rating',
+                'expiry_date' => '2028-12-31',
+            ],
+        ]]);
+
+        $this->assertSame('2027-12-31', $qualification->refresh()->expiry_date?->toDateString());
+        $this->assertSame(['expiry_date'], array_keys($request->requested_changes[ProfileUpdateRequestService::QUALIFICATION_CHANGES_KEY]['operations'][0]['changes']));
+
+        app(ProfileUpdateRequestService::class)->reject($request, $admin, 'Need clearer document.');
+
+        $this->assertSame('2027-12-31', $qualification->refresh()->expiry_date?->toDateString());
+    }
+
+    public function test_admin_approval_applies_qualification_update_and_removal_with_audit(): void
+    {
+        $admin = $this->user(UserRole::Admin);
+        $pilot = $this->user(UserRole::Pilot);
+        $profile = $pilot->pilotProfile()->create();
+        $instrument = $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::InstrumentRating,
+            'code' => 'IR',
+            'description' => 'Instrument Rating',
+            'expiry_date' => '2027-12-31',
+        ]);
+        $aircraft = $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::AircraftRating,
+            'code' => 'C172',
+            'description' => 'Cessna 172',
+        ]);
+
+        $request = app(ProfileUpdateRequestService::class)->submit($pilot, [], 'Credential cleanup.', [], [
+            [
+                'operation' => 'update',
+                'qualification_id' => $instrument->id,
+                'values' => [
+                    'category' => PilotQualificationCategory::InstrumentRating->value,
+                    'code' => 'IR',
+                    'description' => 'Instrument Rating',
+                    'expiry_date' => '2028-12-31',
+                ],
+            ],
+            [
+                'operation' => 'remove',
+                'qualification_id' => $aircraft->id,
+            ],
+        ]);
+
+        app(ProfileUpdateRequestService::class)->approve($request, $admin, 'Verified.');
+
+        $this->assertSame('2028-12-31', $instrument->refresh()->expiry_date?->toDateString());
+        $this->assertDatabaseMissing('pilot_qualifications', ['id' => $aircraft->id]);
+        $this->assertDatabaseHas('user_audit_logs', [
+            'user_id' => $pilot->id,
+            'field' => 'pilot_qualification.update',
+        ]);
+        $this->assertDatabaseHas('user_audit_logs', [
+            'user_id' => $pilot->id,
+            'field' => 'pilot_qualification.remove',
+        ]);
+    }
+
+    public function test_one_pilot_cannot_target_another_pilots_qualification(): void
+    {
+        $owner = $this->user(UserRole::Pilot);
+        $ownerProfile = $owner->pilotProfile()->create();
+        $qualification = $ownerProfile->qualifications()->create([
+            'category' => PilotQualificationCategory::AircraftRating,
+            'code' => 'C172',
+        ]);
+
+        $intruder = $this->user(UserRole::Pilot);
+        $intruder->pilotProfile()->create();
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        app(ProfileUpdateRequestService::class)->submit($intruder, [], 'Trying cross-profile update.', [], [[
+            'operation' => 'update',
+            'qualification_id' => $qualification->id,
+            'values' => [
+                'category' => PilotQualificationCategory::AircraftRating->value,
+                'code' => 'C208',
+            ],
+        ]]);
     }
 
     public function test_artisan_override_requires_reason_and_creates_clear_audit_entry(): void

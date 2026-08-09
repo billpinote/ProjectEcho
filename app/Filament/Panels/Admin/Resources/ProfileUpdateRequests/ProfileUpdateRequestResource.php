@@ -8,6 +8,7 @@ use App\Filament\Panels\Admin\Resources\ProfileUpdateRequests\Pages\EditProfileU
 use App\Filament\Panels\Admin\Resources\ProfileUpdateRequests\Pages\ListProfileUpdateRequests;
 use App\Models\ProfileUpdateRequest;
 use App\Services\ProfileUpdates\ProfileFieldRegistry;
+use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Resources\Resource;
@@ -111,19 +112,46 @@ class ProfileUpdateRequestResource extends Resource
             return '<p>No changes requested.</p>';
         }
 
-        $rows = collect($record->requested_changes)->map(function (array $change, string $field): string {
+        $rows = collect($record->requested_changes)->flatMap(function (array $change, string $field): array {
+            if ($field === ProfileUpdateRequestService::QUALIFICATION_CHANGES_KEY) {
+                return collect($change['operations'] ?? [])
+                    ->map(fn (array $operation): string => sprintf(
+                        '<tr><td>%s</td><td>%s</td><td>%s</td></tr>',
+                        e($operation['label'] ?? 'Qualification change'),
+                        e(self::qualificationSummary($operation['old'] ?? null)),
+                        e(self::qualificationSummary($operation['new'] ?? null)),
+                    ))
+                    ->all();
+            }
+
             $old = ProfileFieldRegistry::labelForValue($field, $change['old'] ?? null);
             $new = ProfileFieldRegistry::labelForValue($field, $change['new'] ?? null);
 
-            return sprintf(
+            return [sprintf(
                 '<tr><td>%s</td><td>%s</td><td>%s</td></tr>',
                 e($change['label'] ?? $field),
                 e($old ?? ''),
                 e($new ?? ''),
-            );
+            )];
         })->implode('');
 
         return '<table class="fi-ta-table w-full text-sm"><thead><tr><th>Field</th><th>Old Value</th><th>Requested New Value</th></tr></thead><tbody>'.$rows.'</tbody></table>';
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $qualification
+     */
+    private static function qualificationSummary(?array $qualification): string
+    {
+        if ($qualification === null) {
+            return '';
+        }
+
+        return trim(implode(' · ', array_filter([
+            $qualification['code'] ?? null,
+            str((string) ($qualification['category'] ?? ''))->replace('_', ' ')->headline()->toString(),
+            filled($qualification['expiry_date'] ?? null) ? 'Expires '.$qualification['expiry_date'] : null,
+        ])));
     }
 
     private static function requestHtml(?ProfileUpdateRequest $record): string
