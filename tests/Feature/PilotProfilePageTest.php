@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
+use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Pilot\Pages\EditMyProfilePage;
 use App\Filament\Panels\Pilot\Pages\HelpPage;
@@ -64,6 +66,7 @@ class PilotProfilePageTest extends TestCase
         ]);
 
         $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
             'license_number' => 'LIC-7788',
             'ratings' => 'IR, ME',
             'license_expiry_date' => '2026-11-15',
@@ -71,22 +74,42 @@ class PilotProfilePageTest extends TestCase
             'operator' => 'Legacy OPR',
             'remarks' => 'Ready for review.',
         ]);
+        $pilot->pilotProfile->qualifications()->createMany([
+            [
+                'category' => PilotQualificationCategory::AircraftRating,
+                'code' => 'C172',
+                'description' => 'Cessna 172',
+            ],
+            [
+                'category' => PilotQualificationCategory::InstrumentRating,
+                'code' => 'IR',
+                'description' => 'Instrument Rating',
+                'expiry_date' => '2026-11-15',
+            ],
+        ]);
 
         $this->actingAs($pilot)
             ->get(MyProfilePage::getUrl(panel: 'pilot'))
             ->assertOk()
             ->assertSeeText('Pilot Record')
             ->assertSeeText('Personal Details')
-            ->assertSeeText('Pilot Credentials')
+            ->assertSeeText('Pilot Licence')
+            ->assertSeeText('Medical')
+            ->assertSeeText('Ratings & Endorsements')
             ->assertSeeText('Operator Assignment')
             ->assertSeeText('Verification Record')
             ->assertSeeText('Account / Administration')
             ->assertSeeText('Bill Q Pilot')
             ->assertSeeText('bill@example.test')
+            ->assertSeeText('CPL')
             ->assertSeeText('LIC-7788')
-            ->assertSeeText('IR, ME')
+            ->assertSeeText('Aircraft Rating')
+            ->assertSeeText('C172')
+            ->assertSeeText('Instrument Rating')
+            ->assertSeeText('IR')
             ->assertSeeText('November 15, 2026')
             ->assertSeeText('October 20, 2026')
+            ->assertSeeText('No Expiry')
             ->assertSeeText('Valid')
             ->assertSeeText('Credentials valid')
             ->assertSeeText('Canonical Air')
@@ -122,7 +145,9 @@ class PilotProfilePageTest extends TestCase
             ->assertOk()
             ->assertSeeText('Sparse Pilot')
             ->assertSeeText('sparse@example.test')
-            ->assertSeeText('No pilot credentials are recorded.')
+            ->assertSeeText('No pilot licence is recorded.')
+            ->assertSeeText('No medical information is recorded.')
+            ->assertSeeText('No ratings or endorsements are recorded.')
             ->assertSeeText('No operator assignment is recorded.')
             ->assertDontSeeText('Not provided')
             ->assertDontSeeText('Home base')
@@ -291,6 +316,7 @@ class PilotProfilePageTest extends TestCase
         ]);
 
         $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
             'license_number' => 'OLD-100',
         ]);
 
@@ -300,8 +326,8 @@ class PilotProfilePageTest extends TestCase
                 'first_name' => 'New',
                 'middle_name' => 'M',
                 'last_name' => 'Pilot',
+                'license_type' => PilotLicenseType::AirlineTransportPilot->value,
                 'license_number' => 'NEW-900',
-                'ratings' => 'ATPL',
                 'license_expiry_date' => '2027-01-04',
                 'medical_expiry_date' => '2027-02-05',
                 'remarks' => 'Updated profile',
@@ -317,6 +343,7 @@ class PilotProfilePageTest extends TestCase
         $this->assertNull($pilot->middle_name);
         $this->assertSame('Name', $pilot->last_name);
         $this->assertSame('old@example.test', $pilot->email);
+        $this->assertSame(PilotLicenseType::CommercialPilot, $pilot->pilotProfile?->license_type);
         $this->assertSame('OLD-100', $pilot->pilotProfile?->license_number);
         $this->assertNull($pilot->pilotProfile?->ratings);
         $this->assertNull($pilot->pilotProfile?->license_expiry_date);
@@ -330,6 +357,8 @@ class PilotProfilePageTest extends TestCase
         $this->assertSame('KYC details have changed.', $request->reason);
         $this->assertSame('Old', $request->requested_changes['user.first_name']['old']);
         $this->assertSame('New', $request->requested_changes['user.first_name']['new']);
+        $this->assertSame(PilotLicenseType::CommercialPilot->value, $request->requested_changes['pilot_profile.license_type']['old']);
+        $this->assertSame(PilotLicenseType::AirlineTransportPilot->value, $request->requested_changes['pilot_profile.license_type']['new']);
         $this->assertSame('OLD-100', $request->requested_changes['pilot_profile.license_number']['old']);
         $this->assertSame('NEW-900', $request->requested_changes['pilot_profile.license_number']['new']);
     }
@@ -480,8 +509,8 @@ class PilotProfilePageTest extends TestCase
                 'first_name' => 'Still',
                 'middle_name' => null,
                 'last_name' => 'Intruder',
+                'license_type' => PilotLicenseType::PrivatePilot->value,
                 'license_number' => 'INTRUDER-2',
-                'ratings' => 'IR',
                 'license_expiry_date' => null,
                 'medical_expiry_date' => null,
                 'remarks' => 'Changed intruder only',

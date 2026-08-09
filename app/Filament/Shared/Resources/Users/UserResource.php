@@ -2,6 +2,8 @@
 
 namespace App\Filament\Shared\Resources\Users;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
+use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Resources\Users\Pages\CreateUser;
 use App\Filament\Shared\Resources\Users\Pages\EditUser;
@@ -114,11 +116,12 @@ class UserResource extends Resource
                 ->columnSpanFull()
                 ->visible(fn (Get $get): bool => $get('role') === UserRole::Pilot->value)
                 ->schema([
+                    Select::make('pilot_license_type')
+                        ->label('Licence Type')
+                        ->options(PilotLicenseType::options())
+                        ->native(false),
                     TextInput::make('pilot_license_number')
                         ->label('License Number')
-                        ->maxLength(255),
-                    TextInput::make('pilot_ratings')
-                        ->label('Ratings')
                         ->maxLength(255),
                     DatePicker::make('pilot_license_expiry_date')
                         ->label('License Expiry Date')
@@ -131,6 +134,35 @@ class UserResource extends Resource
                     Textarea::make('pilot_remarks')
                         ->label('Remarks')
                         ->rows(3)
+                        ->columnSpanFull(),
+                    Repeater::make('pilot_qualifications')
+                        ->label('Ratings & Endorsements')
+                        ->schema([
+                            Select::make('category')
+                                ->label('Category')
+                                ->options(PilotQualificationCategory::options())
+                                ->native(false)
+                                ->required(),
+                            TextInput::make('code')
+                                ->label('Code')
+                                ->required()
+                                ->maxLength(255),
+                            TextInput::make('description')
+                                ->label('Description')
+                                ->maxLength(255),
+                            DatePicker::make('expiry_date')
+                                ->label('Expiry Date')
+                                ->native(false)
+                                ->displayFormat('F j, Y'),
+                            Textarea::make('remarks')
+                                ->label('Remarks')
+                                ->rows(2)
+                                ->columnSpanFull(),
+                        ])
+                        ->columns(2)
+                        ->default([])
+                        ->addActionLabel('Add Qualification')
+                        ->reorderable(false)
                         ->columnSpanFull(),
                 ]),
             Section::make('Dispatch Profile')

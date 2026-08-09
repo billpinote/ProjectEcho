@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PilotProfile extends Model
 {
@@ -12,6 +14,7 @@ class PilotProfile extends Model
 
     protected $fillable = [
         'user_id',
+        'license_type',
         'license_number',
         'ratings',
         'license_expiry_date',
@@ -21,6 +24,7 @@ class PilotProfile extends Model
     ];
 
     protected $casts = [
+        'license_type' => PilotLicenseType::class,
         'license_expiry_date' => 'date',
         'medical_expiry_date' => 'date',
     ];
@@ -28,5 +32,10 @@ class PilotProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function qualifications(): HasMany
+    {
+        return $this->hasMany(PilotQualification::class);
     }
 }

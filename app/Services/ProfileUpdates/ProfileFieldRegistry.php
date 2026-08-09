@@ -2,6 +2,7 @@
 
 namespace App\Services\ProfileUpdates;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Operator;
 use App\Models\User;
@@ -25,6 +26,7 @@ class ProfileFieldRegistry
             'user.wiresign' => ['relationship' => null, 'attribute' => 'wiresign', 'label' => 'Wiresign'],
             'user.role' => ['relationship' => null, 'attribute' => 'role', 'label' => 'Role', 'type' => 'role'],
             'user.station' => ['relationship' => null, 'attribute' => 'station', 'label' => 'Station'],
+            'pilot_profile.license_type' => ['relationship' => 'pilotProfile', 'attribute' => 'license_type', 'label' => 'Pilot Licence Type', 'type' => 'pilot_license_type'],
             'pilot_profile.license_number' => ['relationship' => 'pilotProfile', 'attribute' => 'license_number', 'label' => 'Pilot License Number'],
             'pilot_profile.ratings' => ['relationship' => 'pilotProfile', 'attribute' => 'ratings', 'label' => 'Pilot Ratings'],
             'pilot_profile.license_expiry_date' => ['relationship' => 'pilotProfile', 'attribute' => 'license_expiry_date', 'label' => 'License Expiry Date', 'type' => 'date'],
@@ -69,7 +71,7 @@ class ProfileFieldRegistry
         ];
 
         $keys = match (UserRole::normalize($user->role)) {
-            UserRole::Pilot => [...$keys, 'pilot_profile.license_number', 'pilot_profile.ratings', 'pilot_profile.license_expiry_date', 'pilot_profile.medical_expiry_date', 'pilot_profile.operator', 'pilot_profile.remarks'],
+            UserRole::Pilot => [...$keys, 'pilot_profile.license_type', 'pilot_profile.license_number', 'pilot_profile.license_expiry_date', 'pilot_profile.medical_expiry_date', 'pilot_profile.operator', 'pilot_profile.remarks'],
             UserRole::Dispatch => [...$keys, 'dispatch_profile.dispatcher_license_number', 'dispatch_profile.dispatcher_certificate', 'dispatch_profile.department', 'dispatch_profile.position', 'dispatch_profile.office_phone', 'dispatch_profile.mobile_number', 'dispatch_profile.shift', 'dispatch_profile.remarks'],
             UserRole::Atmo, UserRole::AtsHq => [...$keys, 'atc_profile.wiresign', 'atc_profile.facility', 'atc_profile.position', 'atc_profile.endorsements', 'atc_profile.remarks'],
             UserRole::Avsec => [...$keys, 'avsec_profile.security_certification', 'avsec_profile.certification_expiry', 'avsec_profile.security_clearance_level', 'avsec_profile.position', 'avsec_profile.remarks'],
@@ -156,6 +158,10 @@ class ProfileFieldRegistry
             return Operator::query()->whereKey($value)->value('name');
         }
 
+        if ($type === 'pilot_license_type') {
+            return PilotLicenseType::tryFrom((string) $value)?->label();
+        }
+
         if ($type === 'role') {
             return UserRole::normalize($value)?->label();
         }
@@ -188,6 +194,10 @@ class ProfileFieldRegistry
 
         if ($type === 'date' && filled($value)) {
             return (string) $value;
+        }
+
+        if ($type === 'pilot_license_type' && filled($value)) {
+            return PilotLicenseType::tryFrom((string) $value)?->value;
         }
 
         return $value;

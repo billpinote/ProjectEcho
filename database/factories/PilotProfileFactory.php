@@ -2,11 +2,12 @@
 
 namespace Database\Factories;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Models\PilotProfile;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\PilotProfile>
+ * @extends Factory<PilotProfile>
  */
 class PilotProfileFactory extends Factory
 {
@@ -16,6 +17,7 @@ class PilotProfileFactory extends Factory
     {
         return [
             'user_id' => null,
+            'license_type' => fake()->randomElement(PilotLicenseType::cases())->value,
             'license_number' => fake()->bothify('PILOT-#####'),
             'ratings' => fake()->randomElement(['IR', 'ME', 'ATPL', 'CPL', 'SEL', 'MCC']),
             'license_expiry_date' => fake()->dateTimeBetween('now', '+3 years')->format('Y-m-d'),

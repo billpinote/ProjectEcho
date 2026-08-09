@@ -54,12 +54,12 @@
                     @endif
                 </x-filament::section>
 
-                <x-filament::section heading="Pilot Credentials">
-                    @if (empty($profileData['credentials']))
-                        <p class="text-sm text-gray-600 dark:text-gray-400">No pilot credentials are recorded.</p>
+                <x-filament::section heading="Pilot Licence">
+                    @if (empty($profileData['licence']))
+                        <p class="text-sm text-gray-600 dark:text-gray-400">No pilot licence is recorded.</p>
                     @else
                         <dl class="divide-y divide-gray-200 dark:divide-white/10">
-                            @foreach ($profileData['credentials'] as $field)
+                            @foreach ($profileData['licence'] as $field)
                                 <div class="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
                                     <dt class="text-sm font-medium text-gray-600 dark:text-gray-300">
                                         {{ $field['label'] }}
@@ -76,6 +76,66 @@
                                 </div>
                             @endforeach
                         </dl>
+                    @endif
+                </x-filament::section>
+
+                <x-filament::section heading="Medical">
+                    @if (empty($profileData['medical']))
+                        <p class="text-sm text-gray-600 dark:text-gray-400">No medical information is recorded.</p>
+                    @else
+                        <dl class="divide-y divide-gray-200 dark:divide-white/10">
+                            @foreach ($profileData['medical'] as $field)
+                                <div class="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-center">
+                                    <dt class="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                        {{ $field['label'] }}
+                                    </dt>
+                                    <dd class="flex flex-wrap items-center gap-2 text-sm text-gray-950 dark:text-white">
+                                        <span>{{ $field['value'] }}</span>
+
+                                        @if (! empty($field['status']))
+                                            <x-filament::badge :color="$field['status']['color']">
+                                                {{ $field['status']['label'] }}
+                                            </x-filament::badge>
+                                        @endif
+                                    </dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                    @endif
+                </x-filament::section>
+
+                <x-filament::section heading="Ratings & Endorsements">
+                    @if (empty($profileData['qualifications']))
+                        <p class="text-sm text-gray-600 dark:text-gray-400">No ratings or endorsements are recorded.</p>
+                    @else
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-left text-gray-500 dark:text-gray-400">
+                                        <th class="py-2 pr-4 font-medium">Category</th>
+                                        <th class="py-2 pr-4 font-medium">Code</th>
+                                        <th class="py-2 pr-4 font-medium">Description</th>
+                                        <th class="py-2 pr-4 font-medium">Expiry</th>
+                                        <th class="py-2 pr-4 font-medium">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($profileData['qualifications'] as $qualification)
+                                        <tr class="border-t border-gray-200 dark:border-white/10">
+                                            <td class="py-2 pr-4 text-gray-950 dark:text-white">{{ $qualification['category'] }}</td>
+                                            <td class="py-2 pr-4 font-medium text-gray-950 dark:text-white">{{ $qualification['code'] }}</td>
+                                            <td class="py-2 pr-4 text-gray-700 dark:text-gray-300">{{ $qualification['description'] }}</td>
+                                            <td class="py-2 pr-4 text-gray-700 dark:text-gray-300">{{ $qualification['expiry'] }}</td>
+                                            <td class="py-2 pr-4">
+                                                <x-filament::badge :color="$qualification['status']['color']">
+                                                    {{ $qualification['status']['label'] }}
+                                                </x-filament::badge>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     @endif
                 </x-filament::section>
 

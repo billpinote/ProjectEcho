@@ -2,14 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
+use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Admin\Resources\Users\Pages\CreateUser;
 use App\Filament\Panels\Admin\Resources\Users\Pages\EditUser;
 use App\Filament\Panels\Admin\Resources\Users\Pages\ListUsers;
 use App\Models\Operator;
+use App\Models\User;
 use App\Models\UserAuditLog;
 use App\Models\UserKycDocument;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
@@ -144,11 +146,24 @@ class AdminUserResourceTest extends TestCase
                 'operator_id' => $operator->id,
                 'is_active' => true,
                 'password' => 'StrongPass123!',
+                'pilot_license_type' => PilotLicenseType::CommercialPilot->value,
                 'pilot_license_number' => 'LIC-777',
-                'pilot_ratings' => 'IR, ME',
                 'pilot_license_expiry_date' => '2027-01-15',
                 'pilot_medical_expiry_date' => '2027-02-20',
                 'pilot_remarks' => 'Line checked',
+                'pilot_qualifications' => [
+                    [
+                        'category' => PilotQualificationCategory::InstrumentRating->value,
+                        'code' => 'IR',
+                        'description' => 'Instrument Rating',
+                        'expiry_date' => '2027-01-15',
+                    ],
+                    [
+                        'category' => PilotQualificationCategory::AircraftRating->value,
+                        'code' => 'C172',
+                        'description' => 'Cessna 172',
+                    ],
+                ],
                 'kyc_documents' => [
                     [
                         'document_type' => 'company_id',
@@ -169,12 +184,31 @@ class AdminUserResourceTest extends TestCase
         $this->assertNull($pilot->wiresign);
         $this->assertNotNull($pilot->pilotProfile);
         $this->assertSame($pilot->id, $pilot->pilotProfile->user_id);
+        $this->assertSame(PilotLicenseType::CommercialPilot, $pilot->pilotProfile->license_type);
         $this->assertSame('LIC-777', $pilot->pilotProfile->license_number);
-        $this->assertSame('IR, ME', $pilot->pilotProfile->ratings);
+        $this->assertNull($pilot->pilotProfile->ratings);
         $this->assertSame('2027-01-15', $pilot->pilotProfile->license_expiry_date?->toDateString());
         $this->assertSame('2027-02-20', $pilot->pilotProfile->medical_expiry_date?->toDateString());
         $this->assertSame('Line checked', $pilot->pilotProfile->remarks);
         $this->assertNull($pilot->pilotProfile->operator);
+        $this->assertSame(2, $pilot->pilotProfile->qualifications()->count());
+        $this->assertDatabaseHas('pilot_qualifications', [
+            'pilot_profile_id' => $pilot->pilotProfile->id,
+            'category' => PilotQualificationCategory::InstrumentRating->value,
+            'code' => 'IR',
+            'description' => 'Instrument Rating',
+        ]);
+        $this->assertSame(
+            '2027-01-15',
+            $pilot->pilotProfile->qualifications()->where('code', 'IR')->firstOrFail()->expiry_date?->toDateString(),
+        );
+        $this->assertDatabaseHas('pilot_qualifications', [
+            'pilot_profile_id' => $pilot->pilotProfile->id,
+            'category' => PilotQualificationCategory::AircraftRating->value,
+            'code' => 'C172',
+            'description' => 'Cessna 172',
+            'expiry_date' => null,
+        ]);
 
         $document = $pilot->kycDocuments()->firstOrFail();
 
@@ -260,13 +294,17 @@ class AdminUserResourceTest extends TestCase
                 'email' => 'pilot-only@example.test',
                 'role' => UserRole::Pilot->value,
                 'password' => 'StrongPass123!',
+                'pilot_license_type' => PilotLicenseType::PrivatePilot->value,
                 'pilot_license_number' => 'P-ONLY',
             ])
             ->call('create')
             ->assertHasNoFormErrors();
 
         $this->assertDatabaseHas('dispatch_profiles', ['dispatcher_license_number' => 'D-ONLY']);
-        $this->assertDatabaseHas('pilot_profiles', ['license_number' => 'P-ONLY']);
+        $this->assertDatabaseHas('pilot_profiles', [
+            'license_type' => PilotLicenseType::PrivatePilot->value,
+            'license_number' => 'P-ONLY',
+        ]);
     }
 
     public function test_invalid_create_submission_does_not_leave_partial_user(): void
@@ -305,8 +343,16 @@ class AdminUserResourceTest extends TestCase
                 'suffix' => null,
                 'email' => 'edit-pilot@example.test',
                 'role' => UserRole::Pilot->value,
+                'pilot_license_type' => PilotLicenseType::AirlineTransportPilot->value,
                 'pilot_license_number' => 'NEW',
-                'pilot_ratings' => 'ATPL',
+                'pilot_qualifications' => [
+                    [
+                        'category' => PilotQualificationCategory::InstructorRating->value,
+                        'code' => 'FI',
+                        'description' => 'Flight Instructor',
+                        'expiry_date' => '2027-08-01',
+                    ],
+                ],
             ])
             ->call('save')
             ->assertHasNoFormErrors();
@@ -315,18 +361,35 @@ class AdminUserResourceTest extends TestCase
 
         $this->assertSame('Edited Pilot', $pilot->name);
         $this->assertSame(1, $pilot->pilotProfile()->count());
+        $this->assertSame(PilotLicenseType::AirlineTransportPilot, $pilot->pilotProfile()->first()?->license_type);
         $this->assertSame('NEW', $pilot->pilotProfile()->first()?->license_number);
-        $this->assertSame('ATPL', $pilot->pilotProfile()->first()?->ratings);
+        $this->assertNull($pilot->pilotProfile()->first()?->ratings);
+        $this->assertDatabaseHas('pilot_qualifications', [
+            'pilot_profile_id' => $pilot->pilotProfile()->first()?->id,
+            'category' => PilotQualificationCategory::InstructorRating->value,
+            'code' => 'FI',
+        ]);
 
         $profileAudit = $pilot->auditLogs()
             ->where('auditable_type', $pilot->pilotProfile()->first()?->getMorphClass())
             ->where('action', 'updated')
-            ->latest('id')
-            ->firstOrFail();
+            ->get()
+            ->first(fn (UserAuditLog $log): bool => array_key_exists('license_number', $log->changes ?? []));
 
+        $this->assertNotNull($profileAudit);
+
+        $this->assertArrayHasKey('license_type', $profileAudit->changes);
         $this->assertArrayHasKey('license_number', $profileAudit->changes);
         $this->assertSame('OLD', $profileAudit->changes['license_number']['old']);
         $this->assertSame('NEW', $profileAudit->changes['license_number']['new']);
+
+        $qualificationAudit = $pilot->auditLogs()
+            ->where('auditable_type', $pilot->pilotProfile()->first()?->getMorphClass())
+            ->where('action', 'updated')
+            ->get()
+            ->first(fn (UserAuditLog $log): bool => array_key_exists('qualifications', $log->changes ?? []));
+
+        $this->assertNotNull($qualificationAudit);
     }
 
     public function test_role_change_creates_new_role_profile_without_deleting_existing_profile(): void

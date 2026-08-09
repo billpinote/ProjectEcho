@@ -2,22 +2,24 @@
 
 namespace App\Filament\Shared\Resources\Users\Support;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
+use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Operator;
 use App\Models\User;
 use App\Models\UserAuditLog;
-use App\Models\UserKycDocument;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 
 class UserAccountFormData
 {
     private const PROFILE_FIELDS = [
+        'pilot_license_type',
         'pilot_license_number',
-        'pilot_ratings',
         'pilot_license_expiry_date',
         'pilot_medical_expiry_date',
         'pilot_remarks',
+        'pilot_qualifications',
         'dispatch_dispatcher_license_number',
         'dispatch_dispatcher_certificate',
         'dispatch_department',
@@ -78,11 +80,23 @@ class UserAccountFormData
             ...$data,
             'password' => null,
             'kyc_documents' => [],
+            'pilot_license_type' => $user->pilotProfile?->license_type?->value,
             'pilot_license_number' => $user->pilotProfile?->license_number,
-            'pilot_ratings' => $user->pilotProfile?->ratings,
             'pilot_license_expiry_date' => $user->pilotProfile?->license_expiry_date?->toDateString(),
             'pilot_medical_expiry_date' => $user->pilotProfile?->medical_expiry_date?->toDateString(),
             'pilot_remarks' => $user->pilotProfile?->remarks,
+            'pilot_qualifications' => $user->pilotProfile?->qualifications()
+                ->orderBy('category')
+                ->orderBy('code')
+                ->get(['category', 'code', 'description', 'expiry_date', 'remarks'])
+                ->map(fn ($qualification): array => [
+                    'category' => $qualification->category?->value,
+                    'code' => $qualification->code,
+                    'description' => $qualification->description,
+                    'expiry_date' => $qualification->expiry_date?->toDateString(),
+                    'remarks' => $qualification->remarks,
+                ])
+                ->all() ?? [],
             'dispatch_dispatcher_license_number' => $user->dispatchProfile?->dispatcher_license_number,
             'dispatch_dispatcher_certificate' => $user->dispatchProfile?->dispatcher_certificate,
             'dispatch_department' => $user->dispatchProfile?->department,
@@ -113,12 +127,12 @@ class UserAccountFormData
 
         match ($role) {
             UserRole::Pilot => self::syncOwnedProfile($user, $actor, 'pilotProfile', [
+                'license_type' => self::pilotLicenseTypeValue($profileData['pilot_license_type'] ?? null),
                 'license_number' => self::nullableString($profileData['pilot_license_number'] ?? null),
-                'ratings' => self::nullableString($profileData['pilot_ratings'] ?? null),
-                'license_expiry_date' => $profileData['pilot_license_expiry_date'] ?: null,
-                'medical_expiry_date' => $profileData['pilot_medical_expiry_date'] ?: null,
+                'license_expiry_date' => ($profileData['pilot_license_expiry_date'] ?? null) ?: null,
+                'medical_expiry_date' => ($profileData['pilot_medical_expiry_date'] ?? null) ?: null,
                 'remarks' => self::nullableString($profileData['pilot_remarks'] ?? null),
-            ], ['license_number', 'ratings', 'license_expiry_date', 'medical_expiry_date', 'remarks']),
+            ], ['license_type', 'license_number', 'license_expiry_date', 'medical_expiry_date', 'remarks']),
             UserRole::Dispatch => self::syncOwnedProfile($user, $actor, 'dispatchProfile', [
                 'dispatcher_license_number' => self::nullableString($profileData['dispatch_dispatcher_license_number'] ?? null),
                 'dispatcher_certificate' => self::nullableString($profileData['dispatch_dispatcher_certificate'] ?? null),
@@ -145,6 +159,10 @@ class UserAccountFormData
             ], ['security_certification', 'certification_expiry', 'security_clearance_level', 'position', 'remarks']),
             default => null,
         };
+
+        if ($role === UserRole::Pilot) {
+            self::syncPilotQualifications($user, $actor, $profileData['pilot_qualifications'] ?? []);
+        }
     }
 
     public static function syncPasswordAuthAccount(User $user, ?string $password): void
@@ -363,6 +381,11 @@ class UserAccountFormData
         return $value === '' ? null : $value;
     }
 
+    private static function pilotLicenseTypeValue(mixed $value): ?string
+    {
+        return PilotLicenseType::tryFrom((string) ($value ?? ''))?->value;
+    }
+
     private static function recordAudit(
         User $user,
         ?User $actor,
@@ -400,6 +423,97 @@ class UserAccountFormData
         $profile = $user->{$relationship}()->updateOrCreate([], $attributes);
 
         self::recordProfileChanges($user, $actor, $profile, $changes, $created);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $qualifications
+     */
+    private static function syncPilotQualifications(User $user, ?User $actor, array $qualifications): void
+    {
+        $profile = $user->pilotProfile()->first();
+
+        if ($profile === null) {
+            return;
+        }
+
+        $normalized = collect($qualifications)
+            ->filter(fn (mixed $qualification): bool => is_array($qualification))
+            ->map(function (array $qualification): ?array {
+                $category = PilotQualificationCategory::tryFrom((string) ($qualification['category'] ?? ''));
+                $code = self::nullableString($qualification['code'] ?? null);
+
+                if ($category === null || $code === null) {
+                    return null;
+                }
+
+                return [
+                    'category' => $category->value,
+                    'code' => $code,
+                    'description' => self::nullableString($qualification['description'] ?? null),
+                    'expiry_date' => $qualification['expiry_date'] ?: null,
+                    'remarks' => self::nullableString($qualification['remarks'] ?? null),
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $existing = $profile->qualifications()
+            ->orderBy('category')
+            ->orderBy('code')
+            ->get(['category', 'code', 'description', 'expiry_date', 'remarks'])
+            ->map(fn ($qualification): array => [
+                'category' => $qualification->category?->value,
+                'code' => $qualification->code,
+                'description' => $qualification->description,
+                'expiry_date' => $qualification->expiry_date?->toDateString(),
+                'remarks' => $qualification->remarks,
+            ])
+            ->values()
+            ->all();
+
+        $desired = collect($normalized)
+            ->sortBy(fn (array $qualification): string => $qualification['category'].'|'.$qualification['code'])
+            ->values()
+            ->all();
+
+        if ($existing === $desired) {
+            return;
+        }
+
+        $profile->qualifications()->delete();
+        $profile->qualifications()->createMany($desired);
+
+        self::recordAudit(
+            $user,
+            $actor,
+            'updated',
+            'admin_direct_change',
+            $profile,
+            [
+                'qualifications' => [
+                    'old' => self::qualificationAuditSummary($existing),
+                    'new' => self::qualificationAuditSummary($desired),
+                ],
+            ],
+            'Pilot qualifications changed.',
+        );
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $qualifications
+     */
+    private static function qualificationAuditSummary(array $qualifications): string
+    {
+        return collect($qualifications)
+            ->map(function (array $qualification): string {
+                $category = PilotQualificationCategory::tryFrom((string) ($qualification['category'] ?? ''))?->label()
+                    ?? (string) ($qualification['category'] ?? '');
+
+                return trim($category.' '.($qualification['code'] ?? ''));
+            })
+            ->filter()
+            ->implode('; ');
     }
 
     /**

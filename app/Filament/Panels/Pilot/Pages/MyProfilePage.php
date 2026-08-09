@@ -45,6 +45,7 @@ class MyProfilePage extends Page
                 'kycDocuments.verifiedBy',
                 'operator',
                 'pilotProfile',
+                'pilotProfile.qualifications',
             ]);
 
         $latestAuditLog = $user->auditLogs()
@@ -67,16 +68,19 @@ class MyProfilePage extends Page
             ['label' => 'Email', 'value' => $user->email],
         ]);
 
-        $credentials = $this->filledFields([
-            ['label' => 'Pilot license number', 'value' => $user->pilotProfile?->license_number],
-            ['label' => 'Ratings', 'value' => $user->pilotProfile?->ratings],
+        $licence = $this->filledFields([
+            ['label' => 'Licence type', 'value' => $user->pilotProfile?->license_type?->label()],
+            ['label' => 'Licence number', 'value' => $user->pilotProfile?->license_number],
             [
-                'label' => 'License expiry date',
+                'label' => 'Licence expiry',
                 'value' => $this->formatDate($user->pilotProfile?->license_expiry_date),
                 'status' => $licenseStatus,
             ],
+        ]);
+
+        $medical = $this->filledFields([
             [
-                'label' => 'Medical expiry date',
+                'label' => 'Medical expiry',
                 'value' => $this->formatDate($user->pilotProfile?->medical_expiry_date),
                 'status' => $medicalStatus,
             ],
@@ -107,7 +111,9 @@ class MyProfilePage extends Page
                 ])),
             ],
             'personal_details' => $personalDetails,
-            'credentials' => $credentials,
+            'licence' => $licence,
+            'medical' => $medical,
+            'qualifications' => $this->qualifications($user),
             'operator_assignment' => $operatorAssignment,
             'verification_record' => $verificationRecord,
             'kyc_documents' => $this->kycDocuments($user),
@@ -196,6 +202,26 @@ class MyProfilePage extends Page
         }
 
         return ['label' => 'Credentials incomplete', 'color' => 'gray'];
+    }
+
+    /**
+     * @return array<int, array<string, string|array<string, string>>>
+     */
+    private function qualifications(User $user): array
+    {
+        return $user->pilotProfile?->qualifications
+            ->sortBy(fn ($qualification): string => ($qualification->category?->value ?? '').'|'.$qualification->code)
+            ->map(fn ($qualification): array => [
+                'category' => $qualification->category?->label() ?? '',
+                'code' => $qualification->code,
+                'description' => $qualification->description,
+                'expiry' => $this->formatDate($qualification->expiry_date) ?? 'No expiry',
+                'status' => $qualification->expiry_date === null
+                    ? ['label' => 'No Expiry', 'color' => 'gray']
+                    : $this->credentialStatus($qualification->expiry_date),
+            ])
+            ->values()
+            ->all() ?? [];
     }
 
     /**

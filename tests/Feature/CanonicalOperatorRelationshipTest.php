@@ -63,7 +63,6 @@ class CanonicalOperatorRelationshipTest extends TestCase
                 'operator_id' => $operator->id,
                 'password' => 'StrongPass123!',
                 'pilot_license_number' => 'PILOT-1',
-                'pilot_ratings' => 'IR',
             ])
             ->call('create')
             ->assertHasNoFormErrors();

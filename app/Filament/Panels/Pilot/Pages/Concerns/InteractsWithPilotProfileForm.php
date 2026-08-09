@@ -2,9 +2,11 @@
 
 namespace App\Filament\Panels\Pilot\Pages\Concerns;
 
+use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -14,7 +16,7 @@ trait InteractsWithPilotProfileForm
     use ResolvesPilotPanelProfileUser;
 
     /**
-     * @return array<int, TextInput|DatePicker|Textarea|FileUpload>
+     * @return array<int, TextInput|Select|DatePicker|Textarea|FileUpload>
      */
     protected function getPilotProfileFormComponents(): array
     {
@@ -28,9 +30,10 @@ trait InteractsWithPilotProfileForm
             TextInput::make('last_name')
                 ->label('Last Name')
                 ->maxLength(255),
-            TextInput::make('ratings')
-                ->label('Ratings')
-                ->maxLength(255),
+            Select::make('license_type')
+                ->label('Licence Type')
+                ->options(PilotLicenseType::options())
+                ->native(false),
             TextInput::make('license_number')
                 ->label('License Number')
                 ->maxLength(255),
@@ -74,8 +77,8 @@ trait InteractsWithPilotProfileForm
             'first_name' => $user->first_name,
             'middle_name' => $user->middle_name,
             'last_name' => $user->last_name,
+            'license_type' => $user->pilotProfile?->license_type?->value,
             'license_number' => $user->pilotProfile?->license_number,
-            'ratings' => $user->pilotProfile?->ratings,
             'license_expiry_date' => $user->pilotProfile?->license_expiry_date?->toDateString(),
             'medical_expiry_date' => $user->pilotProfile?->medical_expiry_date?->toDateString(),
             'remarks' => $user->pilotProfile?->remarks,
@@ -95,8 +98,8 @@ trait InteractsWithPilotProfileForm
             'user.first_name' => $data['first_name'] ?? null,
             'user.middle_name' => $data['middle_name'] ?? null,
             'user.last_name' => $data['last_name'] ?? null,
+            'pilot_profile.license_type' => $data['license_type'] ?? null,
             'pilot_profile.license_number' => $data['license_number'] ?? null,
-            'pilot_profile.ratings' => $data['ratings'] ?? null,
             'pilot_profile.license_expiry_date' => $data['license_expiry_date'] ?? null,
             'pilot_profile.medical_expiry_date' => $data['medical_expiry_date'] ?? null,
             'pilot_profile.remarks' => $data['remarks'] ?? null,
