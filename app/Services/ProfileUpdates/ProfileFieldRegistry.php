@@ -70,8 +70,19 @@ class ProfileFieldRegistry
             'user.station',
         ];
 
+        $pilotKeys = [
+            'user.first_name',
+            'user.middle_name',
+            'user.last_name',
+            'user.suffix',
+            'pilot_profile.license_type',
+            'pilot_profile.license_number',
+            'pilot_profile.license_expiry_date',
+            'pilot_profile.medical_expiry_date',
+        ];
+
         $keys = match (UserRole::normalize($user->role)) {
-            UserRole::Pilot => [...$keys, 'pilot_profile.license_type', 'pilot_profile.license_number', 'pilot_profile.license_expiry_date', 'pilot_profile.medical_expiry_date', 'pilot_profile.operator', 'pilot_profile.remarks'],
+            UserRole::Pilot => $pilotKeys,
             UserRole::Dispatch => [...$keys, 'dispatch_profile.dispatcher_license_number', 'dispatch_profile.dispatcher_certificate', 'dispatch_profile.department', 'dispatch_profile.position', 'dispatch_profile.office_phone', 'dispatch_profile.mobile_number', 'dispatch_profile.shift', 'dispatch_profile.remarks'],
             UserRole::Atmo, UserRole::AtsHq => [...$keys, 'atc_profile.wiresign', 'atc_profile.facility', 'atc_profile.position', 'atc_profile.endorsements', 'atc_profile.remarks'],
             UserRole::Avsec => [...$keys, 'avsec_profile.security_certification', 'avsec_profile.certification_expiry', 'avsec_profile.security_clearance_level', 'avsec_profile.position', 'avsec_profile.remarks'],

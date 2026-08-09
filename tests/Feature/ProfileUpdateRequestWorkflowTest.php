@@ -7,7 +7,6 @@ use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Admin\Resources\ProfileUpdateRequests\Pages\EditProfileUpdateRequest;
 use App\Filament\Panels\Admin\Resources\ProfileUpdateRequests\Pages\ListProfileUpdateRequests;
 use App\Filament\Panels\Admin\Resources\Users\Pages\EditUser;
-use App\Models\Operator;
 use App\Models\User;
 use App\Services\ProfileUpdates\ArtisanProfileOverrideService;
 use App\Services\ProfileUpdates\ProfileUpdateRequestService;
@@ -77,6 +76,21 @@ class ProfileUpdateRequestWorkflowTest extends TestCase
         $this->assertSame('Owner', $owner->refresh()->first_name);
     }
 
+    public function test_pilot_request_ignores_forbidden_profile_fields(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, ['first_name' => 'Jesse']);
+        $pilot->pilotProfile()->create(['remarks' => 'Internal note.']);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        app(ProfileUpdateRequestService::class)->submit($pilot, [
+            'user.operator_id' => 123,
+            'user.station' => 'RPUS',
+            'pilot_profile.operator' => 'Legacy OPR',
+            'pilot_profile.remarks' => 'Pilot changed note.',
+        ], 'Unsupported fields.');
+    }
+
     public function test_user_cannot_access_another_users_supporting_documents(): void
     {
         Storage::fake('local');
@@ -108,13 +122,11 @@ class ProfileUpdateRequestWorkflowTest extends TestCase
     public function test_admin_can_review_request_and_approval_applies_changes_with_audit(): void
     {
         $admin = $this->user(UserRole::Admin);
-        $operator = Operator::factory()->create(['name' => 'New Operator']);
         $pilot = $this->user(UserRole::Pilot, ['first_name' => 'Old', 'operator_id' => null]);
         $pilot->pilotProfile()->create(['license_number' => 'OLD-LIC']);
 
         $request = app(ProfileUpdateRequestService::class)->submit($pilot, [
             'user.first_name' => 'New',
-            'user.operator_id' => $operator->id,
             'pilot_profile.license_number' => 'NEW-LIC',
         ], 'Approved docs.');
 
@@ -136,7 +148,7 @@ class ProfileUpdateRequestWorkflowTest extends TestCase
 
         $this->assertSame('approved', $request->status->value);
         $this->assertSame('New', $pilot->first_name);
-        $this->assertSame($operator->id, $pilot->operator_id);
+        $this->assertNull($pilot->operator_id);
         $this->assertSame('NEW-LIC', $pilot->pilotProfile?->license_number);
         $this->assertDatabaseHas('user_audit_logs', [
             'user_id' => $pilot->id,

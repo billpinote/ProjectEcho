@@ -2,11 +2,13 @@
     'flight',
 ])
 
-<div @class([
-    'overflow-hidden rounded-lg border bg-white shadow-sm dark:bg-gray-900',
-    'border-gray-200 dark:border-white/10' => empty($flight['subdued']),
-    'border-gray-200/80 opacity-90 dark:border-white/10' => ! empty($flight['subdued']),
-])>
+<div
+    @class([
+        'echo-flight-ticket-card overflow-hidden rounded-lg border shadow-sm',
+        'border-gray-200 dark:border-white/10' => empty($flight['subdued']),
+        'border-gray-200/80 opacity-90 dark:border-white/10' => ! empty($flight['subdued']),
+    ])
+>
     <div class="grid lg:grid-cols-[minmax(0,7fr)_minmax(14rem,3fr)]">
         <div class="p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

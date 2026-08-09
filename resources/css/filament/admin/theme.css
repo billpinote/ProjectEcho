@@ -187,6 +187,19 @@
         box-shadow: none;
     }
 
+    .echo-flight-ticket-card {
+        background: linear-gradient(110deg, #ffffff 0%, #fdfbf6 65%, #f7f3e9 100%);
+    }
+
+    .echo-flight-ticket-card:where(.dark, .dark *) {
+        background: linear-gradient(
+            110deg,
+            color-mix(in srgb, var(--gray-900) 94%, #fffdf7) 0%,
+            color-mix(in srgb, var(--gray-900) 90%, #fdfbf6) 65%,
+            color-mix(in srgb, var(--gray-800) 88%, #f7f3e9) 100%
+        );
+    }
+
     .fi-input-wrp,
     .fi-select-input,
     .fi-textarea,

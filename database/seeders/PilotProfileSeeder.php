@@ -68,13 +68,13 @@ class PilotProfileSeeder extends Seeder
                 'category' => PilotQualificationCategory::AircraftRating->value,
                 'code' => 'C172',
                 'description' => 'Cessna 172',
-                'expiry_date' => null,
+                'expiry_date' => '2027-06-30',
             ],
             [
                 'category' => PilotQualificationCategory::AircraftRating->value,
                 'code' => 'C208',
                 'description' => 'Cessna 208',
-                'expiry_date' => null,
+                'expiry_date' => '2027-09-30',
             ],
             [
                 'category' => PilotQualificationCategory::InstrumentRating->value,

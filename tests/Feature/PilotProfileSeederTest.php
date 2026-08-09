@@ -52,14 +52,12 @@ class PilotProfileSeederTest extends TestCase
             'category' => PilotQualificationCategory::AircraftRating->value,
             'code' => 'C172',
             'description' => 'Cessna 172',
-            'expiry_date' => null,
         ]);
         $this->assertDatabaseHas('pilot_qualifications', [
             'pilot_profile_id' => $profile->id,
             'category' => PilotQualificationCategory::AircraftRating->value,
             'code' => 'C208',
             'description' => 'Cessna 208',
-            'expiry_date' => null,
         ]);
         $this->assertDatabaseHas('pilot_qualifications', [
             'pilot_profile_id' => $profile->id,
@@ -67,6 +65,14 @@ class PilotProfileSeederTest extends TestCase
             'code' => 'IR',
             'description' => 'Instrument Rating',
         ]);
+        $this->assertSame(
+            '2027-06-30',
+            $profile->qualifications->firstWhere('code', 'C172')?->expiry_date?->toDateString(),
+        );
+        $this->assertSame(
+            '2027-09-30',
+            $profile->qualifications->firstWhere('code', 'C208')?->expiry_date?->toDateString(),
+        );
         $this->assertSame(
             '2027-12-31',
             $profile->qualifications->firstWhere('code', 'IR')?->expiry_date?->toDateString(),
