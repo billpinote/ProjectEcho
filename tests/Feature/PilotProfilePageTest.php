@@ -10,6 +10,8 @@ use App\Filament\Panels\Pilot\Pages\PreferencesPage;
 use App\Filament\Panels\Pilot\Pages\SecurityPage;
 use App\Models\Operator;
 use App\Models\User;
+use App\Models\UserAuditLog;
+use App\Models\UserKycDocument;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -73,15 +75,171 @@ class PilotProfilePageTest extends TestCase
         $this->actingAs($pilot)
             ->get(MyProfilePage::getUrl(panel: 'pilot'))
             ->assertOk()
+            ->assertSeeText('Pilot Record')
+            ->assertSeeText('Personal Details')
+            ->assertSeeText('Pilot Credentials')
+            ->assertSeeText('Operator Assignment')
+            ->assertSeeText('Verification Record')
+            ->assertSeeText('Account / Administration')
             ->assertSeeText('Bill Q Pilot')
             ->assertSeeText('bill@example.test')
             ->assertSeeText('LIC-7788')
             ->assertSeeText('IR, ME')
             ->assertSeeText('November 15, 2026')
             ->assertSeeText('October 20, 2026')
+            ->assertSeeText('Valid')
+            ->assertSeeText('Credentials valid')
             ->assertSeeText('Canonical Air')
+            ->assertDontSeeText('Home base')
+            ->assertDontSeeText('RPUS')
             ->assertDontSeeText('Legacy OPR')
             ->assertSeeText('Ready for review.');
+    }
+
+    public function test_profile_view_hides_empty_optional_pilot_fields_and_admin_or_atc_metadata(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Sparse',
+            'middle_name' => null,
+            'last_name' => 'Pilot',
+            'email' => 'sparse@example.test',
+            'display_name' => null,
+            'employee_id' => 'PIL-SECRET',
+            'wiresign' => 'WS',
+            'station' => null,
+        ]);
+
+        $pilot->pilotProfile()->create([
+            'license_number' => null,
+            'ratings' => null,
+            'license_expiry_date' => null,
+            'medical_expiry_date' => null,
+            'remarks' => null,
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(MyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('Sparse Pilot')
+            ->assertSeeText('sparse@example.test')
+            ->assertSeeText('No pilot credentials are recorded.')
+            ->assertSeeText('No operator assignment is recorded.')
+            ->assertDontSeeText('Not provided')
+            ->assertDontSeeText('Home base')
+            ->assertDontSeeText('Station')
+            ->assertDontSeeText('Employee ID')
+            ->assertDontSeeText('PIL-SECRET')
+            ->assertDontSeeText('Wiresign')
+            ->assertDontSeeText('WS')
+            ->assertDontSeeText('role = pilot')
+            ->assertDontSeeText('Last login');
+    }
+
+    public function test_profile_view_displays_existing_kyc_documents_and_audit_record(): void
+    {
+        $creator = $this->user(UserRole::Admin, ['name' => 'Creator Admin']);
+        $verifier = $this->user(UserRole::Admin, ['name' => 'Verifier Admin']);
+        $modifier = $this->user(UserRole::Admin, ['name' => 'Modifier Admin']);
+        $pilot = $this->pilot([
+            'first_name' => 'Verified',
+            'last_name' => 'Pilot',
+            'created_by_user_id' => $creator->id,
+        ]);
+
+        UserKycDocument::query()->create([
+            'user_id' => $pilot->id,
+            'document_type' => 'pilot_license',
+            'document_identifier' => 'LIC-123456',
+            'file_path' => 'kyc-documents/license.pdf',
+            'original_file_name' => 'license.pdf',
+            'verified_by_user_id' => $verifier->id,
+            'verified_at' => now()->subDay(),
+            'remarks' => 'License copy checked.',
+        ]);
+
+        UserAuditLog::query()->create([
+            'user_id' => $pilot->id,
+            'performed_by_user_id' => $modifier->id,
+            'action' => 'profile_updated',
+            'field' => 'pilot_profile.license_number',
+            'created_at' => now(),
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(MyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('KYC documents verified')
+            ->assertSeeText('Created by')
+            ->assertSeeText('Creator Admin')
+            ->assertSeeText('Last modified by')
+            ->assertSeeText('Modifier Admin')
+            ->assertSeeText('KYC / Supporting Documents')
+            ->assertSeeText('Pilot License')
+            ->assertSeeText('Verifier Admin')
+            ->assertSeeText('License copy checked.')
+            ->assertSee('user-kyc-documents', escape: false)
+            ->assertDontSeeText('LIC-123456');
+    }
+
+    public function test_profile_view_marks_expired_and_expiring_credentials(): void
+    {
+        $expiredPilot = $this->pilot([
+            'first_name' => 'Expired',
+            'last_name' => 'Pilot',
+            'email' => 'expired@example.test',
+        ]);
+        $expiredPilot->pilotProfile()->create([
+            'license_number' => 'EXP-1',
+            'license_expiry_date' => now()->subDay()->toDateString(),
+            'medical_expiry_date' => now()->addMonths(3)->toDateString(),
+        ]);
+
+        $this->actingAs($expiredPilot)
+            ->get(MyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('Credential expired')
+            ->assertSeeText('Expired');
+
+        $expiringPilot = $this->pilot([
+            'first_name' => 'Soon',
+            'last_name' => 'Pilot',
+            'email' => 'soon@example.test',
+        ]);
+        $expiringPilot->pilotProfile()->create([
+            'license_number' => 'SOON-1',
+            'license_expiry_date' => now()->addDays(10)->toDateString(),
+            'medical_expiry_date' => now()->addMonths(3)->toDateString(),
+        ]);
+
+        $this->actingAs($expiringPilot)
+            ->get(MyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('Credential expiring soon')
+            ->assertSeeText('Expiring soon');
+    }
+
+    public function test_profile_view_does_not_mark_distant_future_credentials_as_expiring_soon(): void
+    {
+        $pilot = $this->pilot([
+            'first_name' => 'Future',
+            'last_name' => 'Pilot',
+            'email' => 'future@example.test',
+        ]);
+
+        $pilot->pilotProfile()->create([
+            'license_number' => 'FUT-1',
+            'license_expiry_date' => '2026-12-10',
+            'medical_expiry_date' => '2027-12-21',
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(MyProfilePage::getUrl(panel: 'pilot'))
+            ->assertOk()
+            ->assertSeeText('December 10, 2026')
+            ->assertSeeText('December 21, 2027')
+            ->assertSeeText('Credentials valid')
+            ->assertSeeText('Valid')
+            ->assertDontSeeText('Expiring soon');
     }
 
     public function test_artisan_cannot_view_or_edit_pilot_profile_pages(): void
