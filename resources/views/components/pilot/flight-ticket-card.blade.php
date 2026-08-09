@@ -11,10 +11,10 @@
         <div class="p-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
-                    <div class="truncate text-lg font-semibold tracking-wide text-gray-950 dark:text-white">
+                    <div class="truncate text-xl font-semibold tracking-wide text-gray-950 dark:text-white">
                         {{ $flight['callsign'] }}
                     </div>
-                    <div class="mt-3 flex items-center gap-3 text-xl font-semibold text-gray-950 dark:text-white">
+                    <div class="mt-3 flex items-center gap-3 text-lg font-semibold text-gray-950 dark:text-white">
                         <span>{{ $flight['departure'] }}</span>
                         <span class="text-gray-400">-></span>
                         <span>{{ $flight['destination'] }}</span>

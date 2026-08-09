@@ -1,5 +1,5 @@
-<x-filament-widgets::widget>
-    <div class="space-y-6">
+<x-filament-widgets::widget class="echo-pilot-dashboard-widget">
+    <div class="space-y-6 bg-echo-background">
         <x-filament::section>
             <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                 <div class="min-w-0">

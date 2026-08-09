@@ -181,6 +181,12 @@
         border-radius: 1rem;
     }
 
+    .echo-pilot-dashboard-widget {
+        background: var(--color-echo-background);
+        border-color: transparent;
+        box-shadow: none;
+    }
+
     .fi-input-wrp,
     .fi-select-input,
     .fi-textarea,
