@@ -9,6 +9,7 @@ use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Carbon;
 
 class MyProfilePage extends Page
@@ -35,6 +36,11 @@ class MyProfilePage extends Page
                 ->icon(Heroicon::OutlinedPencilSquare)
                 ->url(EditMyProfilePage::getUrl(panel: 'pilot')),
         ];
+    }
+
+    public function getHeading(): string|Htmlable|null
+    {
+        return null;
     }
 
     public function mount(): void
@@ -69,8 +75,7 @@ class MyProfilePage extends Page
         ]);
 
         $licence = $this->filledFields([
-            ['label' => 'Licence type', 'value' => $user->pilotProfile?->license_type?->label()],
-            ['label' => 'Licence number', 'value' => $user->pilotProfile?->license_number],
+            ['label' => 'Pilot licence', 'value' => $user->pilotProfile?->formattedLicense()],
             [
                 'label' => 'Licence expiry',
                 'value' => $this->formatDate($user->pilotProfile?->license_expiry_date),

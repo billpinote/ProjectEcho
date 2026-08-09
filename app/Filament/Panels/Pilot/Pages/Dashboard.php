@@ -5,6 +5,7 @@ namespace App\Filament\Panels\Pilot\Pages;
 use App\Filament\Panels\Pilot\Widgets\PilotDashboardWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Widgets\Widget;
+use Illuminate\Contracts\Support\Htmlable;
 
 class Dashboard extends BaseDashboard
 {
@@ -14,6 +15,11 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [];
+    }
+
+    public function getHeading(): string|Htmlable|null
+    {
+        return null;
     }
 
     /**

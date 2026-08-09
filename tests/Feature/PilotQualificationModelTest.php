@@ -62,6 +62,27 @@ class PilotQualificationModelTest extends TestCase
         $this->assertSame('2027-08-15', $qualification->expiry_date?->toDateString());
     }
 
+    public function test_pilot_licence_display_is_formatted_without_combining_stored_fields(): void
+    {
+        $profile = PilotProfile::factory()->create([
+            'user_id' => User::factory()->create(['role' => UserRole::Pilot])->id,
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '987654',
+        ]);
+
+        $this->assertSame('CPL-987654', $profile->formatted_license);
+        $this->assertSame('CPL-987654', $profile->formattedLicense());
+        $this->assertSame(PilotLicenseType::CommercialPilot, $profile->license_type);
+        $this->assertSame('987654', $profile->license_number);
+    }
+
+    public function test_pilot_licence_formatter_handles_partial_values(): void
+    {
+        $this->assertSame('CPL', PilotProfile::formatLicense(PilotLicenseType::CommercialPilot, null));
+        $this->assertSame('987654', PilotProfile::formatLicense(null, '987654'));
+        $this->assertNull(PilotProfile::formatLicense(null, null));
+    }
+
     public function test_legacy_ratings_data_is_preserved_as_imported_qualification(): void
     {
         Schema::dropIfExists('pilot_qualifications');

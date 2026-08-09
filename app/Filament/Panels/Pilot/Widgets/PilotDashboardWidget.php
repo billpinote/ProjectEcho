@@ -58,10 +58,7 @@ class PilotDashboardWidget extends Widget
         return [
             'greeting' => $this->greeting(),
             'friendly_name' => $this->friendlyName($user),
-            'licence' => trim(implode(' ', array_filter([
-                $profile?->license_type?->value,
-                $profile?->license_number,
-            ]))) ?: 'Licence not recorded',
+            'licence' => $profile?->formattedLicense() ?: 'Licence not recorded',
             'operator' => $user?->operator?->name ?: 'No operator assigned',
             'licence_status' => $licenceStatus,
             'medical_status' => $medicalStatus,

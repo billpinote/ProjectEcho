@@ -101,8 +101,9 @@ class PilotProfilePageTest extends TestCase
             ->assertSeeText('Account / Administration')
             ->assertSeeText('Bill Q Pilot')
             ->assertSeeText('bill@example.test')
-            ->assertSeeText('CPL')
-            ->assertSeeText('LIC-7788')
+            ->assertSeeText('CPL-LIC-7788')
+            ->assertDontSeeText('Licence type')
+            ->assertDontSeeText('Licence number')
             ->assertSeeText('Aircraft Rating')
             ->assertSeeText('C172')
             ->assertSeeText('Instrument Rating')
@@ -117,6 +118,35 @@ class PilotProfilePageTest extends TestCase
             ->assertDontSeeText('RPUS')
             ->assertDontSeeText('Legacy OPR')
             ->assertSeeText('Ready for review.');
+    }
+
+    public function test_pilot_profile_page_keeps_title_but_uses_custom_visual_header_instead_of_page_heading(): void
+    {
+        $page = app(MyProfilePage::class);
+
+        $this->assertSame('View Profile', $page->getTitle());
+        $this->assertNull($page->getHeading());
+    }
+
+    public function test_admin_pilot_profile_table_uses_formatted_licence_display(): void
+    {
+        $admin = $this->adminUser();
+        $pilot = $this->pilot([
+            'name' => 'Table Pilot',
+            'first_name' => 'Table',
+            'last_name' => 'Pilot',
+        ]);
+
+        $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '445566',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('filament.admin.resources.pilot-profiles.index'))
+            ->assertOk()
+            ->assertSeeText('Table Pilot')
+            ->assertSeeText('CPL-445566');
     }
 
     public function test_profile_view_hides_empty_optional_pilot_fields_and_admin_or_atc_metadata(): void
@@ -548,6 +578,14 @@ class PilotProfilePageTest extends TestCase
     private function artisanUser(array $attributes = []): User
     {
         return $this->user(UserRole::Artisan, $attributes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function adminUser(array $attributes = []): User
+    {
+        return $this->user(UserRole::Admin, $attributes);
     }
 
     /**

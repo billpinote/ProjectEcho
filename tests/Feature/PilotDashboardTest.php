@@ -6,6 +6,7 @@ use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Pilot\Pages\Dashboard;
 use App\Models\Flight;
 use App\Models\Operator;
 use App\Models\User;
@@ -54,7 +55,7 @@ class PilotDashboardTest extends TestCase
             ->get('/pilot')
             ->assertOk()
             ->assertSeeText('Jesse')
-            ->assertSeeText('CPL 987654')
+            ->assertSeeText('CPL-987654')
             ->assertSeeText('Alpha Aviation Group')
             ->assertSeeText('Licence')
             ->assertSeeText('Medical')
@@ -62,6 +63,14 @@ class PilotDashboardTest extends TestCase
             ->assertSeeText('2 Active')
             ->assertSee(route('filament.pilot.resources.flights.create'), false)
             ->assertDontSeeText('Flight Instructor');
+    }
+
+    public function test_dashboard_keeps_browser_title_but_uses_custom_visual_header_instead_of_page_heading(): void
+    {
+        $dashboard = app(Dashboard::class);
+
+        $this->assertSame('Dashboard', $dashboard->getTitle());
+        $this->assertNull($dashboard->getHeading());
     }
 
     public function test_dashboard_greeting_falls_back_to_first_name(): void

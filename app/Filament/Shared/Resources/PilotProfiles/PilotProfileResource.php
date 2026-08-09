@@ -102,8 +102,10 @@ class PilotProfileResource extends Resource
     {
         return $table->columns([
             TextColumn::make('user.name')->label('User')->sortable()->searchable(),
-            TextColumn::make('license_type')->label('Licence Type')->sortable(),
-            TextColumn::make('license_number')->label('License Number')->sortable(),
+            TextColumn::make('formatted_license')
+                ->label('Pilot Licence')
+                ->placeholder('Not recorded')
+                ->searchable(['license_type', 'license_number']),
             TextColumn::make('qualifications_count')->counts('qualifications')->label('Qualifications'),
             TextColumn::make('license_expiry_date')->label('License Expiry')->sortable(),
             TextColumn::make('medical_expiry_date')->label('Medical Expiry')->sortable(),

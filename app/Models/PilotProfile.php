@@ -29,6 +29,38 @@ class PilotProfile extends Model
         'medical_expiry_date' => 'date',
     ];
 
+    public static function formatLicense(PilotLicenseType|string|null $type, ?string $number): ?string
+    {
+        $type = $type instanceof PilotLicenseType
+            ? $type->value
+            : trim((string) $type);
+        $number = trim((string) $number);
+
+        if ($type === '' && $number === '') {
+            return null;
+        }
+
+        if ($type === '') {
+            return $number;
+        }
+
+        if ($number === '') {
+            return $type;
+        }
+
+        return $type.'-'.$number;
+    }
+
+    public function formattedLicense(): ?string
+    {
+        return self::formatLicense($this->license_type, $this->license_number);
+    }
+
+    public function getFormattedLicenseAttribute(): ?string
+    {
+        return $this->formattedLicense();
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
