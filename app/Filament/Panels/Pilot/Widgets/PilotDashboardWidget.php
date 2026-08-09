@@ -65,11 +65,14 @@ class PilotDashboardWidget extends Widget
             'operator' => $user?->operator?->name ?: 'No operator assigned',
             'licence_status' => $licenceStatus,
             'medical_status' => $medicalStatus,
-            'qualification_codes' => $profile?->qualifications
+            'qualifications' => $profile?->qualifications
                 ->filter(fn ($qualification): bool => $qualification->expiry_date === null || Carbon::parse($qualification->expiry_date)->startOfDay()->gte($today))
                 ->sortBy(fn ($qualification): string => ($qualification->category?->value ?? '').'|'.$qualification->code)
-                ->pluck('code')
-                ->filter()
+                ->map(fn ($qualification): array => [
+                    'code' => $qualification->code,
+                    'color' => $this->qualificationColor($qualification->expiry_date),
+                ])
+                ->filter(fn (array $qualification): bool => filled($qualification['code']))
                 ->values()
                 ->all() ?? [],
             'attention' => array_values(array_filter([
@@ -134,6 +137,17 @@ class PilotDashboardWidget extends Widget
         }
 
         return ['label' => 'Valid', 'color' => 'success'];
+    }
+
+    private function qualificationColor(mixed $date): string
+    {
+        if ($date === null) {
+            return 'success';
+        }
+
+        return now()->startOfDay()->diffInDays(Carbon::parse($date)->startOfDay()) <= self::EXPIRING_SOON_DAYS
+            ? 'warning'
+            : 'success';
     }
 
     /**

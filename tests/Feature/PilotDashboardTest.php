@@ -41,6 +41,7 @@ class PilotDashboardTest extends TestCase
                 'category' => PilotQualificationCategory::AircraftRating,
                 'code' => 'C208',
                 'description' => 'Cessna 208',
+                'expiry_date' => now()->addDays(10)->toDateString(),
             ],
             [
                 'category' => PilotQualificationCategory::InstrumentRating,
@@ -68,6 +69,7 @@ class PilotDashboardTest extends TestCase
             ->assertSeeText('C172')
             ->assertSeeText('C208')
             ->assertSeeText('IR')
+            ->assertSee('fi-color-warning', false)
             ->assertSee(route('filament.pilot.resources.flights.create'), false)
             ->assertDontSeeText('Flight Instructor');
     }

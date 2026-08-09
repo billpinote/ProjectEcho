@@ -36,37 +36,35 @@
                 </x-filament::button>
             </div>
 
-            <div class="mt-5 space-y-4">
-                <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-                    <div class="flex items-center gap-2">
+            <div class="mt-5 border-t border-gray-200 pt-4 dark:border-white/10">
+                <div class="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+                    <div class="flex flex-wrap items-center gap-2">
                         <span class="font-medium text-gray-600 dark:text-gray-300">Licence</span>
                         <x-filament::badge :color="$readiness['licence_status']['color']">
                             {{ $readiness['licence_status']['label'] }}
                         </x-filament::badge>
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <span class="font-medium text-gray-600 dark:text-gray-300">Medical</span>
                         <x-filament::badge :color="$readiness['medical_status']['color']">
                             {{ $readiness['medical_status']['label'] }}
                         </x-filament::badge>
                     </div>
-                </div>
 
-                <div>
-                    <div class="text-sm font-medium text-gray-600 dark:text-gray-300">Qualifications</div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-medium text-gray-600 dark:text-gray-300">Qualifications</span>
 
-                    @if (empty($readiness['qualification_codes']))
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">No active qualifications recorded.</p>
-                    @else
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach ($readiness['qualification_codes'] as $code)
-                                <x-filament::badge color="gray">
-                                    {{ $code }}
+                        @if (empty($readiness['qualifications']))
+                            <span class="text-gray-500 dark:text-gray-400">None active</span>
+                        @else
+                            @foreach ($readiness['qualifications'] as $qualification)
+                                <x-filament::badge :color="$qualification['color']">
+                                    {{ $qualification['code'] }}
                                 </x-filament::badge>
                             @endforeach
-                        </div>
-                    @endif
+                        @endif
+                    </div>
                 </div>
             </div>
         </x-filament::section>
