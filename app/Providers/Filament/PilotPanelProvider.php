@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Panels\Pilot\Pages\Dashboard;
 use App\Filament\Panels\Pilot\Pages\EditMyProfilePage;
 use App\Filament\Panels\Pilot\Pages\HelpPage;
 use App\Filament\Panels\Pilot\Pages\MyProfilePage;
@@ -13,13 +14,11 @@ use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResour
 use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
-use App\Filament\Panels\Pilot\Widgets\PilotDashboardWidget;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Facades\Filament;
 use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationBuilder;
 use Filament\Navigation\NavigationItem;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Icons\Heroicon;
@@ -47,9 +46,6 @@ class PilotPanelProvider extends PanelProvider
                 MyCurrentFlightResource::class,
                 MyCompletedFlightResource::class,
                 MyArchivedFlightResource::class,
-            ])
-            ->widgets([
-                PilotDashboardWidget::class,
             ])
             ->userMenuItems([
                 'profile' => MenuItem::make()
