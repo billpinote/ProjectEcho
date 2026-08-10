@@ -28,7 +28,6 @@
 
     .fi-sidebar.fi-main-sidebar,
     .fi-sidebar {
-        position: relative;
         isolation: isolate;
         overflow: hidden;
         background: linear-gradient(
@@ -844,5 +843,13 @@
     50% {
         background-position: 12px 0;
         box-shadow: inset 4px 0 0 var(--color-echo-rejected), inset 0 0 0 999px rgba(245, 165, 36, 0.04);
+    }
+}
+
+@media (max-width: 1023px) {
+    .fi-layout-sidebar-toggle-btn-ctn {
+        background: var(--color-echo-background) !important;
+        border: 0 !important;
+        box-shadow: none !important;
     }
 }
