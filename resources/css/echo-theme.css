@@ -169,3 +169,11 @@
         background: color-mix(in srgb, var(--color-echo-completed) 14%, white);
     }
 }
+
+.fi-header-heading {
+    display: none !important;
+}
+
+.fi-header-subheading {
+    display: none !important;
+}
