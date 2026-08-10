@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\Pilots\Enums\PilotLicenseType;
+use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Admin\Resources\Users\Pages\CreateUser;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
@@ -107,9 +109,14 @@ class CanonicalOperatorRelationshipTest extends TestCase
             'operator_id' => $operator->id,
         ]);
         $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
             'license_number' => 'LIC-123',
             'ratings' => 'IR',
+            'license_expiry_date' => now('Asia/Manila')->addYear()->toDateString(),
             'operator' => 'LEGACY',
+        ])->qualifications()->create([
+            'category' => PilotQualificationCategory::InstrumentRating,
+            'code' => 'IR',
         ]);
 
         Livewire::actingAs($pilot)

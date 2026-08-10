@@ -11,6 +11,7 @@ use App\Domain\FlightPlans\Rules\IcaoFlightRules;
 use App\Domain\FlightPlans\Rules\IcaoTypeOfFlight;
 use App\Domain\FlightPlans\Rules\IcaoWakeTurbulenceCategory;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -77,7 +78,11 @@ class FlightForm
                                             ->required()
                                             ->rule(new FlightScheduleNotInPast)
                                             ->live()
-                                            ->afterStateUpdated(fn (Get $get, Set $set, mixed $state): mixed => self::syncDofTag($get, $set, $state))
+                                            ->afterStateUpdated(function (Get $get, Set $set, mixed $state): mixed {
+                                                self::syncPilotCredentials($set, $state);
+
+                                                return self::syncDofTag($get, $set, $state);
+                                            })
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('originator', 'Originator', 1)
                                             ->readOnly()
@@ -231,18 +236,26 @@ class FlightForm
 
                                         self::text('pilot_in_command', 'Pilot In Command', 4)
                                             ->default(fn (): ?string => self::pilotNameDefault())
+                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
+                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('pilot_license_no', 'Lic. No.', 1)
                                             ->default(fn (): ?string => self::pilotLicenseDefault())
+                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
+                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('pilot_ratings', 'Pilot Ratings', 2)
                                             ->default(fn (): ?string => self::pilotRatingsDefault())
+                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
+                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::date('license_expiry_date', 'Expiry Date', 1)
                                             ->default(fn (): ?string => self::pilotLicenseExpiryDefault())
+                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
+                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
                                             ->live()
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
 
@@ -293,36 +306,93 @@ class FlightForm
     {
         $user = Auth::user();
 
-        return $user?->isPilot() ? trim((string) $user->fullName()) : null;
+        return $user?->isPilot() ? self::pilotCredentials()['pilot_name'] : null;
     }
 
     private static function pilotLicenseDefault(): ?string
     {
         $user = Auth::user();
 
-        return $user?->isPilot() ? trim((string) ($user->pilotProfile?->license_number ?? '')) : null;
+        return $user?->isPilot() ? self::pilotCredentials()['license'] : null;
     }
 
     private static function pilotRatingsDefault(): ?string
     {
         $user = Auth::user();
 
-        return $user?->isPilot() ? trim((string) ($user->pilotProfile?->ratings ?? '')) : null;
+        return $user?->isPilot() ? self::pilotCredentials()['ratings'] : null;
     }
 
     private static function pilotLicenseExpiryDefault(): ?string
     {
         $user = Auth::user();
 
-        return $user?->isPilot() && $user->pilotProfile?->license_expiry_date
-            ? $user->pilotProfile?->license_expiry_date->toDateString()
-            : null;
+        return $user?->isPilot() ? self::pilotCredentials()['license_expiry_date'] : null;
+    }
+
+    /**
+     * @return array{
+     *     pilot_name: ?string,
+     *     license: ?string,
+     *     ratings: ?string,
+     *     license_expiry_date: ?string,
+     *     profile_exists: bool,
+     *     license_valid: bool
+     * }
+     */
+    private static function pilotCredentials(mixed $dateOfFlight = null): array
+    {
+        $user = Auth::user();
+
+        if (! $user?->isPilot()) {
+            return [
+                'pilot_name' => null,
+                'license' => null,
+                'ratings' => null,
+                'license_expiry_date' => null,
+                'profile_exists' => false,
+                'license_valid' => false,
+            ];
+        }
+
+        return PilotFlightPlanCredentials::forUser($user, $dateOfFlight);
+    }
+
+    private static function syncPilotCredentials(Set $set, mixed $dateOfFlight): void
+    {
+        $user = Auth::user();
+
+        if (! $user?->isPilot()) {
+            return;
+        }
+
+        $credentials = self::pilotCredentials($dateOfFlight);
+
+        $set('pilot_in_command', $credentials['pilot_name']);
+        $set('pilot_license_no', $credentials['license']);
+        $set('pilot_ratings', $credentials['ratings']);
+        $set('license_expiry_date', $credentials['license_expiry_date']);
+    }
+
+    private static function usesVerifiedPilotCredentials(): bool
+    {
+        return Auth::user()?->isPilot() ?? false;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function verifiedPilotInputAttributes(): array
+    {
+        return self::usesVerifiedPilotCredentials()
+            ? ['class' => 'caap-control caap-readonly-control']
+            : ['class' => 'caap-control'];
     }
 
     private static function pilotOtherInformationDefaults(): ?string
     {
         $parts = [
-            'DOF/' . now()->format('Ymd'),
+            'DOF/'.now()->format('Ymd'),
         ];
 
         $user = Auth::user();
@@ -331,7 +401,7 @@ class FlightForm
             $operator = trim((string) ($user->flightPlanOperatorName() ?? ''));
 
             if ($operator !== '') {
-                $parts[] = 'OPR/' . $operator;
+                $parts[] = 'OPR/'.$operator;
             }
         }
 

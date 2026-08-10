@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\Pilots\Enums\PilotLicenseType;
+use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\Pages\ListMyArchivedFlights;
 use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\Pages\ListMyCompletedFlights;
@@ -13,7 +16,7 @@ use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Shared\Resources\Flights\Pages\EditFlight;
 use App\Models\Flight;
 use App\Models\User;
-use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -47,8 +50,10 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         ]);
 
         $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
             'license_number' => 'LIC-123',
             'ratings' => 'IR',
+            'license_expiry_date' => now('Asia/Manila')->addYear()->toDateString(),
             'operator' => 'RPUS',
         ]);
 
@@ -83,6 +88,147 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             ->get(route('filament.pilot.resources.flights.create'))
             ->assertOk()
             ->assertDontSeeText((string) $pendingFlight->aircraft_identification);
+    }
+
+    public function test_pilot_form_defaults_to_verified_profile_credentials(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, [
+            'first_name' => 'Verified',
+            'middle_name' => null,
+            'last_name' => 'Pilot',
+            'suffix' => null,
+        ]);
+        $profile = $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '123456',
+            'license_expiry_date' => now('Asia/Manila')->addYear()->toDateString(),
+        ]);
+        $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::AircraftRating,
+            'code' => 'C172',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->assertFormSet([
+                'pilot_in_command' => 'Verified Pilot',
+                'pilot_license_no' => 'CPL-123456',
+                'pilot_ratings' => 'C172',
+                'license_expiry_date' => $profile->license_expiry_date->toDateString(),
+            ]);
+    }
+
+    public function test_pilot_cannot_override_verified_credential_snapshot_on_submit(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, [
+            'first_name' => 'Verified',
+            'middle_name' => null,
+            'last_name' => 'Pilot',
+            'suffix' => null,
+        ]);
+        $licenseExpiryDate = now('Asia/Manila')->addYear()->toDateString();
+        $profile = $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '123456',
+            'ratings' => 'LEGACY',
+            'license_expiry_date' => $licenseExpiryDate,
+        ]);
+        $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::InstrumentRating,
+            'code' => 'IR',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->fillForm($this->validFlightPlanFormData([
+                'pilot_in_command' => 'FORGED NAME',
+                'pilot_license_no' => 'FORGED-LICENSE',
+                'pilot_ratings' => 'FORGED',
+                'license_expiry_date' => now('Asia/Manila')->addYears(10)->toDateString(),
+            ]))
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $flight = Flight::latest('id')->firstOrFail();
+
+        $this->assertSame('VERIFIED PILOT', $flight->pilot_in_command);
+        $this->assertSame('CPL-123456', $flight->pilot_license_no);
+        $this->assertSame('IR', $flight->pilot_ratings);
+        $this->assertSame($licenseExpiryDate, $flight->license_expiry_date);
+    }
+
+    public function test_pilot_license_expiry_before_date_of_flight_blocks_filing(): void
+    {
+        $pilot = $this->user(UserRole::Pilot);
+        $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '123456',
+            'license_expiry_date' => now('Asia/Manila')->toDateString(),
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->fillForm($this->validFlightPlanFormData([
+                'date_of_flight' => now('Asia/Manila')->addDay()->toDateString(),
+            ]))
+            ->call('create')
+            ->assertHasFormErrors(['license_expiry_date']);
+    }
+
+    public function test_stored_flight_keeps_original_credential_snapshot_after_profile_changes(): void
+    {
+        $pilot = $this->user(UserRole::Pilot);
+        $profile = $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot,
+            'license_number' => '123456',
+            'license_expiry_date' => now('Asia/Manila')->addYear()->toDateString(),
+        ]);
+        $profile->qualifications()->create([
+            'category' => PilotQualificationCategory::AircraftRating,
+            'code' => 'C172',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->fillForm($this->validFlightPlanFormData())
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $flight = Flight::latest('id')->firstOrFail();
+
+        $profile->update([
+            'license_type' => PilotLicenseType::AirlineTransportPilot,
+            'license_number' => '999999',
+        ]);
+        $profile->qualifications()->update(['code' => 'C208']);
+
+        $flight->refresh();
+
+        $this->assertSame('CPL-123456', $flight->pilot_license_no);
+        $this->assertSame('C172', $flight->pilot_ratings);
+    }
+
+    public function test_admin_operational_create_keeps_manual_pilot_credentials_available(): void
+    {
+        $admin = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
+
+        Filament::setCurrentPanel('atmo');
+
+        Livewire::actingAs($admin)
+            ->test(\App\Filament\Panels\Atmo\Resources\Flights\Pages\CreateFlight::class)
+            ->fillForm($this->validFlightPlanFormData([
+                'pilot_in_command' => 'OPS PILOT',
+                'pilot_license_no' => 'OPS-123',
+                'pilot_ratings' => 'OPS',
+            ]))
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('flights', [
+            'pilot_in_command' => 'OPS PILOT',
+            'pilot_license_no' => 'OPS-123',
+            'pilot_ratings' => 'OPS',
+        ]);
     }
 
     public function test_pilot_cannot_forge_a_livewire_update_request_for_a_submitted_flight(): void
@@ -441,7 +587,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function validFlightPlanFormData(): array
+    private function validFlightPlanFormData(array $overrides = []): array
     {
         $date = now('Asia/Manila')->addDay();
 
@@ -471,6 +617,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             'license_expiry_date' => $date->addYear()->toDateString(),
             'dinghies_enabled' => false,
             'authorized_representative_enabled' => false,
+            ...$overrides,
         ];
     }
 }
