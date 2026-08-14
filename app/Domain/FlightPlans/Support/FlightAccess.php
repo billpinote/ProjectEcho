@@ -22,6 +22,11 @@ class FlightAccess
             return self::operatorMatches($user, $flight);
         }
 
+        if ($user->isOperatorStaff()) {
+            return $flight->prepared_by_user_id !== null
+                && (int) $flight->prepared_by_user_id === (int) $user->getKey();
+        }
+
         return true;
     }
 
@@ -61,6 +66,10 @@ class FlightAccess
             }
 
             return $query->where('operator_id', $user->operator_id);
+        }
+
+        if ($user->isOperatorStaff()) {
+            return $query->where('prepared_by_user_id', $user->getKey());
         }
 
         return $query;

@@ -76,6 +76,7 @@ class UserPanelAccessTest extends TestCase
             'pilot' => ['pilot', UserRole::Pilot],
             'atmo' => ['atmo', UserRole::Atmo],
             'dispatch' => ['dispatch', UserRole::Dispatch],
+            'operator staff' => ['dispatch', UserRole::OperatorStaff],
             'avsec' => ['avsec', UserRole::Avsec],
             'ats' => ['ats', UserRole::AtsHq],
         ];

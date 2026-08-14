@@ -14,7 +14,7 @@ class AuthenticatedOperatorFlightData
     {
         unset($data['operator_id']);
 
-        if (! $user?->isPilot() && ! $user?->isDispatch()) {
+        if (! $user?->isPilot() && ! $user?->isDispatch() && ! $user?->isOperatorStaff()) {
             return $data;
         }
 

@@ -32,6 +32,11 @@ class Operator extends Model
         return $this->hasMany(User::class);
     }
 
+    public function operatorStaffProfiles(): HasMany
+    {
+        return $this->hasMany(OperatorStaffProfile::class);
+    }
+
     public function flights(): HasMany
     {
         return $this->hasMany(Flight::class);

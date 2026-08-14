@@ -48,8 +48,8 @@ class CreateFlight extends CreateRecord
         if ($user !== null) {
             $data['filed_by_user_id'] = $user->id;
             $data['prepared_by_user_id'] = $user->id;
-            $data['prepared_by_name'] = trim((string) $user->fullName()) ?: $user->email;
-            $data['prepared_by_role'] = $user->role?->value;
+            $data['prepared_by_name'] = $user->preparedByNameSnapshot();
+            $data['prepared_by_role'] = $user->preparedByRoleSnapshot();
         }
 
         $data = AuthenticatedOperatorFlightData::apply($data, $user);

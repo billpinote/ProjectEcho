@@ -10,6 +10,7 @@ enum UserRole: string
     case AtsHq = 'ATSHQ';
     case Avsec = 'AVSEC';
     case Dispatch = 'DISPATCH';
+    case OperatorStaff = 'OPERATOR_STAFF';
     case Pilot = 'PILOT';
 
     /**
@@ -33,6 +34,7 @@ enum UserRole: string
 
         return match ($value) {
             'ATC' => self::Atmo,
+            'OPERATORSTAFF', 'OPERATOR STAFF' => self::OperatorStaff,
             default => self::tryFrom($value),
         };
     }
@@ -46,6 +48,7 @@ enum UserRole: string
             self::AtsHq => 'ATSHQ',
             self::Avsec => 'AVSEC',
             self::Dispatch => 'Dispatch',
+            self::OperatorStaff => 'Operator Staff',
             self::Pilot => 'Pilot',
         };
     }

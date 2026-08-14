@@ -196,6 +196,32 @@ class UserResource extends Resource
                         ->rows(3)
                         ->columnSpanFull(),
                 ]),
+            Section::make('Operator Staff Profile')
+                ->columns(2)
+                ->columnSpanFull()
+                ->visible(fn (Get $get): bool => $get('role') === UserRole::OperatorStaff->value)
+                ->schema([
+                    TextInput::make('operator_staff_position_title')
+                        ->label('Position Title')
+                        ->maxLength(255),
+                    TextInput::make('operator_staff_company_employee_id')
+                        ->label('Company Employee ID')
+                        ->maxLength(255),
+                    TextInput::make('operator_staff_authorization_reference')
+                        ->label('Authorization Reference')
+                        ->maxLength(255),
+                    DatePicker::make('operator_staff_authorization_expiry_date')
+                        ->label('Authorization Expiry Date')
+                        ->native(false)
+                        ->displayFormat('F j, Y'),
+                    Toggle::make('operator_staff_is_authorized')
+                        ->label('Authorized')
+                        ->default(true),
+                    Textarea::make('operator_staff_remarks')
+                        ->label('Remarks')
+                        ->rows(3)
+                        ->columnSpanFull(),
+                ]),
             Section::make('ATC Profile')
                 ->columns(2)
                 ->columnSpanFull()

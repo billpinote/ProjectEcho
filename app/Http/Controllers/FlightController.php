@@ -474,8 +474,8 @@ class FlightController extends Controller
 
         $flightData['filed_by_user_id'] = $user->id;
         $flightData['prepared_by_user_id'] = $user->id;
-        $flightData['prepared_by_name'] = trim((string) $user->fullName()) ?: $user->email;
-        $flightData['prepared_by_role'] = $user->role?->value;
+        $flightData['prepared_by_name'] = $user->preparedByNameSnapshot();
+        $flightData['prepared_by_role'] = $user->preparedByRoleSnapshot();
 
         if ($user->isPilot()) {
             $flightData['user_id'] = $user->id;

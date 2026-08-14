@@ -119,6 +119,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasOne(DispatchProfile::class);
     }
 
+    public function operatorStaffProfile(): HasOne
+    {
+        return $this->hasOne(OperatorStaffProfile::class);
+    }
+
     public function avsecProfile(): HasOne
     {
         return $this->hasOne(AvsecProfile::class);
@@ -208,6 +213,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->role === UserRole::Dispatch;
     }
 
+    public function isOperatorStaff(): bool
+    {
+        return $this->role === UserRole::OperatorStaff;
+    }
+
     public function isAvsec(): bool
     {
         return $this->role === UserRole::Avsec;
@@ -235,7 +245,7 @@ class User extends Authenticatable implements FilamentUser
             'admin' => $this->role === UserRole::Admin,
             'pilot' => $this->role === UserRole::Pilot,
             'atmo' => $this->role === UserRole::Atmo && $this->canAccessFlightPanel(),
-            'dispatch' => $this->role === UserRole::Dispatch,
+            'dispatch' => in_array($this->role, [UserRole::Dispatch, UserRole::OperatorStaff], true),
             'avsec' => $this->role === UserRole::Avsec,
             'ats' => $this->role === UserRole::AtsHq,
             default => false,
@@ -250,6 +260,7 @@ class User extends Authenticatable implements FilamentUser
             UserRole::AtsHq,
             UserRole::Avsec,
             UserRole::Dispatch,
+            UserRole::OperatorStaff,
             UserRole::Pilot => true,
             UserRole::Atmo => $this->isRpusStation(),
             default => false,
@@ -277,6 +288,7 @@ class User extends Authenticatable implements FilamentUser
             && (
                 $this->hasFullFlightAccess()
                 || $this->role === UserRole::Dispatch
+                || $this->role === UserRole::OperatorStaff
                 || $this->role === UserRole::Pilot
             );
     }
@@ -322,6 +334,26 @@ class User extends Authenticatable implements FilamentUser
     private function isRpusStation(): bool
     {
         return strtoupper(trim((string) $this->station)) === 'RPUS';
+    }
+
+    public function preparedByNameSnapshot(): ?string
+    {
+        $name = trim((string) $this->fullName()) ?: trim((string) $this->display_name) ?: trim((string) $this->name) ?: trim((string) $this->email);
+
+        return $name === '' ? null : strtoupper($name);
+    }
+
+    public function preparedByRoleSnapshot(): ?string
+    {
+        if ($this->isOperatorStaff()) {
+            $position = trim((string) ($this->operatorStaffProfile?->position_title ?? ''));
+
+            return $position === '' ? UserRole::OperatorStaff->label() : strtoupper($position);
+        }
+
+        return $this->role instanceof UserRole
+            ? $this->role->value
+            : UserRole::normalize($this->role)?->value;
     }
 
     public function flights(): HasMany

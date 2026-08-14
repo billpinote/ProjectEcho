@@ -28,6 +28,12 @@ class UserAccountFormData
         'dispatch_mobile_number',
         'dispatch_shift',
         'dispatch_remarks',
+        'operator_staff_position_title',
+        'operator_staff_company_employee_id',
+        'operator_staff_authorization_reference',
+        'operator_staff_authorization_expiry_date',
+        'operator_staff_is_authorized',
+        'operator_staff_remarks',
         'atc_wiresign',
         'atc_facility',
         'atc_position',
@@ -74,7 +80,7 @@ class UserAccountFormData
      */
     public static function fillProfileData(User $user, array $data): array
     {
-        $user->loadMissing(['pilotProfile', 'dispatchProfile', 'atcProfile', 'avsecProfile']);
+        $user->loadMissing(['pilotProfile', 'dispatchProfile', 'operatorStaffProfile', 'atcProfile', 'avsecProfile']);
 
         return [
             ...$data,
@@ -105,6 +111,12 @@ class UserAccountFormData
             'dispatch_mobile_number' => $user->dispatchProfile?->mobile_number,
             'dispatch_shift' => $user->dispatchProfile?->shift,
             'dispatch_remarks' => $user->dispatchProfile?->remarks,
+            'operator_staff_position_title' => $user->operatorStaffProfile?->position_title,
+            'operator_staff_company_employee_id' => $user->operatorStaffProfile?->company_employee_id,
+            'operator_staff_authorization_reference' => $user->operatorStaffProfile?->authorization_reference,
+            'operator_staff_authorization_expiry_date' => $user->operatorStaffProfile?->authorization_expiry_date?->toDateString(),
+            'operator_staff_is_authorized' => $user->operatorStaffProfile?->is_authorized ?? true,
+            'operator_staff_remarks' => $user->operatorStaffProfile?->remarks,
             'atc_wiresign' => $user->atcProfile?->wiresign,
             'atc_facility' => $user->atcProfile?->facility,
             'atc_position' => $user->atcProfile?->position,
@@ -143,6 +155,15 @@ class UserAccountFormData
                 'shift' => self::nullableString($profileData['dispatch_shift'] ?? null),
                 'remarks' => self::nullableString($profileData['dispatch_remarks'] ?? null),
             ], ['dispatcher_license_number', 'dispatcher_certificate', 'department', 'position', 'office_phone', 'mobile_number', 'shift', 'remarks']),
+            UserRole::OperatorStaff => self::syncOwnedProfile($user, $actor, 'operatorStaffProfile', [
+                'operator_id' => $user->operator_id,
+                'position_title' => self::nullableString($profileData['operator_staff_position_title'] ?? null),
+                'company_employee_id' => self::nullableString($profileData['operator_staff_company_employee_id'] ?? null),
+                'authorization_reference' => self::nullableString($profileData['operator_staff_authorization_reference'] ?? null),
+                'authorization_expiry_date' => ($profileData['operator_staff_authorization_expiry_date'] ?? null) ?: null,
+                'is_authorized' => (bool) ($profileData['operator_staff_is_authorized'] ?? true),
+                'remarks' => self::nullableString($profileData['operator_staff_remarks'] ?? null),
+            ], ['operator_id', 'position_title', 'company_employee_id', 'authorization_reference', 'authorization_expiry_date', 'is_authorized', 'remarks']),
             UserRole::Atmo, UserRole::AtsHq => self::syncOwnedProfile($user, $actor, 'atcProfile', [
                 'wiresign' => self::nullableString($profileData['atc_wiresign'] ?? $user->wiresign),
                 'facility' => self::nullableString($profileData['atc_facility'] ?? null),

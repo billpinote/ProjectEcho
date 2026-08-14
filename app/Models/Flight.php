@@ -404,6 +404,10 @@ class Flight extends Model
 
     public function requiresPicAuthorization(): bool
     {
+        if ($this->preparedBy?->isOperatorStaff()) {
+            return true;
+        }
+
         if ($this->prepared_by_user_id === null && $this->pilot_in_command_user_id === null) {
             return false;
         }
