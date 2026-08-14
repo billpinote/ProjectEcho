@@ -10,6 +10,7 @@ use App\Models\Operator;
 use App\Models\User;
 use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -56,6 +57,28 @@ class OperatorStaffSupportTest extends TestCase
         $this->assertFalse($staff->canUpdateFlightStartUpTime());
         $this->assertFalse($staff->can('accept', $flight));
         $this->assertFalse($staff->can('reject', $flight));
+    }
+
+    public function test_operator_staff_can_access_create_page_without_pending_atc_list(): void
+    {
+        $staff = $this->user(UserRole::OperatorStaff);
+
+        $this->assertTrue(Route::has('filament.dispatch.resources.flights.create'));
+        $this->assertFalse(Route::has('filament.dispatch.resources.flights.index'));
+
+        $this->actingAs($staff)
+            ->get('/dispatch')
+            ->assertOk()
+            ->assertSeeText('Create Flight Plan')
+            ->assertDontSeeText('Pending Flight Plans');
+
+        $this->actingAs($staff)
+            ->get(route('filament.dispatch.resources.flights.create'))
+            ->assertOk();
+
+        $this->actingAs($staff)
+            ->get('/dispatch/flights')
+            ->assertNotFound();
     }
 
     public function test_operator_staff_profile_relationships_resolve_user_and_operator(): void

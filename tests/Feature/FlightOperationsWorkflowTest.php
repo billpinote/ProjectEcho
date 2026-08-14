@@ -105,6 +105,7 @@ class FlightOperationsWorkflowTest extends TestCase
             ->assertSeeText('Active Flights')
             ->assertSeeText('Landed Flights')
             ->assertSeeText('Completed Flights')
+            ->assertDontSeeText('Create Flight Plan')
             ->assertDontSeeText('QR Import')
             ->assertDontSeeText('Pending Flight Plans')
             ->assertDontSeeText('Airborne Flights')
@@ -311,28 +312,28 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->assertTrue(Flight::query()->ready()->whereKey($flight)->exists());
 
         $this->actingAs($dispatch);
-        (new ListAcceptedFlights())->confirmStartUpNow($flight->id);
+        (new ListAcceptedFlights)->confirmStartUpNow($flight->id);
         $flight->refresh();
         $this->assertNotNull($flight->time_start_up);
         $this->assertTrue(Flight::query()->active()->whereKey($flight)->exists());
 
-        (new ListAcceptedFlights())->confirmBlockOffNow($flight->id);
+        (new ListAcceptedFlights)->confirmBlockOffNow($flight->id);
         $flight->refresh();
         $this->assertNotNull($flight->time_block_off);
 
         $this->actingAs($atmo);
-        (new ListActiveFlights())->confirmAirborneNow($flight->id);
+        (new ListActiveFlights)->confirmAirborneNow($flight->id);
         $flight->refresh();
         $this->assertNotNull($flight->time_airborne);
         $this->assertTrue(Flight::query()->airborne()->whereKey($flight)->exists());
 
-        (new ListAirborneFlights())->confirmTouchdownNow($flight->id);
+        (new ListAirborneFlights)->confirmTouchdownNow($flight->id);
         $flight->refresh();
         $this->assertNotNull($flight->time_touchdown);
         $this->assertTrue(Flight::query()->landed()->whereKey($flight)->exists());
 
         $this->actingAs($dispatch);
-        (new ListLandedFlights())->confirmShutdownNow($flight->id);
+        (new ListLandedFlights)->confirmShutdownNow($flight->id);
         $flight->refresh();
         $this->assertNotNull($flight->time_shutdown);
         $this->assertTrue(CompletedFlightResource::getEloquentQuery()->whereKey($flight)->exists());
