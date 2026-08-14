@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             ChuckLuatSeeder::class,
             DemoUsersSeeder::class,
             PilotProfileSeeder::class,
+            StudentPilotSeeder::class,
             OperatorStaffSeeder::class,
             AtcProfileSeeder::class,
             AvsecProfileSeeder::class,
