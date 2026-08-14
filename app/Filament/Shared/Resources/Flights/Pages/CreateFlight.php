@@ -2,8 +2,9 @@
 
 namespace App\Filament\Shared\Resources\Flights\Pages;
 
-use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
+use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use Filament\Actions\Action;
@@ -11,6 +12,7 @@ use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Validation\ValidationException;
 
 class CreateFlight extends CreateRecord
 {
@@ -50,14 +52,17 @@ class CreateFlight extends CreateRecord
         $data = AuthenticatedOperatorFlightData::apply($data, $user);
 
         if ($user?->isPilot()) {
-            $pilotProfile = $user->pilotProfile()->first();
+            $messages = PilotFlightPlanCredentials::validationMessages($user, $data['date_of_flight'] ?? null);
 
-            $data['user_id'] = $user->id;
-            $data['pilot_id'] = $user->id;
-            $data['pilot_in_command'] = $user->fullName();
-            $data['pilot_license_no'] = $pilotProfile?->license_number ?: $data['pilot_license_no'] ?? null;
-            $data['pilot_ratings'] = $pilotProfile?->ratings ?: $data['pilot_ratings'] ?? null;
-            $data['license_expiry_date'] = $pilotProfile?->license_expiry_date?->toDateString() ?: $data['license_expiry_date'] ?? null;
+            if ($messages !== []) {
+                throw ValidationException::withMessages(
+                    collect($messages)
+                        ->mapWithKeys(fn (string $message, string $field): array => ["data.{$field}" => $message])
+                        ->all()
+                );
+            }
+
+            $data = PilotFlightPlanCredentials::applySnapshot($data, $user);
         }
 
         return FlightResource::normalizeFormData($data);
