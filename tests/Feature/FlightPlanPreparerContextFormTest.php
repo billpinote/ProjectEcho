@@ -156,6 +156,31 @@ class FlightPlanPreparerContextFormTest extends TestCase
             ->assertDontSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.');
     }
 
+    public function test_pending_pic_alert_remains_condition_driven_across_fresh_renders(): void
+    {
+        Filament::setCurrentPanel('dispatch');
+
+        $operator = Operator::factory()->create();
+        $staff = $this->user(UserRole::OperatorStaff, [
+            'operator_id' => $operator->id,
+        ]);
+        $staff->operatorStaffProfile()->create([
+            'operator_id' => $operator->id,
+        ]);
+
+        Livewire::actingAs($staff)
+            ->test(DispatchCreateFlight::class)
+            ->assertSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
+            ->assertSee('data-caap-pending-pic-dismiss', false)
+            ->assertDontSee('localStorage', false)
+            ->assertDontSee('sessionStorage', false);
+
+        Livewire::actingAs($staff)
+            ->test(DispatchCreateFlight::class)
+            ->assertSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
+            ->assertSee('data-caap-pending-pic-dismiss', false);
+    }
+
     public function test_non_pic_preparer_create_records_snapshots_and_requires_pic_authorization(): void
     {
         Filament::setCurrentPanel('dispatch');

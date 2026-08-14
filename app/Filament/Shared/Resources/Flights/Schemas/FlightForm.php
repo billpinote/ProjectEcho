@@ -1255,28 +1255,6 @@ class FlightForm
                     if (alert) {
                         alert.hidden = true;
                     }
-
-                    try {
-                        window.localStorage.setItem('echo.pendingPicNoticeDismissed', '1');
-                    } catch (error) {
-                        //
-                    }
-                });
-
-                document.addEventListener('DOMContentLoaded', () => {
-                    try {
-                        if (window.localStorage.getItem('echo.pendingPicNoticeDismissed') !== '1') {
-                            return;
-                        }
-                    } catch (error) {
-                        return;
-                    }
-
-                    document
-                        .querySelectorAll('[data-caap-pending-pic-alert]')
-                        .forEach((alert) => {
-                            alert.hidden = true;
-                        });
                 });
             </script>
         HTML;
