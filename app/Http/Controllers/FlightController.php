@@ -7,6 +7,7 @@ use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
+use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
@@ -472,12 +473,10 @@ class FlightController extends Controller
             403
         );
 
-        $flightData['filed_by_user_id'] = $user->id;
-        $flightData['prepared_by_user_id'] = $user->id;
-        $flightData['prepared_by_name'] = $user->preparedByNameSnapshot();
-        $flightData['prepared_by_role'] = $user->preparedByRoleSnapshot();
+        $preparerContext = FlightPlanPreparerContext::for($user, $flightData);
+        $flightData = $preparerContext->applyToFlightData($flightData);
 
-        if ($user->isPilot()) {
+        if ($preparerContext->preparerActsAsPic()) {
             $flightData['user_id'] = $user->id;
             $flightData['pilot_id'] = $flightData['pilot_id'] ?? $user->id;
             $flightData['pilot_in_command_user_id'] = $flightData['pilot_in_command_user_id'] ?? $user->id;

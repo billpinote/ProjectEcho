@@ -4,6 +4,7 @@ namespace App\Filament\Shared\Resources\Flights\Pages;
 
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
+use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
@@ -44,17 +45,12 @@ class CreateFlight extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $user = auth()->user();
-
-        if ($user !== null) {
-            $data['filed_by_user_id'] = $user->id;
-            $data['prepared_by_user_id'] = $user->id;
-            $data['prepared_by_name'] = $user->preparedByNameSnapshot();
-            $data['prepared_by_role'] = $user->preparedByRoleSnapshot();
-        }
+        $preparerContext = FlightPlanPreparerContext::for($user, $data);
+        $data = $preparerContext->applyToFlightData($data);
 
         $data = AuthenticatedOperatorFlightData::apply($data, $user);
 
-        if ($user?->isPilot()) {
+        if ($user?->isPilot() && $preparerContext->preparerActsAsPic()) {
             $messages = PilotFlightPlanCredentials::validationMessages($user, $data['date_of_flight'] ?? null);
 
             if ($messages !== []) {

@@ -11,6 +11,7 @@ use App\Domain\FlightPlans\Rules\IcaoFlightRules;
 use App\Domain\FlightPlans\Rules\IcaoTypeOfFlight;
 use App\Domain\FlightPlans\Rules\IcaoWakeTurbulenceCategory;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
@@ -79,7 +80,7 @@ class FlightForm
                                             ->rule(new FlightScheduleNotInPast)
                                             ->live()
                                             ->afterStateUpdated(function (Get $get, Set $set, mixed $state): mixed {
-                                                self::syncPilotCredentials($set, $state);
+                                                self::syncPilotCredentials($get, $set, $state);
 
                                                 return self::syncDofTag($get, $set, $state);
                                             })
@@ -234,36 +235,62 @@ class FlightForm
                                         self::text('aircraft_colour_and_markings', 'Aircraft Colour and Markings', 8),
                                         self::text('remarks', 'Remarks', 8),
 
+                                        self::select('filing_capacity', 'Filing Capacity', [
+                                            FlightPlanPreparerContext::CAPACITY_SELF_PIC => 'I am the Pilot-in-Command',
+                                            FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC => 'I am preparing this flight plan for another PIC',
+                                        ], 3)
+                                            ->default(FlightPlanPreparerContext::CAPACITY_SELF_PIC)
+                                            ->visible(fn (): bool => Auth::user()?->isPilot() ?? false)
+                                            ->live()
+                                            ->afterStateUpdated(fn (Get $get, Set $set, mixed $state): null => self::syncPreparerContext($get, $set)),
+                                        self::spacer(5),
+
+                                        Html::make(fn (Get $get): string => self::pendingPicNotice($get))
+                                            ->visible(fn (Get $get): bool => self::preparerContext($get)->isPreparingForAnotherPic())
+                                            ->columnSpan(8),
+
                                         self::text('pilot_in_command', 'Pilot In Command', 4)
                                             ->default(fn (): ?string => self::pilotNameDefault())
-                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
-                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
+                                            ->placeholder(fn (Get $get): ?string => self::picCredentialPlaceholder($get))
+                                            ->readOnly(fn (Get $get): bool => self::locksPicQualificationFields($get) || self::usesVerifiedPilotCredentials($get))
+                                            ->extraInputAttributes(fn (Get $get): array => self::verifiedPilotInputAttributes($get))
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('pilot_license_no', 'Lic. No.', 1)
                                             ->default(fn (): ?string => self::pilotLicenseDefault())
-                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
-                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
+                                            ->placeholder(fn (Get $get): ?string => self::picCredentialPlaceholder($get))
+                                            ->readOnly(fn (Get $get): bool => self::locksPicQualificationFields($get) || self::usesVerifiedPilotCredentials($get))
+                                            ->extraInputAttributes(fn (Get $get): array => self::verifiedPilotInputAttributes($get))
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('pilot_ratings', 'Pilot Ratings', 2)
                                             ->default(fn (): ?string => self::pilotRatingsDefault())
-                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
-                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
+                                            ->placeholder(fn (Get $get): ?string => self::picCredentialPlaceholder($get))
+                                            ->readOnly(fn (Get $get): bool => self::locksPicQualificationFields($get) || self::usesVerifiedPilotCredentials($get))
+                                            ->extraInputAttributes(fn (Get $get): array => self::verifiedPilotInputAttributes($get))
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::date('license_expiry_date', 'Expiry Date', 1)
                                             ->default(fn (): ?string => self::pilotLicenseExpiryDefault())
-                                            ->readOnly(fn (): bool => self::usesVerifiedPilotCredentials())
-                                            ->extraInputAttributes(fn (): array => self::verifiedPilotInputAttributes())
+                                            ->readOnly(fn (Get $get): bool => self::locksPicQualificationFields($get) || self::usesVerifiedPilotCredentials($get))
+                                            ->extraInputAttributes(fn (Get $get): array => self::verifiedPilotInputAttributes($get))
                                             ->live()
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
 
                                         Checkbox::make('authorized_representative_enabled')
                                             ->label('Filed by Dispatch / Authorized Representative')
                                             ->inline()
+                                            ->default(fn (): bool => self::preparerContext()->shouldAutoEnableAuthorizedRepresentative())
+                                            ->disabled(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
+                                            ->dehydrated(true)
                                             ->live()
-                                            ->afterStateUpdated(function (Set $set, mixed $state): void {
+                                            ->afterStateUpdated(function (Get $get, Set $set, mixed $state): void {
+                                                if (self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields()) {
+                                                    self::syncRepresentativeFields($set, self::preparerContext($get));
+
+                                                    return;
+                                                }
+
                                                 if ($state) {
                                                     return;
                                                 }
@@ -275,20 +302,32 @@ class FlightForm
                                             ->extraAttributes(['class' => 'caap-dispatch-checkbox'])
                                             ->columnSpan(8),
                                         self::text('authorized_representative_name', 'Representative Name', 4)
+                                            ->default(fn (): ?string => self::preparerContext()->representativeName())
                                             ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
                                             ->required(fn (Get $get): bool => (bool) $get('authorized_representative_enabled'))
+                                            ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
+                                            ->extraInputAttributes(fn (Get $get): array => self::representativeInputAttributes($get))
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('authorized_representative_role', 'Role', 2)
-                                            ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled')),
+                                            ->default(fn (): ?string => self::preparerContext()->representativeRole())
+                                            ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
+                                            ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
+                                            ->extraInputAttributes(fn (Get $get): array => self::representativeInputAttributes($get)),
                                         self::text('authorized_representative_id_license', 'ID/License', 1)
+                                            ->default(fn (): ?string => self::preparerContext()->representativeIdOrLicense())
                                             ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
                                             ->required(fn (Get $get): bool => (bool) $get('authorized_representative_enabled'))
+                                            ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
+                                            ->extraInputAttributes(fn (Get $get): array => self::representativeInputAttributes($get))
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::date('authorized_representative_expiry_date', 'Expiry Date', 1)
+                                            ->default(fn (): ?string => self::preparerContext()->representativeAuthorizationExpiry())
                                             ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
-                                            ->required(fn (Get $get): bool => (bool) $get('authorized_representative_enabled'))
+                                            ->required(fn (Get $get): bool => (bool) $get('authorized_representative_enabled') && ! self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
+                                            ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
+                                            ->extraInputAttributes(fn (Get $get): array => self::representativeInputAttributes($get))
                                             ->live()
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
 
@@ -358,11 +397,11 @@ class FlightForm
         return PilotFlightPlanCredentials::forUser($user, $dateOfFlight);
     }
 
-    private static function syncPilotCredentials(Set $set, mixed $dateOfFlight): void
+    private static function syncPilotCredentials(Get $get, Set $set, mixed $dateOfFlight): void
     {
         $user = Auth::user();
 
-        if (! $user?->isPilot()) {
+        if (! $user?->isPilot() || self::preparerContext($get)->isPreparingForAnotherPic()) {
             return;
         }
 
@@ -374,19 +413,87 @@ class FlightForm
         $set('license_expiry_date', $credentials['license_expiry_date']);
     }
 
-    private static function usesVerifiedPilotCredentials(): bool
+    private static function usesVerifiedPilotCredentials(?Get $get = null): bool
     {
-        return Auth::user()?->isPilot() ?? false;
+        return (Auth::user()?->isPilot() ?? false)
+            && ! self::preparerContext($get)->isPreparingForAnotherPic();
     }
 
     /**
      * @return array<string, string>
      */
-    private static function verifiedPilotInputAttributes(): array
+    private static function verifiedPilotInputAttributes(?Get $get = null): array
     {
-        return self::usesVerifiedPilotCredentials()
+        return self::usesVerifiedPilotCredentials($get) || self::locksPicQualificationFields($get)
             ? ['class' => 'caap-control caap-readonly-control']
             : ['class' => 'caap-control'];
+    }
+
+    private static function locksPicQualificationFields(?Get $get = null): bool
+    {
+        return self::preparerContext($get)->shouldLockPicQualificationFields();
+    }
+
+    private static function picCredentialPlaceholder(Get $get): ?string
+    {
+        return self::locksPicQualificationFields($get) ? 'Awaiting PIC identification' : null;
+    }
+
+    private static function pendingPicNotice(Get $get): string
+    {
+        if (! self::preparerContext($get)->isPreparingForAnotherPic()) {
+            return '';
+        }
+
+        return '<div class="caap-pending-pic-notice">Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.</div>';
+    }
+
+    private static function representativeInputAttributes(Get $get): array
+    {
+        return self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields()
+            ? ['class' => 'caap-control caap-readonly-control']
+            : ['class' => 'caap-control'];
+    }
+
+    private static function syncPreparerContext(Get $get, Set $set): null
+    {
+        $context = self::preparerContext($get);
+
+        if ($context->isPreparingForAnotherPic()) {
+            foreach (['pilot_in_command', 'pilot_license_no', 'pilot_ratings', 'license_expiry_date'] as $field) {
+                $set($field, null);
+            }
+
+            $set('authorized_representative_enabled', true);
+            self::syncRepresentativeFields($set, $context);
+
+            return null;
+        }
+
+        $set('authorized_representative_enabled', false);
+
+        foreach (['authorized_representative_name', 'authorized_representative_role', 'authorized_representative_id_license', 'authorized_representative_expiry_date'] as $field) {
+            $set($field, null);
+        }
+
+        self::syncPilotCredentials($get, $set, $get('date_of_flight'));
+
+        return null;
+    }
+
+    private static function syncRepresentativeFields(Set $set, FlightPlanPreparerContext $context): void
+    {
+        $set('authorized_representative_name', $context->representativeName());
+        $set('authorized_representative_role', $context->representativeRole());
+        $set('authorized_representative_id_license', $context->representativeIdOrLicense());
+        $set('authorized_representative_expiry_date', $context->representativeAuthorizationExpiry());
+    }
+
+    private static function preparerContext(?Get $get = null): FlightPlanPreparerContext
+    {
+        return FlightPlanPreparerContext::for(Auth::user(), [
+            'filing_capacity' => $get?->__invoke('filing_capacity'),
+        ]);
     }
 
     private static function pilotOtherInformationDefaults(): ?string
@@ -972,6 +1079,17 @@ class FlightForm
 
                 .caap-dispatch-checkbox {
                     margin-top: 0.0rem;
+                }
+
+                .caap-pending-pic-notice {
+                    border: 1px solid var(--color-echo-border);
+                    border-radius: 0.85rem;
+                    padding: 0.75rem 1rem;
+                    background: color-mix(in srgb, var(--color-echo-background) 84%, white);
+                    color: var(--color-echo-text-secondary);
+                    font-size: var(--text-echo-body);
+                    font-weight: 600;
+                    text-transform: none;
                 }
 
                 .caap-dispatch-checkbox .fi-fo-checkbox {
