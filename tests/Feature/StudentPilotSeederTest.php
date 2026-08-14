@@ -89,6 +89,8 @@ class StudentPilotSeederTest extends TestCase
                 'authorized_representative_enabled' => true,
                 'authorized_representative_name' => 'JUAN DELA CRUZ',
                 'authorized_representative_role' => 'PILOT',
+                'authorized_representative_id_license' => 'SPL-SPL-DEV-001',
+                'authorized_representative_expiry_date' => '2028-12-31',
                 'pilot_in_command' => null,
                 'pilot_license_no' => null,
                 'pilot_ratings' => null,
@@ -120,6 +122,8 @@ class StudentPilotSeederTest extends TestCase
         $this->assertNull($flight->license_expiry_date);
         $this->assertTrue($flight->authorized_representative_enabled);
         $this->assertSame('JUAN DELA CRUZ', $flight->authorized_representative_name);
+        $this->assertSame('SPL-SPL-DEV-001', $flight->authorized_representative_id_license);
+        $this->assertSame('2028-12-31', $flight->authorized_representative_expiry_date);
         $this->assertTrue($flight->requiresPicAuthorization());
         $this->assertFalse($flight->canSubmitToAtc());
     }

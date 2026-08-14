@@ -115,6 +115,14 @@ class FlightPlanPreparerContext
             ]);
         }
 
+        if ($this->preparer?->isPilot()) {
+            return $this->firstFilled([
+                $this->preparer->pilotProfile?->formattedLicense(),
+                $this->preparer->employee_id,
+                $this->preparer->username,
+            ]);
+        }
+
         return $this->firstFilled([
             $this->preparer?->employee_id,
             $this->preparer?->username,
@@ -125,6 +133,10 @@ class FlightPlanPreparerContext
     {
         if ($this->preparer?->isOperatorStaff()) {
             return $this->preparer->operatorStaffProfile?->authorization_expiry_date?->toDateString();
+        }
+
+        if ($this->preparer?->isPilot()) {
+            return $this->preparer->pilotProfile?->license_expiry_date?->toDateString();
         }
 
         return null;

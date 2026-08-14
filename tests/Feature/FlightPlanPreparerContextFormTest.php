@@ -131,6 +131,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'authorized_representative_enabled' => true,
                 'authorized_representative_name' => 'VERIFIED PILOT',
                 'authorized_representative_role' => 'PILOT',
+                'authorized_representative_id_license' => 'CPL-123456',
+                'authorized_representative_expiry_date' => '2028-12-31',
                 'pilot_in_command' => null,
                 'pilot_license_no' => null,
                 'pilot_ratings' => null,
@@ -255,6 +257,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
         $this->assertNull($flight->pilot_license_no);
         $this->assertTrue($flight->authorized_representative_enabled);
         $this->assertSame('VERIFIED PILOT', $flight->authorized_representative_name);
+        $this->assertSame('CPL-123456', $flight->authorized_representative_id_license);
+        $this->assertSame('2028-12-31', $flight->authorized_representative_expiry_date);
         $this->assertTrue($flight->requiresPicAuthorization());
         $this->assertFalse($flight->canSubmitToAtc());
     }
