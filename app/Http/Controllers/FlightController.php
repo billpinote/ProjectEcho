@@ -3,14 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Http\Requests\StoreFlightPlanRequest;
-use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
-use App\Domain\FlightPlans\Services\FlightPlanMutationService;
-use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Models\Flight;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
@@ -473,10 +473,14 @@ class FlightController extends Controller
         );
 
         $flightData['filed_by_user_id'] = $user->id;
+        $flightData['prepared_by_user_id'] = $user->id;
+        $flightData['prepared_by_name'] = trim((string) $user->fullName()) ?: $user->email;
+        $flightData['prepared_by_role'] = $user->role?->value;
 
         if ($user->isPilot()) {
             $flightData['user_id'] = $user->id;
             $flightData['pilot_id'] = $flightData['pilot_id'] ?? $user->id;
+            $flightData['pilot_in_command_user_id'] = $flightData['pilot_in_command_user_id'] ?? $user->id;
         }
 
         $flightData = AuthenticatedOperatorFlightData::apply($flightData, $user);

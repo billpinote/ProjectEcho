@@ -134,6 +134,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Flight::class, 'filed_by_user_id');
     }
 
+    public function preparedFlights(): HasMany
+    {
+        return $this->hasMany(Flight::class, 'prepared_by_user_id');
+    }
+
     public function cancelledFlights(): HasMany
     {
         return $this->hasMany(Flight::class, 'cancelled_by_user_id');
@@ -142,6 +147,16 @@ class User extends Authenticatable implements FilamentUser
     public function pilotFlights(): HasMany
     {
         return $this->hasMany(Flight::class, 'pilot_id');
+    }
+
+    public function flightsAsPic(): HasMany
+    {
+        return $this->hasMany(Flight::class, 'pilot_in_command_user_id');
+    }
+
+    public function picAuthorizations(): HasMany
+    {
+        return $this->hasMany(Flight::class, 'pic_authorized_by_user_id');
     }
 
     public function fullName(): string

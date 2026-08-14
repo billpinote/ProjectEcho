@@ -52,11 +52,18 @@ class Flight extends Model
         'status' => FlightPlanStatus::class,
         'reviewed_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'pic_authorized_at' => 'datetime',
+        'pic_authorization_token_expires_at' => 'datetime',
+        'revision_number' => 'integer',
+        'pic_authorized_revision' => 'integer',
     ];
 
     protected $fillable = [
         'user_id',
         'filed_by_user_id',
+        'prepared_by_user_id',
+        'prepared_by_name',
+        'prepared_by_role',
         'operator_id',
         'time_start_up',
         'time_shutdown',
@@ -123,11 +130,19 @@ class Flight extends Model
         'remarks',
         'pilot_in_command',
         'pilot_id',
+        'pilot_in_command_user_id',
         'filed_by_name',
         'filed_by_signature',
         'pilot_license_no',
         'pilot_ratings',
         'license_expiry_date',
+        'pic_authorized_by_user_id',
+        'pic_authorized_at',
+        'pic_authorization_method',
+        'pic_authorization_token',
+        'pic_authorization_token_expires_at',
+        'revision_number',
+        'pic_authorized_revision',
         'authorized_representative_enabled',
         'authorized_representative_name',
         'authorized_representative_role',
@@ -164,6 +179,11 @@ class Flight extends Model
         return $this->belongsTo(User::class, 'filed_by_user_id');
     }
 
+    public function preparedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'prepared_by_user_id');
+    }
+
     public function operator(): BelongsTo
     {
         return $this->belongsTo(Operator::class);
@@ -182,6 +202,16 @@ class Flight extends Model
     public function pilot(): BelongsTo
     {
         return $this->belongsTo(User::class, 'pilot_id');
+    }
+
+    public function pilotInCommandUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pilot_in_command_user_id');
+    }
+
+    public function picAuthorizedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pic_authorized_by_user_id');
     }
 
     public function scopePendingActive(Builder $query): Builder
@@ -370,6 +400,71 @@ class Flight extends Model
         $this->forceFill([
             'reviewed_at' => now(),
         ])->saveQuietly();
+    }
+
+    public function requiresPicAuthorization(): bool
+    {
+        if ($this->prepared_by_user_id === null && $this->pilot_in_command_user_id === null) {
+            return false;
+        }
+
+        if ($this->pilot_in_command_user_id === null) {
+            return true;
+        }
+
+        if ($this->prepared_by_user_id === null) {
+            return true;
+        }
+
+        return (int) $this->prepared_by_user_id !== (int) $this->pilot_in_command_user_id;
+    }
+
+    public function isPicAuthorized(): bool
+    {
+        return $this->pic_authorized_by_user_id !== null && $this->pic_authorized_at !== null;
+    }
+
+    public function isPicAuthorizationCurrent(): bool
+    {
+        return $this->isPicAuthorized()
+            && $this->pic_authorized_revision !== null
+            && (int) $this->pic_authorized_revision === (int) ($this->revision_number ?? 1);
+    }
+
+    public function canSubmitToAtc(): bool
+    {
+        if (! $this->requiresPicAuthorization()) {
+            return true;
+        }
+
+        return $this->pilot_in_command_user_id !== null && $this->isPicAuthorizationCurrent();
+    }
+
+    public function invalidatePicAuthorization(): void
+    {
+        $this->forceFill([
+            'pic_authorized_by_user_id' => null,
+            'pic_authorized_at' => null,
+            'pic_authorization_method' => null,
+            'pic_authorization_token' => null,
+            'pic_authorization_token_expires_at' => null,
+            'pic_authorized_revision' => null,
+        ]);
+
+        if ($this->exists) {
+            $this->saveQuietly();
+        }
+    }
+
+    public function incrementRevisionNumber(): void
+    {
+        $this->forceFill([
+            'revision_number' => max(1, (int) ($this->revision_number ?? 1)) + 1,
+        ]);
+
+        if ($this->exists) {
+            $this->saveQuietly();
+        }
     }
 
     public static function hasReviewedAtColumn(): bool

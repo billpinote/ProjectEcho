@@ -59,6 +59,7 @@ class PilotFlightPlanCredentials
 
         $data['user_id'] = $user->id;
         $data['pilot_id'] = $user->id;
+        $data['pilot_in_command_user_id'] = $user->id;
         $data['pilot_in_command'] = $credentials['pilot_name'];
         $data['pilot_license_no'] = $credentials['license'];
         $data['pilot_ratings'] = $credentials['ratings'];

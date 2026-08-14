@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 
 enum FlightPlanStatus: string
 {
+    case AwaitingPic = 'awaiting_pic';
     case Pending = 'pending';
     case Accepted = 'accepted';
     case Active = 'active';
@@ -21,6 +22,7 @@ enum FlightPlanStatus: string
     public function filamentColor(): string
     {
         return match ($this) {
+            self::AwaitingPic => 'gray',
             self::Pending => 'warning',
             self::Accepted => 'success',
             self::Active => 'info',

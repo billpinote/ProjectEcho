@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Auth;
 
 final class FlightStatusDisplay
 {
+    public const AWAITING_PIC = 'awaiting_pic';
+
     public const PENDING = 'pending';
 
     public const ACCEPTED = 'accepted';
@@ -47,6 +49,10 @@ final class FlightStatusDisplay
 
         if ($flight->isPendingExpired()) {
             return self::EXPIRED;
+        }
+
+        if ($flight->status === FlightPlanStatus::AwaitingPic) {
+            return self::AWAITING_PIC;
         }
 
         if ($flight->status === FlightPlanStatus::Pending) {
@@ -126,6 +132,7 @@ final class FlightStatusDisplay
 
         if ($role === UserRole::Pilot) {
             return match ($status) {
+                self::AWAITING_PIC => 'Awaiting PIC',
                 self::PENDING => 'Awaiting Approval',
                 self::ACCEPTED => 'Approved',
                 self::STARTED => 'Preparing for Departure',
@@ -140,6 +147,7 @@ final class FlightStatusDisplay
         }
 
         return match ($status) {
+            self::AWAITING_PIC => 'Awaiting PIC',
             self::PENDING => 'Pending',
             self::ACCEPTED => 'Accepted',
             self::STARTED => 'Started',
@@ -163,6 +171,7 @@ final class FlightStatusDisplay
     public static function color(string $status): string
     {
         return match ($status) {
+            self::AWAITING_PIC => 'gray',
             self::PENDING => 'gray',
             self::ACCEPTED => 'slate',
             self::STARTED => 'indigo',
@@ -179,6 +188,7 @@ final class FlightStatusDisplay
     public static function icon(string $status): string
     {
         return match ($status) {
+            self::AWAITING_PIC => 'heroicon-o-user-circle',
             self::PENDING => 'heroicon-o-clock',
             self::ACCEPTED => 'heroicon-o-check',
             self::STARTED => 'heroicon-o-play',
@@ -194,7 +204,7 @@ final class FlightStatusDisplay
 
     public static function isOutlined(string $status): bool
     {
-        return $status === self::PENDING;
+        return in_array($status, [self::AWAITING_PIC, self::PENDING], true);
     }
 
     public static function tooltip(string $status, UserRole|string|null $viewerRole = null): string
@@ -203,6 +213,7 @@ final class FlightStatusDisplay
 
         if ($role === UserRole::Pilot) {
             return match ($status) {
+                self::AWAITING_PIC => 'This flight plan is waiting for Pilot-in-Command authorization.',
                 self::PENDING => 'Your flight plan is waiting for ATC review.',
                 self::ACCEPTED => 'Your flight plan has been approved.',
                 self::STARTED => 'Startup or block-off has been recorded.',
@@ -217,6 +228,7 @@ final class FlightStatusDisplay
         }
 
         return match ($status) {
+            self::AWAITING_PIC => 'Prepared and awaiting Pilot-in-Command authorization.',
             self::PENDING => 'Filed and awaiting review.',
             self::ACCEPTED => 'Accepted and awaiting startup or block-off.',
             self::STARTED => 'Startup or block-off recorded; not yet airborne.',
