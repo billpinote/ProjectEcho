@@ -246,7 +246,7 @@ class FlightForm
                                         self::spacer(5),
 
                                         Html::make(fn (Get $get): string => self::pendingPicNotice($get))
-                                            ->visible(fn (Get $get): bool => self::preparerContext($get)->isPreparingForAnotherPic())
+                                            ->visible(fn (Get $get): bool => self::shouldShowPendingPicAlert($get))
                                             ->columnSpan(8),
 
                                         self::text('pilot_in_command', 'Pilot In Command', 4)
@@ -441,16 +441,30 @@ class FlightForm
 
     private static function pendingPicNotice(Get $get): string
     {
-        if (! self::preparerContext($get)->isPreparingForAnotherPic()) {
+        if (! self::shouldShowPendingPicAlert($get)) {
             return '';
         }
 
         return '
-            <div class="caap-pending-pic-notice" data-caap-pending-pic-alert>
-                <span>Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.</span>
-                <button type="button" class="caap-pending-pic-notice__close" aria-label="Dismiss PIC identification notice" data-caap-pending-pic-dismiss>&times;</button>
+            <div class="fi-alert fi-color-warning caap-pending-pic-alert" role="alert" data-caap-pending-pic-alert>
+                <div class="caap-pending-pic-alert__icon" aria-hidden="true">!</div>
+                <div class="caap-pending-pic-alert__body">Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.</div>
+                <button type="button" class="caap-pending-pic-alert__close" aria-label="Dismiss PIC identification notice" data-caap-pending-pic-dismiss>&times;</button>
             </div>
         ';
+    }
+
+    private static function shouldShowPendingPicAlert(Get $get): bool
+    {
+        if (! self::preparerContext($get)->isPreparingForAnotherPic()) {
+            return false;
+        }
+
+        if (filled($get('pilot_in_command_user_id'))) {
+            return false;
+        }
+
+        return ! (filled($get('pic_authorized_by_user_id')) && filled($get('pic_authorized_at')));
     }
 
     private static function representativeInputAttributes(Get $get): array
@@ -1086,39 +1100,57 @@ class FlightForm
                     margin-top: 0.0rem;
                 }
 
-                .caap-pending-pic-notice {
+                .caap-pending-pic-alert {
                     display: flex;
                     align-items: center;
-                    justify-content: space-between;
-                    gap: 1rem;
-                    border: 1px solid var(--color-echo-border);
-                    border-radius: 0.85rem;
+                    gap: 0.75rem;
+                    border: 1px solid var(--color-200);
+                    border-radius: var(--radius-lg);
                     padding: 0.75rem 1rem;
-                    background: color-mix(in srgb, var(--color-echo-background) 84%, white);
-                    color: var(--color-echo-text-secondary);
+                    background: var(--color-50);
+                    color: var(--color-800);
                     font-size: var(--text-echo-body);
                     font-weight: 600;
                     text-transform: none;
                 }
 
-                .caap-pending-pic-notice__close {
+                .caap-pending-pic-alert__icon {
+                    display: inline-flex;
+                    width: 1.5rem;
+                    height: 1.5rem;
+                    flex: 0 0 auto;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 999px;
+                    background: var(--color-100);
+                    color: var(--color-700);
+                    font-weight: 700;
+                }
+
+                .caap-pending-pic-alert__body {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                }
+
+                .caap-pending-pic-alert__close {
                     display: inline-flex;
                     width: 1.75rem;
                     height: 1.75rem;
                     flex: 0 0 auto;
                     align-items: center;
                     justify-content: center;
-                    border: 1px solid var(--color-echo-border);
+                    border: 1px solid var(--color-200);
                     border-radius: 999px;
-                    background: #fff;
-                    color: var(--color-echo-text-secondary);
+                    background: var(--color-50);
+                    color: var(--color-700);
                     cursor: pointer;
                     font-size: 1.25rem;
                     line-height: 1;
                 }
 
-                .caap-pending-pic-notice__close:hover {
-                    color: var(--color-echo-text-primary);
+                .caap-pending-pic-alert__close:hover {
+                    background: var(--color-100);
+                    color: var(--color-900);
                 }
 
                 .caap-dispatch-checkbox .fi-fo-checkbox {

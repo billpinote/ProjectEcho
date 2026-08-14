@@ -42,6 +42,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
 
         Livewire::actingAs($staff)
             ->test(DispatchCreateFlight::class)
+            ->assertSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
+            ->assertSee('data-caap-pending-pic-dismiss', false)
             ->assertFormSet([
                 'authorized_representative_enabled' => true,
                 'authorized_representative_name' => 'PEDRO SANTOS',
@@ -103,6 +105,7 @@ class FlightPlanPreparerContextFormTest extends TestCase
 
         Livewire::actingAs($pilot)
             ->test(CreateFlight::class)
+            ->assertDontSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
             ->assertFormSet([
                 'filing_capacity' => 'self_pic',
                 'pilot_in_command' => 'Verified Pilot',
@@ -122,6 +125,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
         Livewire::actingAs($pilot)
             ->test(CreateFlight::class)
             ->fillForm(['filing_capacity' => 'for_another_pic'])
+            ->assertSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
+            ->assertSee('data-caap-pending-pic-dismiss', false)
             ->assertFormSet([
                 'authorized_representative_enabled' => true,
                 'authorized_representative_name' => 'VERIFIED PILOT',
@@ -133,6 +138,22 @@ class FlightPlanPreparerContextFormTest extends TestCase
             ])
             ->assertFormFieldDisabled('authorized_representative_enabled')
             ->assertFormFieldReadOnly('pilot_license_no');
+    }
+
+    public function test_pending_pic_alert_hides_after_pic_is_identified(): void
+    {
+        $pilot = $this->pilotWithCredentials();
+        $identifiedPic = $this->pilotWithCredentials([
+            'first_name' => 'Identified',
+            'last_name' => 'Pic',
+        ]);
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->fillForm(['filing_capacity' => 'for_another_pic'])
+            ->assertSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
+            ->fillForm(['pilot_in_command_user_id' => $identifiedPic->id])
+            ->assertDontSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.');
     }
 
     public function test_non_pic_preparer_create_records_snapshots_and_requires_pic_authorization(): void
@@ -222,13 +243,14 @@ class FlightPlanPreparerContextFormTest extends TestCase
         ]);
     }
 
-    private function pilotWithCredentials(): User
+    private function pilotWithCredentials(array $attributes = []): User
     {
         $pilot = $this->user(UserRole::Pilot, [
             'first_name' => 'Verified',
             'middle_name' => null,
             'last_name' => 'Pilot',
             'suffix' => null,
+            ...$attributes,
         ]);
         $profile = $pilot->pilotProfile()->create([
             'license_type' => PilotLicenseType::CommercialPilot,
