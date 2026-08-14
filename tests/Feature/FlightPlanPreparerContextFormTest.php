@@ -29,6 +29,7 @@ class FlightPlanPreparerContextFormTest extends TestCase
             'first_name' => 'Pedro',
             'middle_name' => null,
             'last_name' => 'Santos',
+            'suffix' => null,
             'operator_id' => $operator->id,
         ]);
         $staff->operatorStaffProfile()->create([
@@ -69,6 +70,7 @@ class FlightPlanPreparerContextFormTest extends TestCase
             'first_name' => 'Ava',
             'middle_name' => null,
             'last_name' => 'Mendoza',
+            'suffix' => null,
             'employee_id' => 'DISP-EMP-1',
         ]);
         $dispatch->dispatchProfile()->create([
@@ -142,6 +144,7 @@ class FlightPlanPreparerContextFormTest extends TestCase
             'first_name' => 'Pedro',
             'middle_name' => null,
             'last_name' => 'Santos',
+            'suffix' => null,
             'operator_id' => $operator->id,
         ]);
         $staff->operatorStaffProfile()->create([

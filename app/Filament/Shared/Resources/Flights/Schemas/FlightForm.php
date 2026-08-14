@@ -445,7 +445,12 @@ class FlightForm
             return '';
         }
 
-        return '<div class="caap-pending-pic-notice">Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.</div>';
+        return '
+            <div class="caap-pending-pic-notice" data-caap-pending-pic-alert>
+                <span>Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.</span>
+                <button type="button" class="caap-pending-pic-notice__close" aria-label="Dismiss PIC identification notice" data-caap-pending-pic-dismiss>&times;</button>
+            </div>
+        ';
     }
 
     private static function representativeInputAttributes(Get $get): array
@@ -1082,6 +1087,10 @@ class FlightForm
                 }
 
                 .caap-pending-pic-notice {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 1rem;
                     border: 1px solid var(--color-echo-border);
                     border-radius: 0.85rem;
                     padding: 0.75rem 1rem;
@@ -1090,6 +1099,26 @@ class FlightForm
                     font-size: var(--text-echo-body);
                     font-weight: 600;
                     text-transform: none;
+                }
+
+                .caap-pending-pic-notice__close {
+                    display: inline-flex;
+                    width: 1.75rem;
+                    height: 1.75rem;
+                    flex: 0 0 auto;
+                    align-items: center;
+                    justify-content: center;
+                    border: 1px solid var(--color-echo-border);
+                    border-radius: 999px;
+                    background: #fff;
+                    color: var(--color-echo-text-secondary);
+                    cursor: pointer;
+                    font-size: 1.25rem;
+                    line-height: 1;
+                }
+
+                .caap-pending-pic-notice__close:hover {
+                    color: var(--color-echo-text-primary);
                 }
 
                 .caap-dispatch-checkbox .fi-fo-checkbox {
@@ -1181,6 +1210,43 @@ class FlightForm
                     font-weight: 500;
                 }
             </style>
+            <script>
+                document.addEventListener('click', (event) => {
+                    const button = event.target.closest('[data-caap-pending-pic-dismiss]');
+
+                    if (! button) {
+                        return;
+                    }
+
+                    const alert = button.closest('[data-caap-pending-pic-alert]');
+
+                    if (alert) {
+                        alert.hidden = true;
+                    }
+
+                    try {
+                        window.localStorage.setItem('echo.pendingPicNoticeDismissed', '1');
+                    } catch (error) {
+                        //
+                    }
+                });
+
+                document.addEventListener('DOMContentLoaded', () => {
+                    try {
+                        if (window.localStorage.getItem('echo.pendingPicNoticeDismissed') !== '1') {
+                            return;
+                        }
+                    } catch (error) {
+                        return;
+                    }
+
+                    document
+                        .querySelectorAll('[data-caap-pending-pic-alert]')
+                        .forEach((alert) => {
+                            alert.hidden = true;
+                        });
+                });
+            </script>
         HTML;
     }
 }
