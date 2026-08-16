@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
@@ -105,6 +106,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
 
         Livewire::actingAs($pilot)
             ->test(CreateFlight::class)
+            ->assertDontSee('Filing Capacity')
+            ->assertSee('Not the PIC for this flight?')
             ->assertDontSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
             ->assertFormSet([
                 'filing_capacity' => 'self_pic',
@@ -116,6 +119,106 @@ class FlightPlanPreparerContextFormTest extends TestCase
             ])
             ->assertFormFieldReadOnly('pilot_license_no')
             ->assertFormFieldEnabled('authorized_representative_enabled');
+    }
+
+    public function test_ppl_cpl_and_atpl_forms_hide_capacity_dropdown_and_show_secondary_pic_action(): void
+    {
+        foreach ([
+            PilotLicenseType::PrivatePilot,
+            PilotLicenseType::CommercialPilot,
+            PilotLicenseType::AirlineTransportPilot,
+        ] as $licenseType) {
+            $pilot = $this->pilotWithCredentials([], $licenseType);
+
+            Livewire::actingAs($pilot)
+                ->test(CreateFlight::class)
+                ->assertDontSee('Filing Capacity')
+                ->assertSee('Not the PIC for this flight?')
+                ->assertFormSet([
+                    'filing_capacity' => FlightPlanPreparerContext::CAPACITY_SELF_PIC,
+                ]);
+        }
+    }
+
+    public function test_licensed_pilot_can_switch_to_another_pic_and_back_without_losing_verified_credentials(): void
+    {
+        $pilot = $this->pilotWithCredentials();
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->callFormComponentAction('pilot-pic-capacity-actions', 'prepareForAnotherPic')
+            ->assertSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
+            ->assertFormSet([
+                'filing_capacity' => FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC,
+                'authorized_representative_enabled' => true,
+                'authorized_representative_name' => 'VERIFIED PILOT',
+                'authorized_representative_role' => 'PILOT',
+                'authorized_representative_id_license' => 'CPL-123456',
+                'pilot_in_command' => null,
+                'pilot_license_no' => null,
+                'pilot_ratings' => null,
+                'license_expiry_date' => null,
+            ])
+            ->assertSee('I am the PIC')
+            ->callFormComponentAction('pilot-pic-capacity-actions', 'prepareAsSelfPic')
+            ->assertDontSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
+            ->assertFormSet([
+                'filing_capacity' => FlightPlanPreparerContext::CAPACITY_SELF_PIC,
+                'authorized_representative_enabled' => false,
+                'authorized_representative_name' => null,
+                'authorized_representative_role' => null,
+                'authorized_representative_id_license' => null,
+                'authorized_representative_expiry_date' => null,
+                'pilot_in_command' => 'Verified Pilot',
+                'pilot_license_no' => 'CPL-123456',
+                'pilot_ratings' => 'C172',
+                'license_expiry_date' => '2028-12-31',
+            ])
+            ->assertSee('Not the PIC for this flight?');
+    }
+
+    public function test_non_student_pilot_licenses_retain_self_pic_capacity_behavior(): void
+    {
+        foreach ([
+            PilotLicenseType::PrivatePilot,
+            PilotLicenseType::CommercialPilot,
+            PilotLicenseType::AirlineTransportPilot,
+        ] as $licenseType) {
+            $pilot = $this->pilotWithCredentials();
+            $pilot->pilotProfile()->update(['license_type' => $licenseType]);
+
+            $context = FlightPlanPreparerContext::for($pilot, [
+                'filing_capacity' => FlightPlanPreparerContext::CAPACITY_SELF_PIC,
+            ]);
+
+            $this->assertSame(FlightPlanPreparerContext::CAPACITY_SELF_PIC, $context->capacity());
+            $this->assertTrue($context->preparerActsAsPic());
+            $this->assertTrue($context->shouldShowFilingCapacityControl());
+        }
+    }
+
+    public function test_spl_representative_license_is_formatted_during_context_and_form_hydration(): void
+    {
+        $pilot = $this->pilotWithCredentials([], PilotLicenseType::StudentPilot, '123456');
+        $context = FlightPlanPreparerContext::for($pilot);
+
+        $this->assertSame('SPL-123456', $context->representativeIdOrLicense());
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->assertFormSet([
+                'authorized_representative_id_license' => 'SPL-123456',
+            ])
+            ->fillForm($this->validFlightPlanFormData([
+                'pilot_in_command' => 'FORGED PIC',
+                'pilot_license_no' => '123456',
+            ]))
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $flight = Flight::query()->latest('id')->firstOrFail();
+
+        $this->assertSame('SPL-123456', $flight->authorized_representative_id_license);
     }
 
     public function test_pilot_can_choose_prepare_for_another_pic_and_their_credentials_are_not_used_as_pic(): void
@@ -272,8 +375,11 @@ class FlightPlanPreparerContextFormTest extends TestCase
         ]);
     }
 
-    private function pilotWithCredentials(array $attributes = []): User
-    {
+    private function pilotWithCredentials(
+        array $attributes = [],
+        PilotLicenseType $licenseType = PilotLicenseType::CommercialPilot,
+        string $licenseNumber = '123456',
+    ): User {
         $pilot = $this->user(UserRole::Pilot, [
             'first_name' => 'Verified',
             'middle_name' => null,
@@ -282,8 +388,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
             ...$attributes,
         ]);
         $profile = $pilot->pilotProfile()->create([
-            'license_type' => PilotLicenseType::CommercialPilot,
-            'license_number' => '123456',
+            'license_type' => $licenseType,
+            'license_number' => $licenseNumber,
             'license_expiry_date' => '2028-12-31',
         ]);
         $profile->qualifications()->create([

@@ -9,7 +9,7 @@ class OperatorSeeder extends Seeder
 {
     public function run(): void
     {
-        Operator::factory()->createMany([
+        $operators = [
             [
                 'name' => 'Philippine Airlines',
                 'icao_code' => 'PAL',
@@ -37,6 +37,13 @@ class OperatorSeeder extends Seeder
                 'email' => 'contact@alphaaviation.ph',
                 'remarks' => 'Flight training and charter operator.',
             ],
-        ]);
+        ];
+
+        foreach ($operators as $operator) {
+            Operator::query()->updateOrCreate(
+                ['icao_code' => $operator['icao_code']],
+                $operator,
+            );
+        }
     }
 }

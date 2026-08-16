@@ -3,6 +3,7 @@
 namespace App\Domain\FlightPlans\Support;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\User;
 
@@ -30,7 +31,7 @@ class FlightPlanPreparerContext
 
     public function capacity(): string
     {
-        if ($this->preparer?->isOperatorStaff() || $this->preparer?->isDispatch()) {
+        if ($this->hasAutomaticallyResolvedCapacity()) {
             return self::CAPACITY_FOR_ANOTHER_PIC;
         }
 
@@ -41,6 +42,12 @@ class FlightPlanPreparerContext
         }
 
         return self::CAPACITY_SELF_PIC;
+    }
+
+    public function shouldShowFilingCapacityControl(): bool
+    {
+        return $this->preparer?->isPilot() === true
+            && ! $this->hasAutomaticallyResolvedCapacity();
     }
 
     public function isPreparingForAnotherPic(): bool
@@ -90,6 +97,10 @@ class FlightPlanPreparerContext
             $department = trim((string) ($this->preparer->dispatchProfile?->department ?? ''));
 
             return $department !== '' ? strtoupper($department) : UserRole::Dispatch->label();
+        }
+
+        if ($this->isStudentPilot()) {
+            return 'STUDENT PILOT';
         }
 
         return $this->preparer?->preparedByRoleSnapshot();
@@ -191,5 +202,18 @@ class FlightPlanPreparerContext
         }
 
         return null;
+    }
+
+    private function hasAutomaticallyResolvedCapacity(): bool
+    {
+        return $this->preparer?->isOperatorStaff()
+            || $this->preparer?->isDispatch()
+            || $this->isStudentPilot();
+    }
+
+    private function isStudentPilot(): bool
+    {
+        return $this->preparer?->isPilot() === true
+            && $this->preparer->pilotProfile?->license_type === PilotLicenseType::StudentPilot;
     }
 }

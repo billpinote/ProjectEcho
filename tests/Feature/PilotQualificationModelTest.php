@@ -76,6 +76,24 @@ class PilotQualificationModelTest extends TestCase
         $this->assertSame('987654', $profile->license_number);
     }
 
+    public function test_pilot_licence_display_uses_the_canonical_formatter_for_all_license_types(): void
+    {
+        foreach ([
+            PilotLicenseType::StudentPilot,
+            PilotLicenseType::PrivatePilot,
+            PilotLicenseType::CommercialPilot,
+            PilotLicenseType::AirlineTransportPilot,
+        ] as $licenseType) {
+            $profile = PilotProfile::factory()->create([
+                'user_id' => User::factory()->create(['role' => UserRole::Pilot])->id,
+                'license_type' => $licenseType,
+                'license_number' => '123456',
+            ]);
+
+            $this->assertSame($licenseType->value.'-123456', $profile->formattedLicense());
+        }
+    }
+
     public function test_pilot_licence_formatter_handles_partial_values(): void
     {
         $this->assertSame('CPL', PilotProfile::formatLicense(PilotLicenseType::CommercialPilot, null));

@@ -57,7 +57,7 @@ class StudentPilotSeeder extends Seeder
             [
                 'user_id' => $pilot->id,
                 'license_type' => PilotLicenseType::StudentPilot,
-                'license_number' => 'SPL-DEV-001',
+                'license_number' => '359501',
                 'license_expiry_date' => '2028-12-31',
                 'medical_expiry_date' => '2027-12-31',
                 'operator' => null,

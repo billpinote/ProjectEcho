@@ -33,7 +33,6 @@ class RPUSFlightSeeder extends Seeder
         ];
 
         $flights = [];
-        $usedCallsigns = [];
 
         // Create 8 flights to international destinations
         for ($i = 0; $i < 8; $i++) {
@@ -41,7 +40,7 @@ class RPUSFlightSeeder extends Seeder
             $aircraftType = $aircraftTypes[$i % count($aircraftTypes)];
             $route = $this->generateRoute($destination);
             $eet = $this->calculateEET($destination);
-            $callsign = $this->generateRandomCallsign($usedCallsigns);
+            $callsign = $this->generateCallsign($i);
 
             $flights[] = [
                 'aircraft_identification' => $callsign,
@@ -63,7 +62,7 @@ class RPUSFlightSeeder extends Seeder
             $trainingArea = $trainingAreas[($i - 8) % count($trainingAreas)];
             $aircraftType = $aircraftTypes[$i % count($aircraftTypes)];
             $route = 'RPUS ' . $trainingArea . ' RPUS';
-            $callsign = $this->generateRandomCallsign($usedCallsigns);
+            $callsign = $this->generateCallsign($i);
 
             $flights[] = [
                 'aircraft_identification' => $callsign,
@@ -135,17 +134,9 @@ class RPUSFlightSeeder extends Seeder
         }
     }
 
-    private function generateRandomCallsign(array &$usedCallsigns): string
+    private function generateCallsign(int $index): string
     {
-        do {
-            $digitCount = random_int(2, 4);
-            $number = (string) random_int(10 ** ($digitCount - 1), (10 ** $digitCount) - 1);
-            $callsign = 'RPC' . $number;
-        } while (in_array($callsign, $usedCallsigns, true));
-
-        $usedCallsigns[] = $callsign;
-
-        return $callsign;
+        return 'RPC' . str_pad((string) (1001 + $index), 4, '0', STR_PAD_LEFT);
     }
 
     private function generateRoute(string $destination): string

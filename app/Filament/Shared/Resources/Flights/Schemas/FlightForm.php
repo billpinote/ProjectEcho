@@ -13,11 +13,14 @@ use App\Domain\FlightPlans\Rules\IcaoWakeTurbulenceCategory;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Html;
@@ -235,19 +238,36 @@ class FlightForm
                                         self::text('aircraft_colour_and_markings', 'Aircraft Colour and Markings', 8),
                                         self::text('remarks', 'Remarks', 8),
 
-                                        self::select('filing_capacity', 'Filing Capacity', [
-                                            FlightPlanPreparerContext::CAPACITY_SELF_PIC => 'I am the Pilot-in-Command',
-                                            FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC => 'I am preparing this flight plan for another PIC',
-                                        ], 3)
-                                            ->default(FlightPlanPreparerContext::CAPACITY_SELF_PIC)
-                                            ->visible(fn (): bool => Auth::user()?->isPilot() ?? false)
+                                        Hidden::make('filing_capacity')
+                                            ->default(fn (): string => FlightPlanPreparerContext::for(Auth::user())->capacity())
                                             ->live()
                                             ->afterStateUpdated(fn (Get $get, Set $set, mixed $state): null => self::syncPreparerContext($get, $set)),
-                                        self::spacer(5),
 
                                         Html::make(fn (Get $get): string => self::pendingPicNotice($get))
                                             ->visible(fn (Get $get): bool => self::shouldShowPendingPicAlert($get))
                                             ->columnSpan(8),
+
+                                        Actions::make([
+                                            Action::make('prepareForAnotherPic')
+                                                ->label('Not the PIC for this flight?')
+                                                ->link()
+                                                ->visible(fn (Get $get): bool => self::shouldShowPilotPicToggle($get)
+                                                    && ! self::preparerContext($get)->isPreparingForAnotherPic())
+                                                ->action(function (Action $action): void {
+                                                    $action->getLivewire()->togglePilotPicCapacity();
+                                                }),
+                                            Action::make('prepareAsSelfPic')
+                                                ->label('I am the PIC')
+                                                ->link()
+                                                ->visible(fn (Get $get): bool => self::shouldShowPilotPicToggle($get)
+                                                    && self::preparerContext($get)->isPreparingForAnotherPic())
+                                                ->action(function (Action $action): void {
+                                                    $action->getLivewire()->togglePilotPicCapacity();
+                                                }),
+                                        ])
+                                            ->key('pilot-pic-capacity-actions')
+                                            ->columnSpan(8)
+                                            ->visible(fn (Get $get): bool => self::shouldShowPilotPicToggle($get)),
 
                                         self::text('pilot_in_command', 'Pilot In Command', 4)
                                             ->default(fn (): ?string => self::pilotNameDefault())
@@ -345,28 +365,36 @@ class FlightForm
     {
         $user = Auth::user();
 
-        return $user?->isPilot() ? self::pilotCredentials()['pilot_name'] : null;
+        return $user?->isPilot() && ! self::preparerContext()->isPreparingForAnotherPic()
+            ? self::pilotCredentials()['pilot_name']
+            : null;
     }
 
     private static function pilotLicenseDefault(): ?string
     {
         $user = Auth::user();
 
-        return $user?->isPilot() ? self::pilotCredentials()['license'] : null;
+        return $user?->isPilot() && ! self::preparerContext()->isPreparingForAnotherPic()
+            ? self::pilotCredentials()['license']
+            : null;
     }
 
     private static function pilotRatingsDefault(): ?string
     {
         $user = Auth::user();
 
-        return $user?->isPilot() ? self::pilotCredentials()['ratings'] : null;
+        return $user?->isPilot() && ! self::preparerContext()->isPreparingForAnotherPic()
+            ? self::pilotCredentials()['ratings']
+            : null;
     }
 
     private static function pilotLicenseExpiryDefault(): ?string
     {
         $user = Auth::user();
 
-        return $user?->isPilot() ? self::pilotCredentials()['license_expiry_date'] : null;
+        return $user?->isPilot() && ! self::preparerContext()->isPreparingForAnotherPic()
+            ? self::pilotCredentials()['license_expiry_date']
+            : null;
     }
 
     /**
@@ -476,28 +504,98 @@ class FlightForm
 
     private static function syncPreparerContext(Get $get, Set $set): null
     {
-        $context = self::preparerContext($get);
+        $state = [];
+
+        foreach (self::preparerContextStateFields() as $field) {
+            $state[$field] = $get($field);
+        }
+
+        $state = self::synchronizePreparerContextState($state);
+
+        foreach ($state as $field => $value) {
+            $set($field, $value);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    public static function togglePilotPicCapacityState(array $state): array
+    {
+        $context = self::preparerContextFromState($state);
+
+        $state['filing_capacity'] = $context->isPreparingForAnotherPic()
+            ? FlightPlanPreparerContext::CAPACITY_SELF_PIC
+            : FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC;
+
+        return self::synchronizePreparerContextState($state);
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    private static function synchronizePreparerContextState(array $state): array
+    {
+        $context = self::preparerContextFromState($state);
 
         if ($context->isPreparingForAnotherPic()) {
             foreach (['pilot_in_command', 'pilot_license_no', 'pilot_ratings', 'license_expiry_date'] as $field) {
-                $set($field, null);
+                $state[$field] = null;
             }
 
-            $set('authorized_representative_enabled', true);
-            self::syncRepresentativeFields($set, $context);
+            $state['authorized_representative_enabled'] = true;
+            $state['authorized_representative_name'] = $context->representativeName();
+            $state['authorized_representative_role'] = $context->representativeRole();
+            $state['authorized_representative_id_license'] = $context->representativeIdOrLicense();
+            $state['authorized_representative_expiry_date'] = $context->representativeAuthorizationExpiry();
 
-            return null;
+            return $state;
         }
 
-        $set('authorized_representative_enabled', false);
+        $state['authorized_representative_enabled'] = false;
 
         foreach (['authorized_representative_name', 'authorized_representative_role', 'authorized_representative_id_license', 'authorized_representative_expiry_date'] as $field) {
-            $set($field, null);
+            $state[$field] = null;
         }
 
-        self::syncPilotCredentials($get, $set, $get('date_of_flight'));
+        $credentials = self::pilotCredentials($state['date_of_flight'] ?? null);
+        $state['pilot_in_command'] = $credentials['pilot_name'];
+        $state['pilot_license_no'] = $credentials['license'];
+        $state['pilot_ratings'] = $credentials['ratings'];
+        $state['license_expiry_date'] = $credentials['license_expiry_date'];
 
-        return null;
+        return $state;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function preparerContextStateFields(): array
+    {
+        return [
+            'filing_capacity',
+            'date_of_flight',
+            'pilot_in_command',
+            'pilot_license_no',
+            'pilot_ratings',
+            'license_expiry_date',
+            'authorized_representative_enabled',
+            'authorized_representative_name',
+            'authorized_representative_role',
+            'authorized_representative_id_license',
+            'authorized_representative_expiry_date',
+        ];
+    }
+
+    private static function preparerContext(?Get $get = null): FlightPlanPreparerContext
+    {
+        return self::preparerContextFromState([
+            'filing_capacity' => $get?->__invoke('filing_capacity'),
+        ]);
     }
 
     private static function syncRepresentativeFields(Set $set, FlightPlanPreparerContext $context): void
@@ -508,11 +606,20 @@ class FlightForm
         $set('authorized_representative_expiry_date', $context->representativeAuthorizationExpiry());
     }
 
-    private static function preparerContext(?Get $get = null): FlightPlanPreparerContext
+    /**
+     * @param  array<string, mixed>  $state
+     */
+    private static function preparerContextFromState(array $state): FlightPlanPreparerContext
     {
         return FlightPlanPreparerContext::for(Auth::user(), [
-            'filing_capacity' => $get?->__invoke('filing_capacity'),
+            'filing_capacity' => $state['filing_capacity'] ?? null,
         ]);
+    }
+
+    private static function shouldShowPilotPicToggle(?Get $get = null): bool
+    {
+        return Auth::user()?->isPilot() === true
+            && self::preparerContext($get)->shouldShowFilingCapacityControl();
     }
 
     private static function pilotOtherInformationDefaults(): ?string

@@ -8,6 +8,7 @@ use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
+use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Alignment;
@@ -40,6 +41,12 @@ class CreateFlight extends CreateRecord
     public static function canAccess(array $parameters = []): bool
     {
         return static::getResource()::canCreate();
+    }
+
+    public function togglePilotPicCapacity(): void
+    {
+        $this->data = FlightForm::togglePilotPicCapacityState($this->data);
+        $this->form->fill($this->data);
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array

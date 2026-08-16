@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
@@ -48,7 +49,7 @@ class StudentPilotSeederTest extends TestCase
         $this->assertNotNull($profile);
         $this->assertSame(1, $pilot->pilotProfile()->count());
         $this->assertSame(PilotLicenseType::StudentPilot, $profile->license_type);
-        $this->assertSame('SPL-DEV-001', $profile->license_number);
+        $this->assertSame('359501', $profile->license_number);
         $this->assertSame('2028-12-31', $profile->license_expiry_date?->toDateString());
         $this->assertSame('2027-12-31', $profile->medical_expiry_date?->toDateString());
 
@@ -66,7 +67,7 @@ class StudentPilotSeederTest extends TestCase
         ]);
     }
 
-    public function test_seeded_student_pilot_can_prepare_for_another_pic_without_becoming_pic(): void
+    public function test_seeded_student_pilot_automatically_prepares_for_another_pic_without_becoming_pic(): void
     {
         $this->seed(StudentPilotSeeder::class);
 
@@ -77,27 +78,49 @@ class StudentPilotSeederTest extends TestCase
             ->with('pilotProfile')
             ->firstOrFail();
 
+        $context = FlightPlanPreparerContext::for($studentPilot, [
+            'filing_capacity' => FlightPlanPreparerContext::CAPACITY_SELF_PIC,
+        ]);
+
+        $this->assertSame(FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC, $context->capacity());
+        $this->assertFalse($context->preparerActsAsPic());
+        $this->assertTrue($context->shouldAutoEnableAuthorizedRepresentative());
+        $this->assertTrue($context->shouldRequirePicAuthorization());
+        $this->assertFalse($context->shouldShowFilingCapacityControl());
+
         $this->actingAs($studentPilot)
             ->get(route('filament.pilot.resources.flights.create'))
             ->assertOk();
 
+        $formattedLicense = $studentPilot->pilotProfile instanceof PilotProfile
+            ? $studentPilot->pilotProfile->formattedLicense()
+            : null;
+
         Livewire::actingAs($studentPilot)
             ->test(CreateFlight::class)
-            ->fillForm(['filing_capacity' => 'for_another_pic'])
+            ->assertDontSee('Filing Capacity')
+            ->assertDontSee('Not the PIC for this flight?')
             ->assertSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
             ->assertFormSet([
+                'filing_capacity' => FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC,
                 'authorized_representative_enabled' => true,
                 'authorized_representative_name' => 'JUAN DELA CRUZ',
-                'authorized_representative_role' => 'PILOT',
-                'authorized_representative_id_license' => 'SPL-SPL-DEV-001',
+                'authorized_representative_role' => 'STUDENT PILOT',
+                'authorized_representative_id_license' => $formattedLicense,
                 'authorized_representative_expiry_date' => '2028-12-31',
                 'pilot_in_command' => null,
                 'pilot_license_no' => null,
                 'pilot_ratings' => null,
                 'license_expiry_date' => null,
             ])
+            ->assertFormFieldDisabled('authorized_representative_enabled')
+            ->assertFormFieldReadOnly('authorized_representative_name')
+            ->assertFormFieldReadOnly('authorized_representative_role')
+            ->assertFormFieldReadOnly('authorized_representative_id_license')
+            ->assertFormFieldReadOnly('pilot_license_no')
+            ->assertFormFieldReadOnly('pilot_ratings')
+            ->assertFormFieldReadOnly('license_expiry_date')
             ->fillForm($this->validFlightPlanFormData([
-                'filing_capacity' => 'for_another_pic',
                 'pilot_in_command' => 'JUAN DELA CRUZ',
                 'pilot_license_no' => $studentPilot->pilotProfile instanceof PilotProfile
                     ? $studentPilot->pilotProfile->formatted_license
@@ -113,7 +136,7 @@ class StudentPilotSeederTest extends TestCase
         $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
         $this->assertSame($studentPilot->id, $flight->prepared_by_user_id);
         $this->assertSame('JUAN DELA CRUZ', $flight->prepared_by_name);
-        $this->assertSame('PILOT', $flight->prepared_by_role);
+        $this->assertSame('STUDENT PILOT', $flight->prepared_by_role);
         $this->assertNull($flight->pilot_id);
         $this->assertNull($flight->pilot_in_command_user_id);
         $this->assertNull($flight->pilot_in_command);
@@ -122,7 +145,7 @@ class StudentPilotSeederTest extends TestCase
         $this->assertNull($flight->license_expiry_date);
         $this->assertTrue($flight->authorized_representative_enabled);
         $this->assertSame('JUAN DELA CRUZ', $flight->authorized_representative_name);
-        $this->assertSame('SPL-SPL-DEV-001', $flight->authorized_representative_id_license);
+        $this->assertSame($formattedLicense, $flight->authorized_representative_id_license);
         $this->assertSame('2028-12-31', $flight->authorized_representative_expiry_date);
         $this->assertTrue($flight->requiresPicAuthorization());
         $this->assertFalse($flight->canSubmitToAtc());
