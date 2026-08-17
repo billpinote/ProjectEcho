@@ -75,6 +75,7 @@ class FlightPlanQrPayloadService
         'authorized_representative_role',
         'authorized_representative_id_license',
         'authorized_representative_expiry_date',
+        'revision_number',
     ];
 
     private const LEGACY_V1_PATTERN = '/^ECHOFPL\|1\|DB\|(\d+)$/i';
@@ -105,6 +106,7 @@ class FlightPlanQrPayloadService
         'persons_on_board',
         'dinghies_number',
         'dinghies_capacity',
+        'revision_number',
     ];
 
     public function buildPayload(Flight $flight): ?string
@@ -205,6 +207,23 @@ class FlightPlanQrPayloadService
 
         return Str::startsWith(strtoupper($normalizedPayload), self::PREFIX.'|'.self::VERSION.'|'.self::MODE.'|')
             && substr_count($normalizedPayload, '|') >= 8;
+    }
+
+    /**
+     * Confirm that a signed offline snapshot still describes the saved flight.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
+    public function snapshotMatchesFlight(array $snapshot, Flight $flight): bool
+    {
+        foreach (self::S1_FIELDS as $field) {
+            if ($this->normalizeFieldValue($field, $snapshot[$field] ?? null)
+                !== $this->normalizeFieldValue($field, $flight->getAttribute($field))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function invalidPayloadMessage(string $payload): string
@@ -323,6 +342,12 @@ class FlightPlanQrPayloadService
         }
 
         $fields = $this->fieldsForSchema($schemaId);
+
+        // Accept older S1 payloads for read-only QR lookup. Authorization requires
+        // the current payload, which includes the revision snapshot.
+        if (count($values) === count($fields) - 1) {
+            $fields = array_slice($fields, 0, -1);
+        }
 
         if (count($values) !== count($fields)) {
             return null;

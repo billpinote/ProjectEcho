@@ -39,6 +39,11 @@ class ImportScanQr extends Page
      */
     public ?array $matchedFlight = null;
 
+    public function isPicAuthorizationPage(): bool
+    {
+        return false;
+    }
+
     /**
      * @return array<string, array<int, string>>
      */
@@ -94,7 +99,7 @@ class ImportScanQr extends Page
         }
     }
 
-    private function lookupPayload(string $payload, bool $notifyOnSuccess, bool $notifyOnFailure): void
+    protected function lookupPayload(string $payload, bool $notifyOnSuccess, bool $notifyOnFailure): void
     {
         $parsedPayload = $this->qrPayloads()->parsePayload($payload);
 

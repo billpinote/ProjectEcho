@@ -423,6 +423,31 @@
                         >
                             Open Flight Plan
                         </a>
+
+                        @if($this->isPicAuthorizationPage())
+                            @if($this->canAuthorizeMatchedFlight())
+                                <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #b7791f; border-radius: 0.75rem; background: #fff8e1;">
+                                    <strong>PIC Authorization Required</strong>
+                                    <p style="margin: 0.4rem 0 0;">Review this flight plan carefully. By authorizing it, you identify yourself as the Pilot-in-Command for this flight.</p>
+                                </div>
+                                <button type="button" wire:click="authorizeAsPic" wire:loading.attr="disabled" class="echo-button echo-button-accent" style="margin-top: 1rem;">
+                                    Authorize as PIC
+                                </button>
+                            @else
+                                <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #718096; border-radius: 0.75rem; background: #edf2f7;">
+                                    <strong>Awaiting PIC Authorization</strong>
+                                    <p style="margin: 0.4rem 0 0;">This flight plan requires authorization from a verified PPL, CPL, or ATPL holder. You may review the flight plan, but you cannot authorize it.</p>
+                                </div>
+                            @endif
+
+                            <form wire:submit="declineAuthorization" style="margin-top: 1rem;">
+                                <label for="decline-reason" class="echo-field-label echo-title">Decline reason (optional)</label>
+                                <textarea id="decline-reason" wire:model="declineReason" rows="2" class="echo-payload-textarea" placeholder="Optional reason"></textarea>
+                                <button type="submit" wire:loading.attr="disabled" class="echo-button echo-button-secondary" style="margin-top: 0.75rem;">
+                                    Decline Authorization
+                                </button>
+                            </form>
+                        @endif
                     </section>
                 @else
                     <section class="echo-import-empty echo-empty-state">

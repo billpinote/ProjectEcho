@@ -3,10 +3,12 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Panels\Dispatch\Resources\AcceptedFlights\AcceptedFlightResource;
+use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Dispatch\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Panels\Dispatch\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Panels\Dispatch\Resources\Flights\FlightResource;
 use App\Filament\Panels\Dispatch\Resources\LandedFlights\LandedFlightResource;
+use App\Filament\Panels\Dispatch\Pages\ScanAuthorizationQr;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Navigation\NavigationBuilder;
 use Filament\Navigation\NavigationItem;
@@ -27,6 +29,7 @@ class DispatchPanelProvider extends PanelProvider
         return $this->configureEchoPanel($panel, 'dispatch', 'dispatch')
             ->pages([
                 Dashboard::class,
+                ScanAuthorizationQr::class,
             ])
             ->resources([
                 FlightResource::class,
@@ -34,6 +37,7 @@ class DispatchPanelProvider extends PanelProvider
                 ActiveFlightResource::class,
                 LandedFlightResource::class,
                 CompletedFlightResource::class,
+                AwaitingAuthorizationFlightResource::class,
             ])
             ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
                 return $builder
@@ -55,6 +59,14 @@ class DispatchPanelProvider extends PanelProvider
                         self::dispatchResourceNavigationItem(ActiveFlightResource::class, 'filament.dispatch.resources.active-flights.*'),
                         self::dispatchResourceNavigationItem(LandedFlightResource::class, 'filament.dispatch.resources.landed-flights.*'),
                         self::dispatchResourceNavigationItem(CompletedFlightResource::class, 'filament.dispatch.resources.completed-flights.*'),
+                    ])
+                    ->group('PIC Authorization', [
+                        self::dispatchResourceNavigationItem(AwaitingAuthorizationFlightResource::class, 'filament.dispatch.resources.awaiting-authorization-flights.*'),
+                        NavigationItem::make('Scan Authorization QR')
+                            ->icon(Heroicon::OutlinedQrCode)
+                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.dispatch.pages.scan-authorization-qr'))
+                            ->sort(2)
+                            ->url(fn (): string => ScanAuthorizationQr::getUrl(panel: 'dispatch')),
                     ]);
             });
     }

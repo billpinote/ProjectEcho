@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\Users\Enums\UserRole;
 use Carbon\CarbonInterface;
 use Database\Factories\FlightFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -56,6 +57,7 @@ class Flight extends Model
         'pic_authorization_token_expires_at' => 'datetime',
         'revision_number' => 'integer',
         'pic_authorized_revision' => 'integer',
+        'pic_authorization_declined_at' => 'datetime',
     ];
 
     protected $fillable = [
@@ -143,6 +145,10 @@ class Flight extends Model
         'pic_authorization_token_expires_at',
         'revision_number',
         'pic_authorized_revision',
+        'pic_authorization_status',
+        'pic_authorization_declined_by_user_id',
+        'pic_authorization_declined_at',
+        'pic_authorization_decline_reason',
         'authorized_representative_enabled',
         'authorized_representative_name',
         'authorized_representative_role',
@@ -342,6 +348,41 @@ class Flight extends Model
     public function scopeVisibleTo(Builder $query, ?User $user): Builder
     {
         return FlightAccess::restrictQueryToVisibleFlights($query, $user);
+    }
+
+    public function scopeAwaitingPicAuthorization(Builder $query): Builder
+    {
+        return $query
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereHas('preparedBy', fn (Builder $query): Builder => $query->where('role', UserRole::OperatorStaff->value))
+                    ->orWhere(function (Builder $query): void {
+                        $query
+                            ->where(function (Builder $query): void {
+                                $query
+                                    ->whereNull('prepared_by_user_id')
+                                    ->whereNotNull('pilot_in_command_user_id');
+                            })
+                            ->orWhere(function (Builder $query): void {
+                                $query
+                                    ->whereNotNull('prepared_by_user_id')
+                                    ->whereNull('pilot_in_command_user_id');
+                            })
+                            ->orWhere(function (Builder $query): void {
+                                $query
+                                    ->whereNotNull('prepared_by_user_id')
+                                    ->whereNotNull('pilot_in_command_user_id')
+                                    ->whereColumn('prepared_by_user_id', '!=', 'pilot_in_command_user_id');
+                            });
+                    });
+            })
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNull('pic_authorized_by_user_id')
+                    ->orWhereNull('pic_authorized_at')
+                    ->orWhereNull('pic_authorized_revision')
+                    ->orWhereRaw('pic_authorized_revision != COALESCE(revision_number, 1)');
+            });
     }
 
     public function scopePendingUnreviewed(Builder $query): Builder

@@ -11,6 +11,8 @@ use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\LandedFlights\LandedFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
+use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
+use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource as DispatchAwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
@@ -270,6 +272,8 @@ class FlightsTable
             MyCurrentFlightResource::class,
             MyCompletedFlightResource::class,
             MyArchivedFlightResource::class,
+            AwaitingAuthorizationFlightResource::class,
+            DispatchAwaitingAuthorizationFlightResource::class,
         ], true)) {
             array_unshift($columns, FlightStatusDisplay::tableColumn());
         }
@@ -1069,7 +1073,7 @@ class FlightsTable
                 ->orderByDesc('id');
         }
 
-        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class], true)) {
+        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class, AwaitingAuthorizationFlightResource::class, DispatchAwaitingAuthorizationFlightResource::class], true)) {
             return $query
                 ->orderByDesc('date_of_flight')
                 ->orderByDesc('updated_at')
@@ -1115,7 +1119,7 @@ class FlightsTable
             return $actions;
         }
 
-        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class], true)) {
+        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class, AwaitingAuthorizationFlightResource::class, DispatchAwaitingAuthorizationFlightResource::class], true)) {
             return $actions;
         }
 

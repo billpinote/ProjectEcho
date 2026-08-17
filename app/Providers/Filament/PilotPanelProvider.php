@@ -8,8 +8,10 @@ use App\Filament\Panels\Pilot\Pages\HelpPage;
 use App\Filament\Panels\Pilot\Pages\MyProfilePage;
 use App\Filament\Panels\Pilot\Pages\PreferencesPage;
 use App\Filament\Panels\Pilot\Pages\SecurityPage;
+use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Filament\Panels\Pilot\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\Pages\CreateFlight;
+use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
@@ -39,6 +41,7 @@ class PilotPanelProvider extends PanelProvider
                 PreferencesPage::class,
                 SecurityPage::class,
                 HelpPage::class,
+                ScanAuthorizationQr::class,
             ])
             ->resources([
                 FlightResource::class,
@@ -46,6 +49,7 @@ class PilotPanelProvider extends PanelProvider
                 MyCurrentFlightResource::class,
                 MyCompletedFlightResource::class,
                 MyArchivedFlightResource::class,
+                AwaitingAuthorizationFlightResource::class,
             ])
             ->userMenuItems([
                 'profile' => MenuItem::make()
@@ -101,6 +105,18 @@ class PilotPanelProvider extends PanelProvider
                             ->sort(13)
                             ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.pilot.resources.my-archived-flights.*'))
                             ->url(fn (): string => MyArchivedFlightResource::getUrl('index')),
+                    ], collapsible: true)
+                    ->group('PIC Authorization', [
+                        NavigationItem::make('Awaiting Authorization')
+                            ->icon(Heroicon::OutlinedShieldExclamation)
+                            ->sort(1)
+                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.pilot.resources.awaiting-authorization-flights.*'))
+                            ->url(fn (): string => AwaitingAuthorizationFlightResource::getUrl('index')),
+                        NavigationItem::make('Scan Authorization QR')
+                            ->icon(Heroicon::OutlinedQrCode)
+                            ->sort(2)
+                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.pilot.pages.scan-authorization-qr'))
+                            ->url(fn (): string => ScanAuthorizationQr::getUrl()),
                     ], collapsible: true);
             });
     }
