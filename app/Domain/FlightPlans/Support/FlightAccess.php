@@ -30,6 +30,24 @@ class FlightAccess
         return true;
     }
 
+    public static function canAccessPicAuthorization(User $user, Flight $flight): bool
+    {
+        if (! $user->is_active || ! $user->canViewFlightPlans()) {
+            return false;
+        }
+
+        if ($user->isPilot() || $user->isDispatch()) {
+            return self::operatorMatches($user, $flight);
+        }
+
+        if ($user->isOperatorStaff()) {
+            return $flight->prepared_by_user_id !== null
+                && (int) $flight->prepared_by_user_id === (int) $user->getKey();
+        }
+
+        return $user->hasFullFlightAccess();
+    }
+
     public static function canOperationallyUpdate(User $user, Flight $flight): bool
     {
         if (! $user->is_active) {

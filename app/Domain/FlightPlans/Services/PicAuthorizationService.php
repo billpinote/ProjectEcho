@@ -4,6 +4,7 @@ namespace App\Domain\FlightPlans\Services;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Models\Flight;
 use App\Models\User;
@@ -96,8 +97,17 @@ class PicAuthorizationService
 
         $flight = Flight::query()->find((int) $parsed['flight_id']);
 
-        if ($flight === null || ! $user->can('view', $flight)) {
+        if ($flight === null) {
             throw ValidationException::withMessages(['payload' => 'The signed QR does not identify an accessible saved flight plan.']);
+        }
+
+        if (! FlightAccess::canAccessPicAuthorization($user, $flight)) {
+            $message = ($user->isPilot() || $user->isDispatch())
+                && ! FlightAccess::operatorMatches($user, $flight)
+                ? "This flight plan belongs to another operator. PIC authorization is limited to eligible pilots associated with the flight's operator."
+                : 'The signed QR does not identify an accessible saved flight plan.';
+
+            throw ValidationException::withMessages(['payload' => $message]);
         }
 
         if (! app(FlightPlanQrPayloadService::class)->snapshotMatchesFlight($parsed['snapshot'], $flight)) {

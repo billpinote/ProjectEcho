@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Resources\Flights\FlightResource;
@@ -34,6 +35,40 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->assertTrue($authorized->isPicAuthorizationCurrent());
         $this->assertTrue($authorized->canSubmitToAtc());
         $this->assertSame(FlightPlanStatus::Pending, $authorized->status);
+    }
+
+    #[DataProvider('eligibleLicenseTypes')]
+    public function test_same_operator_eligible_pilot_can_authorize_another_pilots_flight(string $licenseType): void
+    {
+        $operator = Operator::factory()->create();
+        $authorizer = $this->user(UserRole::Pilot, $licenseType, $operator);
+        $filedBy = $this->user(UserRole::Pilot, null, $operator);
+        $flight = $this->awaitingFlight($authorizer, [
+            'filed_by_user_id' => $filedBy->id,
+            'operator_id' => $operator->id,
+        ]);
+
+        $this->assertFalse(FlightAccess::canView($authorizer, $flight));
+        $this->assertTrue(FlightAccess::canAccessPicAuthorization($authorizer, $flight));
+        $this->assertTrue(app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer)->canSubmitToAtc());
+    }
+
+    #[DataProvider('eligibleLicenseTypes')]
+    public function test_different_operator_eligible_pilot_is_denied(string $licenseType): void
+    {
+        $flightOperator = Operator::factory()->create();
+        $authorizer = $this->user(UserRole::Pilot, $licenseType, Operator::factory()->create());
+        $flight = $this->awaitingFlight($authorizer, ['operator_id' => $flightOperator->id]);
+
+        try {
+            app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer);
+            $this->fail('A pilot from another operator was allowed to authorize.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                "This flight plan belongs to another operator. PIC authorization is limited to eligible pilots associated with the flight's operator.",
+                $exception->errors()['payload'][0],
+            );
+        }
     }
 
     public static function eligibleLicenseTypes(): array
@@ -131,9 +166,13 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->assertTrue($declined->requiresPicAuthorization());
     }
 
-    private function user(UserRole $role, ?string $licenseType = null): User
+    private function user(UserRole $role, ?string $licenseType = null, ?Operator $operator = null): User
     {
-        $user = User::factory()->create(['role' => $role, 'is_active' => true]);
+        $user = User::factory()->create([
+            'role' => $role,
+            'is_active' => true,
+            'operator_id' => $operator?->id,
+        ]);
 
         if ($licenseType !== null) {
             $user->pilotProfile()->create([
@@ -153,7 +192,9 @@ class PicAuthorizationWorkflowTest extends TestCase
         $preparer = in_array($authorizer->role, [UserRole::Dispatch, UserRole::OperatorStaff], true)
             ? $authorizer
             : $this->user(UserRole::Dispatch);
-        $operator = $authorizer->isDispatch() ? Operator::factory()->create() : null;
+        $operator = $authorizer->operator_id !== null
+            ? Operator::find($authorizer->operator_id)
+            : Operator::factory()->create();
 
         if ($operator !== null) {
             $authorizer->forceFill(['operator_id' => $operator->id])->save();
