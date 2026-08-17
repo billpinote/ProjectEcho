@@ -68,12 +68,27 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->actingAs($authorizer);
 
-        Livewire::test(ScanAuthorizationQr::class)
+        $component = Livewire::test(ScanAuthorizationQr::class)
             ->set('payload', $this->payload($flight))
             ->assertSet('matchedFlight.id', $flight->id)
             ->assertSeeText('PIC Authorization Required')
             ->assertSeeText('Authorize as PIC')
             ->assertSeeText('Decline Authorization');
+
+        $previewToken = array_key_last((array) session('scanned_flight_plan_previews'));
+        $previewUrl = route('flightplan.pic-authorization.preview', ['token' => $previewToken]);
+
+        $component->assertSet('matchedFlight.view_url', $previewUrl);
+
+        $this->get($previewUrl)
+            ->assertOk()
+            ->assertSee('FLIGHT PLAN', false)
+            ->assertSee('BACK TO PIC AUTHORIZATION SCANNER', false)
+            ->assertDontSee('<button', false)
+            ->assertDontSee('<form method="POST"', false);
+
+        $this->get(route('flights.view', $flight))->assertForbidden();
+        $this->assertFalse(FlightResource::getEloquentQuery()->whereKey($flight)->exists());
     }
 
     public function test_different_operator_pilot_is_rejected_by_the_scanner_before_authorization(): void
@@ -87,6 +102,48 @@ class PicAuthorizationWorkflowTest extends TestCase
         Livewire::test(ScanAuthorizationQr::class)
             ->set('payload', $this->payload($flight))
             ->assertSet('matchedFlight', null);
+    }
+
+    public function test_different_operator_cannot_use_a_pic_preview_token(): void
+    {
+        $operator = Operator::factory()->create();
+        $authorizer = $this->user(UserRole::Pilot, PilotLicenseType::AirlineTransportPilot->value, $operator);
+        $filedBy = $this->user(UserRole::Pilot, null, $operator);
+        $flight = $this->awaitingFlight($authorizer, [
+            'filed_by_user_id' => $filedBy->id,
+            'operator_id' => $operator->id,
+        ]);
+
+        $this->actingAs($authorizer);
+        Livewire::test(ScanAuthorizationQr::class)->set('payload', $this->payload($flight));
+        $previewToken = array_key_last((array) session('scanned_flight_plan_previews'));
+
+        $otherPilot = $this->user(UserRole::Pilot, PilotLicenseType::PrivatePilot->value, Operator::factory()->create());
+
+        $this->actingAs($otherPilot)
+            ->get(route('flightplan.pic-authorization.preview', ['token' => $previewToken]))
+            ->assertForbidden();
+    }
+
+    public function test_preparer_can_load_authorization_preview_but_has_no_decision_controls(): void
+    {
+        $preparer = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($preparer, ['prepared_by_user_id' => $preparer->id]);
+
+        $this->actingAs($preparer);
+
+        Livewire::test(ScanAuthorizationQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSet('matchedFlight.id', $flight->id)
+            ->assertSeeText('You prepared this flight plan')
+            ->assertDontSeeText('Authorize as PIC')
+            ->assertDontSeeText('Decline Authorization');
+
+        $previewToken = array_key_last((array) session('scanned_flight_plan_previews'));
+
+        $this->get(route('flightplan.pic-authorization.preview', ['token' => $previewToken]))
+            ->assertOk()
+            ->assertSee('BACK TO PIC AUTHORIZATION SCANNER', false);
     }
 
     public function test_normal_import_scanner_still_denies_another_pilots_flight(): void

@@ -7,6 +7,7 @@ use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
@@ -449,6 +450,47 @@ class FlightController extends Controller
             'isPreview' => true,
             'showPreviewActions' => false,
             'showReviewActions' => false,
+        ]);
+    }
+
+    public function previewPicAuthorizationFlightPlan(Request $request, string $token)
+    {
+        $this->ensureFlightUserAccess();
+
+        $preview = $request->session()->get('scanned_flight_plan_previews.'.$token);
+
+        abort_unless(
+            is_array($preview)
+            && ($preview['purpose'] ?? null) === 'pic_authorization'
+            && is_string($preview['payload'] ?? null)
+            && is_array($preview['snapshot'] ?? null)
+            && is_numeric($preview['flight_id'] ?? null),
+            403,
+        );
+
+        $parsedPayload = $this->qrPayloads()->parsePayload($preview['payload']);
+        $flight = Flight::query()->find((int) $preview['flight_id']);
+
+        abort_unless(
+            ($parsedPayload['format'] ?? null) === 'v2-offline'
+            && (int) ($parsedPayload['flight_id'] ?? 0) === (int) $flight?->getKey()
+            && is_array($parsedPayload['snapshot'] ?? null)
+            && $parsedPayload['snapshot'] === $preview['snapshot']
+            && $flight !== null
+            && FlightAccess::canAccessPicAuthorization(Auth::user(), $flight)
+            && $flight->requiresPicAuthorization()
+            && ! $flight->isPicAuthorizationCurrent()
+            && $this->qrPayloads()->snapshotMatchesFlight($parsedPayload['snapshot'], $flight),
+            403,
+        );
+
+        return view('flightplan.pdf', [
+            'flight' => $flight,
+            'qrCodeBase64' => $this->generateQrCodeBase64FromPayload($preview['payload']),
+            'isPreview' => true,
+            'showPreviewActions' => false,
+            'showReviewActions' => false,
+            'backActionUrl' => $this->picAuthorizationScannerUrl(),
         ]);
     }
 
@@ -1153,6 +1195,13 @@ class FlightController extends Controller
         $user = Auth::user();
 
         return (string) ($user?->wiresign ?: $user?->name ?: '');
+    }
+
+    private function picAuthorizationScannerUrl(): string
+    {
+        return Auth::user()?->isPilot()
+            ? route('filament.pilot.pages.scan-authorization-qr')
+            : route('filament.dispatch.pages.scan-authorization-qr');
     }
 
     /**

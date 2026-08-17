@@ -445,13 +445,15 @@
                                 </div>
                             @endif
 
-                            <form wire:submit="declineAuthorization" style="margin-top: 1rem;">
-                                <label for="decline-reason" class="echo-field-label echo-title">Decline reason (optional)</label>
-                                <textarea id="decline-reason" wire:model="declineReason" rows="2" class="echo-payload-textarea" placeholder="Optional reason"></textarea>
-                                <button type="submit" wire:loading.attr="disabled" class="echo-button echo-button-secondary" style="margin-top: 0.75rem;">
-                                    Decline Authorization
-                                </button>
-                            </form>
+                            @if(! $this->isPicAuthorizationPreparer())
+                                <form wire:submit="declineAuthorization" style="margin-top: 1rem;">
+                                    <label for="decline-reason" class="echo-field-label echo-title">Decline reason (optional)</label>
+                                    <textarea id="decline-reason" wire:model="declineReason" rows="2" class="echo-payload-textarea" placeholder="Optional reason"></textarea>
+                                    <button type="submit" wire:loading.attr="disabled" class="echo-button echo-button-secondary" style="margin-top: 0.75rem;">
+                                        Decline Authorization
+                                    </button>
+                                </form>
+                            @endif
                         @endif
                     </section>
                 @else

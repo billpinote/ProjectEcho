@@ -40,6 +40,16 @@ class ScanAuthorizationQr extends ImportScanQr
         return $user !== null && FlightAccess::canAccessPicAuthorization($user, $flight);
     }
 
+    protected function scannedPreviewPurpose(): ?string
+    {
+        return 'pic_authorization';
+    }
+
+    protected function scannedFlightViewUrl(?Flight $flight, string $previewToken): string
+    {
+        return route('flightplan.pic-authorization.preview', ['token' => $previewToken]);
+    }
+
     public function canAuthorizeMatchedFlight(): bool
     {
         $flight = $this->matchedFlight !== null ? Flight::find((int) $this->matchedFlight['id']) : null;

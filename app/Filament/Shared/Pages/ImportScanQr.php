@@ -152,6 +152,7 @@ class ImportScanQr extends Page
                 'payload' => $parsedPayload['normalized_payload'],
                 'snapshot' => $snapshot,
                 'flight_id' => $parsedPayload['flight_id'],
+                'purpose' => $this->scannedPreviewPurpose(),
                 'issued_at' => $parsedPayload['issued_at'],
                 'key_id' => $parsedPayload['key_id'],
                 'schema_id' => $parsedPayload['schema_id'],
@@ -169,9 +170,7 @@ class ImportScanQr extends Page
                 'status' => $status?->value ?? 'verified_qr_only',
                 'status_label' => $status?->label() ?? 'Valid QR. Needs ATC Review.',
                 'status_color' => $status?->filamentColor() ?? 'info',
-                'view_url' => $flight
-                    ? route('flights.view', $flight)
-                    : route('flightplan.scan-qr.preview', ['token' => $previewToken]),
+                'view_url' => $this->scannedFlightViewUrl($flight, $previewToken),
             ];
 
             if ($notifyOnSuccess) {
@@ -207,6 +206,17 @@ class ImportScanQr extends Page
         $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
         $status = $flight->status instanceof FlightPlanStatus ? $flight->status : FlightPlanStatus::tryFrom((string) $flight->status);
 
+        $previewToken = null;
+
+        if ($this->scannedPreviewPurpose() !== null) {
+            $previewToken = $this->storeScannedFlightPlanPreview([
+                'payload' => $parsedPayload['normalized_payload'],
+                'snapshot' => $flight->toArray(),
+                'flight_id' => $flight->getKey(),
+                'purpose' => $this->scannedPreviewPurpose(),
+            ]);
+        }
+
         $this->matchedFlight = [
             'id' => $flight->getKey(),
             'aircraft_identification' => (string) ($flight->aircraft_identification ?? 'N/A'),
@@ -217,7 +227,9 @@ class ImportScanQr extends Page
             'status' => $status?->value ?? (string) ($flight->status ?? 'unknown'),
             'status_label' => $status?->label() ?? str((string) ($flight->status ?? 'unknown'))->headline()->toString(),
             'status_color' => $status?->filamentColor() ?? 'gray',
-            'view_url' => route('flights.view', $flight),
+            'view_url' => $previewToken !== null
+                ? $this->scannedFlightViewUrl($flight, $previewToken)
+                : route('flights.view', $flight),
         ];
 
         if ($notifyOnSuccess) {
@@ -231,6 +243,18 @@ class ImportScanQr extends Page
     protected function canAccessScannedFlight(Flight $flight): bool
     {
         return Auth::user()?->can('view', $flight) ?? false;
+    }
+
+    protected function scannedPreviewPurpose(): ?string
+    {
+        return null;
+    }
+
+    protected function scannedFlightViewUrl(?Flight $flight, string $previewToken): string
+    {
+        return $flight
+            ? route('flights.view', $flight)
+            : route('flightplan.scan-qr.preview', ['token' => $previewToken]);
     }
 
     /**
