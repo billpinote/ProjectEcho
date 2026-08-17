@@ -146,6 +146,32 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertSee('BACK TO PIC AUTHORIZATION SCANNER', false);
     }
 
+    public function test_pic_authorization_preview_rejects_missing_token(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+
+        $this->actingAs($pilot)
+            ->get(route('flightplan.pic-authorization.preview', ['token' => 'missing-token']))
+            ->assertForbidden();
+    }
+
+    public function test_pic_authorization_preview_rejects_stale_session_payload(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::AirlineTransportPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+
+        $this->actingAs($pilot);
+        Livewire::test(ScanAuthorizationQr::class)->set('payload', $this->payload($flight));
+        $previewToken = array_key_last((array) session('scanned_flight_plan_previews'));
+
+        $flight->forceFill([
+            'revision_number' => (int) ($flight->revision_number ?? 1) + 1,
+        ])->save();
+
+        $this->get(route('flightplan.pic-authorization.preview', ['token' => $previewToken]))
+            ->assertForbidden();
+    }
+
     public function test_normal_import_scanner_still_denies_another_pilots_flight(): void
     {
         $operator = Operator::factory()->create();

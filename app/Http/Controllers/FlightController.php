@@ -6,8 +6,8 @@ use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
+use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
-use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class FlightController extends Controller
@@ -468,21 +469,14 @@ class FlightController extends Controller
             403,
         );
 
-        $parsedPayload = $this->qrPayloads()->parsePayload($preview['payload']);
-        $flight = Flight::query()->find((int) $preview['flight_id']);
+        try {
+            $flight = app(PicAuthorizationService::class)
+                ->resolveAccessibleFlightFromPayload($preview['payload'], Auth::user());
+        } catch (ValidationException) {
+            abort(403);
+        }
 
-        abort_unless(
-            ($parsedPayload['format'] ?? null) === 'v2-offline'
-            && (int) ($parsedPayload['flight_id'] ?? 0) === (int) $flight?->getKey()
-            && is_array($parsedPayload['snapshot'] ?? null)
-            && $parsedPayload['snapshot'] === $preview['snapshot']
-            && $flight !== null
-            && FlightAccess::canAccessPicAuthorization(Auth::user(), $flight)
-            && $flight->requiresPicAuthorization()
-            && ! $flight->isPicAuthorizationCurrent()
-            && $this->qrPayloads()->snapshotMatchesFlight($parsedPayload['snapshot'], $flight),
-            403,
-        );
+        abort_unless((int) $preview['flight_id'] === (int) $flight->getKey(), 403);
 
         return view('flightplan.pdf', [
             'flight' => $flight,

@@ -21,7 +21,7 @@ class PicAuthorizationService
 
     public function authorizeFromPayload(string $payload, User $authorizer): Flight
     {
-        $flight = $this->resolveFlight($payload, $authorizer);
+        $flight = $this->resolveAccessibleFlightFromPayload($payload, $authorizer);
         $credentials = $this->eligibleCredentials($authorizer, $flight);
 
         return DB::transaction(function () use ($flight, $authorizer, $credentials): Flight {
@@ -52,7 +52,7 @@ class PicAuthorizationService
 
     public function declineFromPayload(string $payload, User $user, ?string $reason = null): Flight
     {
-        $flight = $this->resolveFlight($payload, $user);
+        $flight = $this->resolveAccessibleFlightFromPayload($payload, $user);
 
         return DB::transaction(function () use ($flight, $user, $reason): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
@@ -87,9 +87,10 @@ class PicAuthorizationService
         return $credentials;
     }
 
-    private function resolveFlight(string $payload, User $user): Flight
+    public function resolveAccessibleFlightFromPayload(string $payload, User $user): Flight
     {
-        $parsed = app(FlightPlanQrPayloadService::class)->parsePayload($payload);
+        $payloadService = app(FlightPlanQrPayloadService::class);
+        $parsed = $payloadService->parsePayload($payload);
 
         if (($parsed['format'] ?? null) !== 'v2-offline' || ! is_array($parsed['snapshot'] ?? null)) {
             throw ValidationException::withMessages(['payload' => 'A current signed Echo flight-plan QR is required for PIC authorization.']);
@@ -110,8 +111,12 @@ class PicAuthorizationService
             throw ValidationException::withMessages(['payload' => $message]);
         }
 
-        if (! app(FlightPlanQrPayloadService::class)->snapshotMatchesFlight($parsed['snapshot'], $flight)) {
+        if (! $payloadService->snapshotMatchesFlight($parsed['snapshot'], $flight)) {
             throw ValidationException::withMessages(['payload' => 'This QR payload is stale. Scan the current flight-plan QR again.']);
+        }
+
+        if (! $flight->requiresPicAuthorization() || $flight->isPicAuthorizationCurrent()) {
+            throw ValidationException::withMessages(['payload' => 'This flight plan no longer requires PIC authorization.']);
         }
 
         return $flight;
