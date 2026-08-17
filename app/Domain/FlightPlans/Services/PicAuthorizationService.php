@@ -56,7 +56,7 @@ class PicAuthorizationService
 
         return DB::transaction(function () use ($flight, $user, $reason): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
-            $this->guardCurrentAuthorizationState($flight, $user, enforcePreparerRestriction: false);
+            $this->guardCurrentAuthorizationState($flight, $user);
 
             $flight->forceFill([
                 'pic_authorization_status' => 'declined',

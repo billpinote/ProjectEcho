@@ -49,6 +49,13 @@ class ScanAuthorizationQr extends ImportScanQr
         }
     }
 
+    public function isPicAuthorizationPreparer(): bool
+    {
+        return $this->matchedFlight !== null
+            && (int) $this->matchedFlight['id'] > 0
+            && (int) Flight::query()->whereKey($this->matchedFlight['id'])->value('prepared_by_user_id') === (int) auth()->id();
+    }
+
     public function authorizeAsPic(): void
     {
         try {

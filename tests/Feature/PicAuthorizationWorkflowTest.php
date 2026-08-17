@@ -9,6 +9,7 @@ use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Resources\Flights\FlightResource;
+use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Models\Flight;
 use App\Models\Operator;
 use App\Models\User;
@@ -85,6 +86,26 @@ class PicAuthorizationWorkflowTest extends TestCase
         app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer);
     }
 
+    public function test_same_operator_spl_can_access_the_qr_but_cannot_authorize(): void
+    {
+        $operator = Operator::factory()->create();
+        $authorizer = $this->user(UserRole::Pilot, PilotLicenseType::StudentPilot->value, $operator);
+        $filedBy = $this->user(UserRole::Pilot, null, $operator);
+        $flight = $this->awaitingFlight($authorizer, [
+            'filed_by_user_id' => $filedBy->id,
+            'operator_id' => $operator->id,
+        ]);
+
+        $this->assertTrue(FlightAccess::canAccessPicAuthorization($authorizer, $flight));
+
+        try {
+            app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer);
+            $this->fail('An SPL holder was allowed to authorize.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Only verified PPL, CPL, or ATPL holders may authorize as PIC.', $exception->errors()['payload'][0]);
+        }
+    }
+
     public function test_dispatch_and_operator_staff_without_eligible_profiles_cannot_authorize(): void
     {
         foreach ([UserRole::Dispatch, UserRole::OperatorStaff] as $role) {
@@ -105,8 +126,38 @@ class PicAuthorizationWorkflowTest extends TestCase
         $preparer = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
         $flight = $this->awaitingFlight($preparer, ['prepared_by_user_id' => $preparer->id]);
 
-        $this->expectException(ValidationException::class);
-        app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $preparer);
+        try {
+            app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $preparer);
+            $this->fail('The preparer was allowed to authorize their own submission.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('The preparer cannot authorize their own flight-plan submission.', $exception->errors()['payload'][0]);
+        }
+    }
+
+    public function test_preparer_cannot_decline_their_own_submission(): void
+    {
+        $preparer = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($preparer, ['prepared_by_user_id' => $preparer->id]);
+
+        try {
+            app(PicAuthorizationService::class)->declineFromPayload($this->payload($flight), $preparer, 'No.');
+            $this->fail('The preparer was allowed to decline their own submission.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('The preparer cannot authorize their own flight-plan submission.', $exception->errors()['payload'][0]);
+            $this->assertNull($flight->refresh()->pic_authorization_status);
+        }
+    }
+
+    public function test_preparer_can_open_but_has_no_pic_decision_controls(): void
+    {
+        $preparer = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($preparer, ['prepared_by_user_id' => $preparer->id]);
+        $page = new ScanAuthorizationQr;
+        $page->matchedFlight = ['id' => $flight->id];
+
+        $this->actingAs($preparer);
+        $this->assertTrue($page->isPicAuthorizationPreparer());
+        $this->assertFalse($page->canAuthorizeMatchedFlight());
     }
 
     public function test_awaiting_pic_flight_is_absent_from_atmo_pending_queue(): void
@@ -150,8 +201,13 @@ class PicAuthorizationWorkflowTest extends TestCase
 
     public function test_decline_records_audit_state_without_deleting_the_flight(): void
     {
-        $reviewer = $this->user(UserRole::Dispatch);
-        $flight = $this->awaitingFlight($reviewer);
+        $operator = Operator::factory()->create();
+        $reviewer = $this->user(UserRole::Dispatch, null, $operator);
+        $preparer = $this->user(UserRole::Dispatch, null, $operator);
+        $flight = $this->awaitingFlight($reviewer, [
+            'prepared_by_user_id' => $preparer->id,
+            'operator_id' => $operator->id,
+        ]);
 
         $declined = app(PicAuthorizationService::class)->declineFromPayload(
             $this->payload($flight),
