@@ -3,6 +3,7 @@
 namespace App\Filament\Panels\Pilot\Pages;
 
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Pages\ImportScanQr;
 use App\Models\Flight;
@@ -30,6 +31,13 @@ class ScanAuthorizationQr extends ImportScanQr
     public function isPicAuthorizationPage(): bool
     {
         return true;
+    }
+
+    protected function canAccessScannedFlight(Flight $flight): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null && FlightAccess::canAccessPicAuthorization($user, $flight);
     }
 
     public function canAuthorizeMatchedFlight(): bool

@@ -130,7 +130,7 @@ class ImportScanQr extends Page
 
             $flight = Flight::find((int) $parsedPayload['flight_id']);
 
-            if ($flight !== null && ! (Auth::user()?->can('view', $flight) ?? false)) {
+            if ($flight !== null && ! $this->canAccessScannedFlight($flight)) {
                 $this->matchedFlight = null;
                 $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
 
@@ -186,7 +186,7 @@ class ImportScanQr extends Page
 
         $flight = Flight::find((int) $parsedPayload['flight_id']);
 
-        if (! $flight || ! (Auth::user()?->can('view', $flight) ?? false)) {
+        if (! $flight || ! $this->canAccessScannedFlight($flight)) {
             $this->matchedFlight = null;
             $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
 
@@ -226,6 +226,11 @@ class ImportScanQr extends Page
                 ->success()
                 ->send();
         }
+    }
+
+    protected function canAccessScannedFlight(Flight $flight): bool
+    {
+        return Auth::user()?->can('view', $flight) ?? false;
     }
 
     /**

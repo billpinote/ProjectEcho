@@ -10,6 +10,7 @@ use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
+use App\Filament\Shared\Pages\ImportScanQr;
 use App\Models\Flight;
 use App\Models\Operator;
 use App\Models\User;
@@ -17,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
+use Livewire\Livewire;
 
 class PicAuthorizationWorkflowTest extends TestCase
 {
@@ -52,6 +54,56 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->assertFalse(FlightAccess::canView($authorizer, $flight));
         $this->assertTrue(FlightAccess::canAccessPicAuthorization($authorizer, $flight));
         $this->assertTrue(app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer)->canSubmitToAtc());
+    }
+
+    public function test_same_operator_pilot_loads_another_pilots_qr_through_the_scanner(): void
+    {
+        $operator = Operator::factory()->create();
+        $authorizer = $this->user(UserRole::Pilot, PilotLicenseType::AirlineTransportPilot->value, $operator);
+        $filedBy = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $flight = $this->awaitingFlight($authorizer, [
+            'filed_by_user_id' => $filedBy->id,
+            'operator_id' => $operator->id,
+        ]);
+
+        $this->actingAs($authorizer);
+
+        Livewire::test(ScanAuthorizationQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSet('matchedFlight.id', $flight->id)
+            ->assertSeeText('PIC Authorization Required')
+            ->assertSeeText('Authorize as PIC')
+            ->assertSeeText('Decline Authorization');
+    }
+
+    public function test_different_operator_pilot_is_rejected_by_the_scanner_before_authorization(): void
+    {
+        $flightOperator = Operator::factory()->create();
+        $authorizer = $this->user(UserRole::Pilot, PilotLicenseType::AirlineTransportPilot->value, Operator::factory()->create());
+        $flight = $this->awaitingFlight($authorizer, ['operator_id' => $flightOperator->id]);
+
+        $this->actingAs($authorizer);
+
+        Livewire::test(ScanAuthorizationQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSet('matchedFlight', null);
+    }
+
+    public function test_normal_import_scanner_still_denies_another_pilots_flight(): void
+    {
+        $operator = Operator::factory()->create();
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::AirlineTransportPilot->value, $operator);
+        $filedBy = $this->user(UserRole::Pilot, null, $operator);
+        $flight = $this->awaitingFlight($pilot, [
+            'filed_by_user_id' => $filedBy->id,
+            'operator_id' => $operator->id,
+        ]);
+
+        $this->actingAs($pilot);
+
+        Livewire::test(ImportScanQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSet('matchedFlight', null);
     }
 
     #[DataProvider('eligibleLicenseTypes')]
