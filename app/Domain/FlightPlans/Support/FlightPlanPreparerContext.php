@@ -181,6 +181,12 @@ class FlightPlanPreparerContext
             $data['authorized_representative_role'] = $this->representativeRole();
             $data['authorized_representative_id_license'] = $this->representativeIdOrLicense();
             $data['authorized_representative_expiry_date'] = $this->representativeAuthorizationExpiry();
+        } elseif ($this->preparerActsAsPic()) {
+            $data['authorized_representative_enabled'] = false;
+            $data['authorized_representative_name'] = null;
+            $data['authorized_representative_role'] = null;
+            $data['authorized_representative_id_license'] = null;
+            $data['authorized_representative_expiry_date'] = null;
         }
 
         unset($data['filing_capacity']);

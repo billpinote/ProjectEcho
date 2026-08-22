@@ -116,9 +116,40 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'pilot_ratings' => 'C172',
                 'license_expiry_date' => '2028-12-31',
                 'authorized_representative_enabled' => false,
+                'authorized_representative_name' => null,
+                'authorized_representative_role' => null,
+                'authorized_representative_id_license' => null,
+                'authorized_representative_expiry_date' => null,
             ])
             ->assertFormFieldReadOnly('pilot_license_no')
             ->assertFormFieldEnabled('authorized_representative_enabled');
+    }
+
+    public function test_pilot_self_pic_save_stores_only_pic_certification_data(): void
+    {
+        $pilot = $this->pilotWithCredentials();
+
+        Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->fillForm($this->validFlightPlanFormData([
+                'authorized_representative_enabled' => true,
+                'authorized_representative_name' => 'FORGED REPRESENTATIVE',
+                'authorized_representative_role' => 'PILOT',
+                'authorized_representative_id_license' => 'CPL-FORGED',
+                'authorized_representative_expiry_date' => '2035-01-01',
+            ]))
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $flight = Flight::query()->latest('id')->firstOrFail();
+
+        $this->assertSame('VERIFIED PILOT', $flight->pilot_in_command);
+        $this->assertSame('CPL-123456', $flight->pilot_license_no);
+        $this->assertFalse($flight->authorized_representative_enabled);
+        $this->assertNull($flight->authorized_representative_name);
+        $this->assertNull($flight->authorized_representative_role);
+        $this->assertNull($flight->authorized_representative_id_license);
+        $this->assertNull($flight->authorized_representative_expiry_date);
     }
 
     public function test_ppl_cpl_and_atpl_forms_hide_capacity_dropdown_and_show_secondary_pic_action(): void
@@ -206,9 +237,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
 
         Livewire::actingAs($pilot)
             ->test(CreateFlight::class)
-            ->assertFormSet([
-                'authorized_representative_id_license' => 'SPL-123456',
-            ])
+            ->fillForm(['filing_capacity' => FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC])
+            ->assertFormSet(['authorized_representative_id_license' => 'SPL-123456'])
             ->fillForm($this->validFlightPlanFormData([
                 'pilot_in_command' => 'FORGED PIC',
                 'pilot_license_no' => '123456',

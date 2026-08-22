@@ -322,7 +322,7 @@ class FlightForm
                                             ->extraAttributes(['class' => 'caap-dispatch-checkbox'])
                                             ->columnSpan(8),
                                         self::text('authorized_representative_name', 'Representative Name', 4)
-                                            ->default(fn (): ?string => self::preparerContext()->representativeName())
+                                            ->default(fn (): ?string => self::representativeDefault('name'))
                                             ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
                                             ->required(fn (Get $get): bool => (bool) $get('authorized_representative_enabled'))
                                             ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
@@ -330,12 +330,12 @@ class FlightForm
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::text('authorized_representative_role', 'Role', 2)
-                                            ->default(fn (): ?string => self::preparerContext()->representativeRole())
+                                            ->default(fn (): ?string => self::representativeDefault('role'))
                                             ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
                                             ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
                                             ->extraInputAttributes(fn (Get $get): array => self::representativeInputAttributes($get)),
                                         self::text('authorized_representative_id_license', 'ID/License', 1)
-                                            ->default(fn (): ?string => self::preparerContext()->representativeIdOrLicense())
+                                            ->default(fn (): ?string => self::representativeDefault('id_license'))
                                             ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
                                             ->required(fn (Get $get): bool => (bool) $get('authorized_representative_enabled'))
                                             ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
@@ -343,7 +343,7 @@ class FlightForm
                                             ->live(onBlur: true)
                                             ->partiallyRenderComponentsAfterStateUpdated(['certification-lines']),
                                         self::date('authorized_representative_expiry_date', 'Expiry Date', 1)
-                                            ->default(fn (): ?string => self::preparerContext()->representativeAuthorizationExpiry())
+                                            ->default(fn (): ?string => self::representativeDefault('expiry_date'))
                                             ->hidden(fn (Get $get): bool => ! (bool) $get('authorized_representative_enabled'))
                                             ->required(fn (Get $get): bool => (bool) $get('authorized_representative_enabled') && ! self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
                                             ->readOnly(fn (Get $get): bool => self::preparerContext($get)->shouldLockAuthorizedRepresentativeFields())
@@ -604,6 +604,23 @@ class FlightForm
         $set('authorized_representative_role', $context->representativeRole());
         $set('authorized_representative_id_license', $context->representativeIdOrLicense());
         $set('authorized_representative_expiry_date', $context->representativeAuthorizationExpiry());
+    }
+
+    private static function representativeDefault(string $field): ?string
+    {
+        $context = self::preparerContext();
+
+        if (! $context->isPreparingForAnotherPic()) {
+            return null;
+        }
+
+        return match ($field) {
+            'name' => $context->representativeName(),
+            'role' => $context->representativeRole(),
+            'id_license' => $context->representativeIdOrLicense(),
+            'expiry_date' => $context->representativeAuthorizationExpiry(),
+            default => null,
+        };
     }
 
     /**
