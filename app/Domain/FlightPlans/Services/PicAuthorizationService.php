@@ -64,11 +64,25 @@ class PicAuthorizationService
     public function authorizeFromPayload(string $payload, User $authorizer): Flight
     {
         $flight = $this->resolveAccessibleFlightFromPayload($payload, $authorizer);
+        $token = $this->createAuthorizationHandoff($flight);
+
+        return $this->authorizeFromHandoff($token, $authorizer);
+    }
+
+    public function authorizeFromHandoff(string $token, User $authorizer): Flight
+    {
+        $flight = $this->resolveAuthorizationHandoff($token);
+        if ($flight === null) {
+            throw ValidationException::withMessages(['payload' => 'This PIC authorization handoff is invalid, expired, or no longer current.']);
+        }
+
+        $this->guardPicAccess($flight, $authorizer);
         $credentials = $this->eligibleCredentials($authorizer, $flight);
 
-        return DB::transaction(function () use ($flight, $authorizer, $credentials): Flight {
+        return DB::transaction(function () use ($flight, $authorizer, $credentials, $token): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $this->guardCurrentAuthorizationState($flight, $authorizer);
+            $this->guardHandoffToken($flight, $token);
 
             $flight->forceFill([
                 'pilot_in_command_user_id' => $authorizer->getKey(),
@@ -97,10 +111,24 @@ class PicAuthorizationService
     public function declineFromPayload(string $payload, User $user, ?string $reason = null): Flight
     {
         $flight = $this->resolveAccessibleFlightFromPayload($payload, $user);
+        $token = $this->createAuthorizationHandoff($flight);
 
-        return DB::transaction(function () use ($flight, $user, $reason): Flight {
+        return $this->declineFromHandoff($token, $user, $reason);
+    }
+
+    public function declineFromHandoff(string $token, User $user, ?string $reason = null): Flight
+    {
+        $flight = $this->resolveAuthorizationHandoff($token);
+        if ($flight === null) {
+            throw ValidationException::withMessages(['payload' => 'This PIC authorization handoff is invalid, expired, or no longer current.']);
+        }
+
+        $this->guardPicAccess($flight, $user);
+
+        return DB::transaction(function () use ($flight, $user, $reason, $token): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $this->guardCurrentAuthorizationState($flight, $user);
+            $this->guardHandoffToken($flight, $token);
 
             $flight->forceFill([
                 'pic_authorization_status' => 'declined',
@@ -176,6 +204,22 @@ class PicAuthorizationService
 
         if ($enforcePreparerRestriction && (int) $flight->prepared_by_user_id === (int) $user->getKey()) {
             throw ValidationException::withMessages(['payload' => 'The preparer cannot authorize their own flight-plan submission.']);
+        }
+    }
+
+    private function guardHandoffToken(Flight $flight, string $token): void
+    {
+        $current = $this->resolveAuthorizationHandoff($token);
+
+        if ($current === null || (int) $current->getKey() !== (int) $flight->getKey()) {
+            throw ValidationException::withMessages(['payload' => 'This PIC authorization handoff is invalid, expired, or no longer current.']);
+        }
+    }
+
+    private function guardPicAccess(Flight $flight, User $user): void
+    {
+        if (! FlightAccess::canAccessPicAuthorization($user, $flight)) {
+            throw ValidationException::withMessages(['payload' => 'You are not authorized to act on this flight plan.']);
         }
     }
 }

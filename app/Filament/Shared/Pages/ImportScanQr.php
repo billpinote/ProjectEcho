@@ -6,6 +6,7 @@ use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Models\Flight;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
+use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -38,6 +39,8 @@ class ImportScanQr extends Page
      * @var array<string, mixed>|null
      */
     public ?array $matchedFlight = null;
+
+    public ?string $picAuthorizationHandoffToken = null;
 
     public function isPicAuthorizationPage(): bool
     {
@@ -145,6 +148,10 @@ class ImportScanQr extends Page
                 return;
             }
 
+            if (! $this->validatePicAuthorizationScan($parsedPayload['normalized_payload'])) {
+                return;
+            }
+
             $status = $flight?->status instanceof FlightPlanStatus
                 ? $flight->status
                 : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
@@ -163,6 +170,7 @@ class ImportScanQr extends Page
                     ->createAuthorizationHandoff($flight);
                 session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
                 $previewToken = $handoffToken;
+                $this->picAuthorizationHandoffToken = $handoffToken;
             }
 
             $this->payload = $parsedPayload['normalized_payload'];
@@ -209,6 +217,10 @@ class ImportScanQr extends Page
             return;
         }
 
+        if (! $this->validatePicAuthorizationScan($parsedPayload['normalized_payload'])) {
+            return;
+        }
+
         $this->payload = $parsedPayload['normalized_payload'];
         $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
         $status = $flight->status instanceof FlightPlanStatus ? $flight->status : FlightPlanStatus::tryFrom((string) $flight->status);
@@ -228,6 +240,7 @@ class ImportScanQr extends Page
                     ->createAuthorizationHandoff($flight);
                 session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
                 $previewToken = $handoffToken;
+                $this->picAuthorizationHandoffToken = $handoffToken;
             }
         }
 
@@ -262,6 +275,27 @@ class ImportScanQr extends Page
     protected function scannedPreviewPurpose(): ?string
     {
         return null;
+    }
+
+    private function validatePicAuthorizationScan(string $payload): bool
+    {
+        if ($this->scannedPreviewPurpose() !== 'pic_authorization') {
+            return true;
+        }
+
+        try {
+            app(PicAuthorizationService::class)->resolveAccessibleFlightFromPayload($payload, Auth::user());
+
+            return true;
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                foreach ($messages as $message) {
+                    $this->addError($field, $message);
+                }
+            }
+
+            return false;
+        }
     }
 
     protected function scannedFlightViewUrl(?Flight $flight, string $previewToken): string

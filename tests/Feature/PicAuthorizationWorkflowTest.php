@@ -173,6 +173,14 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->get(route('flightplan.pic-authorization.preview', ['token' => $token]))
             ->assertOk()
             ->assertSee('FLIGHT PLAN', false);
+
+        Livewire::actingAs($pilot)
+            ->test(ScanAuthorizationQr::class)
+            ->set('picAuthorizationHandoffToken', $token)
+            ->call('authorizeAsPic')
+            ->assertHasNoErrors();
+
+        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
     }
 
     public function test_jesse_to_chezka_current_qr_authorization_succeeds(): void
@@ -297,11 +305,41 @@ class PicAuthorizationWorkflowTest extends TestCase
         $flight = $this->awaitingFlight($pilot);
         $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
 
-        app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $pilot);
+        app(PicAuthorizationService::class)->authorizeFromHandoff($token, $pilot);
 
         $this->actingAs($pilot)
             ->get(route('flightplan.pic-authorization.preview', ['token' => $token]))
             ->assertForbidden();
+    }
+
+    public function test_revision_change_after_handoff_blocks_token_authorization(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        $flight->incrementRevisionNumber();
+
+        $this->expectException(ValidationException::class);
+        app(PicAuthorizationService::class)->authorizeFromHandoff($token, $pilot);
+    }
+
+    public function test_decline_consumes_the_pic_authorization_handoff(): void
+    {
+        $operator = Operator::factory()->create();
+        $reviewer = $this->user(UserRole::Dispatch, null, $operator);
+        $preparer = $this->user(UserRole::Dispatch, null, $operator);
+        $flight = $this->awaitingFlight($reviewer, [
+            'operator_id' => $operator->id,
+            'prepared_by_user_id' => $preparer->id,
+        ]);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        app(PicAuthorizationService::class)->declineFromHandoff($token, $reviewer, 'Needs correction.');
+
+        $this->assertNull($flight->refresh()->pic_authorization_token);
+        $this->expectException(ValidationException::class);
+        app(PicAuthorizationService::class)->declineFromHandoff($token, $reviewer);
     }
 
     public function test_tampered_or_expired_pic_authorization_handoff_is_rejected(): void

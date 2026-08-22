@@ -77,8 +77,8 @@ class ScanAuthorizationQr extends ImportScanQr
     public function authorizeAsPic(): void
     {
         try {
-            app(PicAuthorizationService::class)->authorizeFromPayload($this->payload, auth()->user());
-            $this->lookupPayload($this->payload, false, false);
+            app(PicAuthorizationService::class)->authorizeFromHandoff($this->picAuthorizationHandoffToken ?? '', auth()->user());
+            $this->picAuthorizationHandoffToken = null;
             Notification::make()->success()->title('Flight plan authorized as PIC')->send();
         } catch (ValidationException $exception) {
             $this->setValidationErrors($exception);
@@ -88,8 +88,8 @@ class ScanAuthorizationQr extends ImportScanQr
     public function declineAuthorization(): void
     {
         try {
-            app(PicAuthorizationService::class)->declineFromPayload($this->payload, auth()->user(), $this->declineReason);
-            $this->lookupPayload($this->payload, false, false);
+            app(PicAuthorizationService::class)->declineFromHandoff($this->picAuthorizationHandoffToken ?? '', auth()->user(), $this->declineReason);
+            $this->picAuthorizationHandoffToken = null;
             Notification::make()->success()->title('PIC authorization declined')->send();
         } catch (ValidationException $exception) {
             $this->setValidationErrors($exception);
