@@ -9,6 +9,7 @@ use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
@@ -202,6 +203,7 @@ class FlightController extends Controller
                 && $flight->status === FlightPlanStatus::Pending
                 && ! $flight->isPendingExpired(),
             'backActionUrl' => $backActionUrl,
+            'backActionLabel' => 'BACK TO FLIGHTS',
             'acceptActionUrl' => route('flights.accept', $flight),
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->resolveAtcWiresign(),
@@ -458,33 +460,26 @@ class FlightController extends Controller
     {
         $this->ensureFlightUserAccess();
 
-        $preview = $request->session()->get('scanned_flight_plan_previews.'.$token);
-
-        abort_unless(
-            is_array($preview)
-            && ($preview['purpose'] ?? null) === 'pic_authorization'
-            && is_string($preview['payload'] ?? null)
-            && is_array($preview['snapshot'] ?? null)
-            && is_numeric($preview['flight_id'] ?? null),
-            403,
-        );
+        $flight = app(PicAuthorizationService::class)->resolveAuthorizationHandoff($token);
+        abort_unless($flight !== null, 403);
+        abort_unless(FlightAccess::canAccessPicAuthorization(Auth::user(), $flight), 403);
 
         try {
-            $flight = app(PicAuthorizationService::class)
-                ->resolveAccessibleFlightFromPayload($preview['payload'], Auth::user());
+            app(PicAuthorizationService::class)->eligibleCredentials(Auth::user(), $flight);
         } catch (ValidationException) {
             abort(403);
         }
 
-        abort_unless((int) $preview['flight_id'] === (int) $flight->getKey(), 403);
+        $payload = app(FlightPlanQrPayloadService::class)->buildPayload($flight);
 
         return view('flightplan.pdf', [
             'flight' => $flight,
-            'qrCodeBase64' => $this->generateQrCodeBase64FromPayload($preview['payload']),
+            'qrCodeBase64' => $payload !== null ? $this->generateQrCodeBase64FromPayload($payload) : null,
             'isPreview' => true,
             'showPreviewActions' => false,
             'showReviewActions' => false,
             'backActionUrl' => $this->picAuthorizationScannerUrl(),
+            'backActionLabel' => 'BACK TO PIC AUTHORIZATION SCANNER',
         ]);
     }
 
@@ -1169,7 +1164,14 @@ class FlightController extends Controller
         $currentUrl = $request->fullUrl();
         $referer = $request->headers->get('referer');
 
-        if (is_string($referer) && $referer !== '' && $referer !== $currentUrl && ! str_contains($referer, '/flights/'.$flight->getKey().'/view')) {
+        $refererHost = is_string($referer) ? parse_url($referer, PHP_URL_HOST) : null;
+        $currentHost = parse_url($currentUrl, PHP_URL_HOST);
+
+        if (is_string($referer)
+            && $referer !== ''
+            && $referer !== $currentUrl
+            && $refererHost === $currentHost
+            && ! str_contains($referer, '/flights/'.$flight->getKey().'/view')) {
             $request->session()->put($sessionKey, $referer);
 
             return $referer;
@@ -1181,7 +1183,7 @@ class FlightController extends Controller
             return $storedBackUrl;
         }
 
-        return url('/admin');
+        return $this->roleAwarePanelUrl();
     }
 
     private function resolveAtcWiresign(): string
@@ -1196,6 +1198,21 @@ class FlightController extends Controller
         return Auth::user()?->isPilot()
             ? route('filament.pilot.pages.scan-authorization-qr')
             : route('filament.dispatch.pages.scan-authorization-qr');
+    }
+
+    private function roleAwarePanelUrl(): string
+    {
+        $panel = match (Auth::user()?->role?->value) {
+            'ATMO' => 'atmo',
+            'PILOT' => 'pilot',
+            'DISPATCH', 'OPERATOR_STAFF' => 'dispatch',
+            'AVSEC' => 'avsec',
+            'ATSHQ' => 'ats',
+            'ARTISAN' => 'artisan',
+            default => 'admin',
+        };
+
+        return url('/'.$panel);
     }
 
     /**

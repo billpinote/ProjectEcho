@@ -9,15 +9,57 @@ use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Models\Flight;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class PicAuthorizationService
 {
+    private const HANDOFF_TTL_MINUTES = 30;
+
     private const ELIGIBLE_LICENSES = [
         PilotLicenseType::PrivatePilot,
         PilotLicenseType::CommercialPilot,
         PilotLicenseType::AirlineTransportPilot,
     ];
+
+    public function createAuthorizationHandoff(Flight $flight): string
+    {
+        abort_unless($flight->requiresPicAuthorization() && ! $flight->isPicAuthorizationCurrent(), 422);
+
+        $token = Str::random(64);
+        $revision = (int) ($flight->revision_number ?? 1);
+        $flight->forceFill([
+            'pic_authorization_token' => hash('sha256', $token.'.'.$revision),
+            'pic_authorization_token_expires_at' => now()->addMinutes(self::HANDOFF_TTL_MINUTES),
+        ])->saveQuietly();
+
+        return $token;
+    }
+
+    public function resolveAuthorizationHandoff(string $token): ?Flight
+    {
+        if ($token === '' || ! preg_match('/^[A-Za-z0-9]+$/', $token)) {
+            return null;
+        }
+
+        $flight = Flight::query()
+            ->whereNotNull('pic_authorization_token')
+            ->get()
+            ->first(fn (Flight $candidate): bool => hash_equals(
+                (string) $candidate->pic_authorization_token,
+                hash('sha256', $token.'.'.((int) ($candidate->revision_number ?? 1))),
+            ));
+
+        if ($flight === null
+            || $flight->pic_authorization_token_expires_at?->isPast()
+            || ! $flight->requiresPicAuthorization()
+            || $flight->isPicAuthorizationCurrent()
+            ) {
+            return null;
+        }
+
+        return $flight;
+    }
 
     public function authorizeFromPayload(string $payload, User $authorizer): Flight
     {
@@ -43,6 +85,8 @@ class PicAuthorizationService
                 'pic_authorization_declined_by_user_id' => null,
                 'pic_authorization_declined_at' => null,
                 'pic_authorization_decline_reason' => null,
+                'pic_authorization_token' => null,
+                'pic_authorization_token_expires_at' => null,
                 'status' => FlightPlanStatus::Pending,
             ])->save();
 
@@ -63,6 +107,8 @@ class PicAuthorizationService
                 'pic_authorization_declined_by_user_id' => $user->getKey(),
                 'pic_authorization_declined_at' => now(),
                 'pic_authorization_decline_reason' => filled($reason) ? trim($reason) : null,
+                'pic_authorization_token' => null,
+                'pic_authorization_token_expires_at' => null,
             ])->save();
 
             return $flight->refresh();

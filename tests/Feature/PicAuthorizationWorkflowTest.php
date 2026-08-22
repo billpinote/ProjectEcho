@@ -155,7 +155,73 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_pic_authorization_preview_rejects_stale_session_payload(): void
+    public function test_pic_authorization_handoff_can_be_opened_from_a_separate_session(): void
+    {
+        $operator = Operator::factory()->create();
+        $scanner = $this->user(UserRole::Dispatch, null, $operator);
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $flight = $this->awaitingFlight($scanner, [
+            'operator_id' => $operator->id,
+            'prepared_by_user_id' => $scanner->id,
+            'pilot_in_command_user_id' => null,
+        ]);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        $this->actingAs($pilot)
+            ->withSession([])
+            ->get(route('flightplan.pic-authorization.preview', ['token' => $token]))
+            ->assertOk()
+            ->assertSee('FLIGHT PLAN', false);
+    }
+
+    public function test_consumed_pic_authorization_handoff_cannot_be_reused(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $pilot);
+
+        $this->actingAs($pilot)
+            ->get(route('flightplan.pic-authorization.preview', ['token' => $token]))
+            ->assertForbidden();
+    }
+
+    public function test_tampered_or_expired_pic_authorization_handoff_is_rejected(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        $this->actingAs($pilot)
+            ->get(route('flightplan.pic-authorization.preview', ['token' => substr_replace($token, 'x', 0, 1)]))
+            ->assertForbidden();
+
+        $flight->forceFill(['pic_authorization_token_expires_at' => now()->subMinute()])->saveQuietly();
+
+        $this->get(route('flightplan.pic-authorization.preview', ['token' => $token]))
+            ->assertForbidden();
+    }
+
+    public function test_atmo_saved_flight_preview_uses_atmo_back_destination(): void
+    {
+        $atmo = $this->user(UserRole::Atmo);
+        $atmo->forceFill(['station' => 'RPUS'])->save();
+        $flight = $this->awaitingFlight($atmo, [
+            'status' => FlightPlanStatus::Pending,
+            'prepared_by_user_id' => $atmo->id,
+            'pilot_in_command_user_id' => $atmo->id,
+        ]);
+
+        $this->actingAs($atmo)
+            ->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSee('BACK TO FLIGHTS', false)
+            ->assertDontSee('BACK TO PIC AUTHORIZATION SCANNER', false)
+            ->assertDontSee('/admin', false);
+    }
+
+    public function test_pic_authorization_preview_rejects_stale_handoff_after_revision_change(): void
     {
         $pilot = $this->user(UserRole::Pilot, PilotLicenseType::AirlineTransportPilot->value);
         $flight = $this->awaitingFlight($pilot);

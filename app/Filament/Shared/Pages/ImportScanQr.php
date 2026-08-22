@@ -158,6 +158,13 @@ class ImportScanQr extends Page
                 'schema_id' => $parsedPayload['schema_id'],
             ]);
 
+            if ($this->scannedPreviewPurpose() === 'pic_authorization' && $flight !== null) {
+                $handoffToken = app(\App\Domain\FlightPlans\Services\PicAuthorizationService::class)
+                    ->createAuthorizationHandoff($flight);
+                session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
+                $previewToken = $handoffToken;
+            }
+
             $this->payload = $parsedPayload['normalized_payload'];
             $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
             $this->matchedFlight = [
@@ -215,6 +222,13 @@ class ImportScanQr extends Page
                 'flight_id' => $flight->getKey(),
                 'purpose' => $this->scannedPreviewPurpose(),
             ]);
+
+            if ($this->scannedPreviewPurpose() === 'pic_authorization') {
+                $handoffToken = app(\App\Domain\FlightPlans\Services\PicAuthorizationService::class)
+                    ->createAuthorizationHandoff($flight);
+                session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
+                $previewToken = $handoffToken;
+            }
         }
 
         $this->matchedFlight = [

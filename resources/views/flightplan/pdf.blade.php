@@ -1034,7 +1034,7 @@
 
     @if(isset($isPreview) && isset($backActionUrl) && $backActionUrl)
     <div style="display:flex; justify-content:center; margin-top:10px;">
-        <a href="{{ $backActionUrl }}">BACK TO PIC AUTHORIZATION SCANNER</a>
+        <a href="{{ $backActionUrl }}">{{ $backActionLabel ?? 'BACK' }}</a>
     </div>
     @endif
 
