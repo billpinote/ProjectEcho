@@ -7,6 +7,7 @@ use App\Models\Flight;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
+use App\Domain\Users\Enums\UserRole;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
@@ -21,7 +22,7 @@ class ImportScanQr extends Page
 {
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQrCode;
 
-    protected static ?string $navigationLabel = 'QR Import';
+    protected static ?string $navigationLabel = 'Open Flight Plan';
 
     protected static ?string $navigationParentItem = null;
 
@@ -45,6 +46,43 @@ class ImportScanQr extends Page
     public function isPicAuthorizationPage(): bool
     {
         return false;
+    }
+
+    public function shouldShowRawPayload(): bool
+    {
+        return Auth::user()?->role === UserRole::Artisan;
+    }
+
+    /**
+     * @return array<int, array{title: string, body: string}>
+     */
+    public function workflowGuidance(): array
+    {
+        $user = Auth::user();
+
+        if ($user?->isPilot()) {
+            return [
+                ['title' => '1. Scan the flight plan QR', 'body' => 'Scan the QR from the prepared flight plan.'],
+                ['title' => '2. Review the flight details', 'body' => 'Review the flight details carefully.'],
+                ['title' => '3. Authorize when you are the PIC', 'body' => 'If you are the Pilot-in-Command, verify and authorize the flight.'],
+                ['title' => '4. Continue to ATC review', 'body' => 'Once authorized, the flight proceeds to ATC review.'],
+            ];
+        }
+
+        if ($user?->role === UserRole::Atmo) {
+            return [
+                ['title' => '1. Scan the flight plan QR', 'body' => 'Scan the QR from the submitted flight plan.'],
+                ['title' => '2. Review the submitted details', 'body' => 'Review the flight plan details carefully.'],
+                ['title' => '3. Confirm PIC authorization', 'body' => 'Confirm that required PIC authorization has been completed.'],
+                ['title' => '4. Continue ATC processing', 'body' => 'Continue with ATC processing when the flight is ready.'],
+            ];
+        }
+
+        return [
+            ['title' => '1. Scan the flight plan QR', 'body' => 'Scan the QR from the flight plan.'],
+            ['title' => '2. Review the flight plan', 'body' => 'Review the flight plan details.'],
+            ['title' => '3. Follow the available actions', 'body' => 'Echo will show the actions available for your role.'],
+        ];
     }
 
     /**
@@ -111,8 +149,8 @@ class ImportScanQr extends Page
             $this->lastProcessedPayload = null;
 
             if ($notifyOnFailure) {
-                Notification::make()
-                    ->title('Invalid QR payload')
+                    Notification::make()
+                    ->title('Invalid flight plan QR')
                     ->body($this->qrPayloads()->invalidPayloadMessage($payload))
                     ->danger()
                     ->send();
@@ -183,7 +221,7 @@ class ImportScanQr extends Page
                 'departure_aerodrome' => (string) ($snapshot['departure_aerodrome'] ?? 'N/A'),
                 'destination_aerodrome' => (string) ($snapshot['destination_aerodrome'] ?? 'N/A'),
                 'status' => $status?->value ?? 'verified_qr_only',
-                'status_label' => $status?->label() ?? 'Valid QR. Needs ATC Review.',
+                'status_label' => $status?->label() ?? 'Flight plan ready for review.',
                 'status_color' => $status?->filamentColor() ?? 'info',
                 'view_url' => $this->scannedFlightViewUrl($flight, $previewToken),
             ];

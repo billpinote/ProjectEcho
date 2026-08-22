@@ -26,7 +26,7 @@ class ListFlights extends ListRecords
 
             if (Route::has($importRouteName)) {
                 $actions[] = Action::make('importScanQr')
-                    ->label('Import / Scan QR')
+                    ->label('Open Flight Plan')
                     ->icon('heroicon-o-qr-code')
                     ->url(
                         fn (): string => ImportScanQr::getUrl(panel: $panelId)

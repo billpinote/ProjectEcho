@@ -10,6 +10,9 @@ use App\Filament\Shared\Resources\AirborneFlights\Pages\ListAirborneFlights;
 use App\Filament\Shared\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Shared\Resources\LandedFlights\Pages\ListLandedFlights;
 use App\Filament\Shared\Widgets\AlphaFlightsTable;
+use App\Filament\Panels\Atmo\Pages\ImportScanQr as AtmoImportScanQr;
+use App\Filament\Panels\Dispatch\Pages\ScanAuthorizationQr as DispatchScanAuthorizationQr;
+use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Models\Flight;
 use App\Models\Operator;
 use App\Models\User;
@@ -74,7 +77,7 @@ class FlightOperationsWorkflowTest extends TestCase
                 ->assertSeeText('Rejected Flights')
                 ->assertSeeText('All Flights')
                 ->assertSeeText('Coordinator')
-                ->assertSeeText('QR Import')
+                ->assertSeeText('Open Flight Plan')
                 ->assertSeeText('Alpha');
 
             $coordinatorResponse = $this->actingAs($user)->get('/atmo/coordinator');
@@ -93,6 +96,36 @@ class FlightOperationsWorkflowTest extends TestCase
                 'Post-Ops Log',
             ]);
         }
+    }
+
+    public function test_qr_page_uses_role_appropriate_operational_guidance_and_hides_payload_for_pilot_and_atmo(): void
+    {
+        Livewire::actingAs($this->user(UserRole::Pilot))
+            ->test(ScanAuthorizationQr::class)
+            ->assertSeeText('Open Flight Plan')
+            ->assertDontSeeText('Echo ATC Tools')
+            ->assertDontSeeText('Import / Scan QR')
+            ->assertDontSeeText('QR Payload')
+            ->assertSeeText('If you are the Pilot-in-Command, verify and authorize the flight.')
+            ->assertSeeText('Once authorized, the flight proceeds to ATC review.');
+
+        Livewire::actingAs($this->user(UserRole::Atmo, ['station' => 'RPUS']))
+            ->test(AtmoImportScanQr::class)
+            ->assertDontSeeText('QR Payload')
+            ->assertSeeText('Confirm that required PIC authorization has been completed.')
+            ->assertSeeText('Continue with ATC processing when the flight is ready.');
+    }
+
+    public function test_qr_page_keeps_raw_payload_for_artisan_and_generic_guidance_for_dispatch(): void
+    {
+        Livewire::actingAs($this->user(UserRole::Artisan))
+            ->test(AtmoImportScanQr::class)
+            ->assertSeeText('QR Payload');
+
+        Livewire::actingAs($this->user(UserRole::Dispatch))
+            ->test(DispatchScanAuthorizationQr::class)
+            ->assertDontSeeText('QR Payload')
+            ->assertSeeText('Echo will show the actions available for your role.');
     }
 
     public function test_dispatch_sidebar_renders_dispatch_operational_navigation(): void

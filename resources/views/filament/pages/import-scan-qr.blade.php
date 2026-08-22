@@ -266,10 +266,10 @@
         <section class="echo-import-hero">
             <div class="echo-import-hero-grid">
                 <div>
-                    <p class="echo-import-kicker echo-label">Echo ATC Tools</p>
-                    <h2 class="echo-display" style="margin: 0.5rem 0 0;">Import / Scan QR</h2>
+                    <p class="echo-import-kicker echo-label">Echo Flight Operations</p>
+                    <h2 class="echo-display" style="margin: 0.5rem 0 0;">Open Flight Plan</h2>
                     <p class="echo-import-subtitle echo-body">
-                        Scan a live QR code from a device camera or upload an image file, then verify the signed Echo payload and load the flight plan record for review.
+                        Scan the flight plan QR with your camera or upload an image to review, authorize, or process the flight.
                     </p>
                 </div>
             </div>
@@ -280,7 +280,7 @@
                 <div class="echo-panel-header">
                     <div>
                         <h3 class="echo-heading" style="margin: 0;">Scan or Upload</h3>
-                        <p class="echo-help" style="margin: 0.35rem 0 0;">Use either method below to capture the QR payload.</p>
+                        <p class="echo-help" style="margin: 0.35rem 0 0;">Use either method below to open the flight plan.</p>
                     </div>
                 </div>
 
@@ -333,14 +333,17 @@
                     </div>                    
 
                     <div>
-                        <label for="payload" class="echo-field-label echo-title">QR Payload</label>
+                        @if($this->shouldShowRawPayload())
+                            <label for="payload" class="echo-field-label echo-title">QR Payload</label>
+                        @endif
                         <textarea
                             id="payload"
                             wire:model.live.debounce.300ms="payload"
                             rows="4"
                             autofocus
-                            placeholder="ECHOFPL|2|OFFLINE|K1|S1|123|20260428T143000Z|..."
-                            class="echo-payload-textarea echo-mono"
+                            placeholder="Paste a flight plan QR value if needed"
+                            class="echo-payload-textarea echo-mono {{ $this->shouldShowRawPayload() ? '' : 'sr-only' }}"
+                            @if(! $this->shouldShowRawPayload()) aria-hidden="true" tabindex="-1" @endif
                         ></textarea>
                         @error('payload')
                             <p
@@ -361,7 +364,7 @@
                                 wire:target="submit"
                                 class="echo-button echo-button-accent"
                             >
-                                <span wire:loading.remove wire:target="submit">Find Flight Plan</span>
+                                <span wire:loading.remove wire:target="submit">Open Flight Plan</span>
                                 <span wire:loading wire:target="submit">Loading...</span>
                             </button>
 
@@ -375,7 +378,7 @@
                         </div>
 
                         <div class="echo-help" style="max-width: 32rem;">
-                            Tip: if a QR scanner pastes the full payload into the field, the flight plan preview will load automatically.
+                            Tip: scanning or uploading a valid QR opens the flight plan automatically.
                         </div>
                     </div>
                 </form>
@@ -386,7 +389,7 @@
                     <section id="matched-flight-plan" class="echo-import-summary">
                         <div class="echo-summary-header">
                             <div>
-                                <div class="echo-label" style="color: var(--color-echo-primary);">Matched Flight Plan</div>
+                                <div class="echo-label" style="color: var(--color-echo-primary);">Flight Plan Found</div>
                                 <h3 class="echo-display" style="margin: 0.5rem 0 0; font-size: 1.5rem;">{{ $matchedFlight['aircraft_identification'] }}</h3>
                             </div>
 
@@ -466,23 +469,15 @@
                 @endif
 
                 <section class="echo-import-panel">
-                    <h3 class="echo-heading" style="margin: 0;">How It Works</h3>
+                    <h3 class="echo-heading" style="margin: 0;">How it works</h3>
 
                     <div class="echo-workflow">
-                        <div class="echo-workflow-step">
-                            <div class="echo-label">1. Capture the QR</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">Use the webcam or upload a saved QR image from a device.</div>
-                        </div>
-
-                        <div class="echo-workflow-step">
-                            <div class="echo-label">2. Load the Echo record</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">The page verifies the signature, then uses the embedded full record even if the live database copy is unavailable.</div>
-                        </div>
-
-                        <div class="echo-workflow-step">
-                            <div class="echo-label">3. Open for review</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">Jump directly into the saved flight plan for acceptance, rejection, or review.</div>
-                        </div>
+                        @foreach($this->workflowGuidance() as $step)
+                            <div class="echo-workflow-step">
+                                <div class="echo-label">{{ $step['title'] }}</div>
+                                <div class="echo-help" style="margin-top: 0.3rem;">{{ $step['body'] }}</div>
+                            </div>
+                        @endforeach
                     </div>
                 </section>
             </div>

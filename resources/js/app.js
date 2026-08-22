@@ -57,7 +57,7 @@ const queueQrLookupSubmit = (delay = 450) => {
     }
 
     importScanQrAutoSubmitTimer = window.setTimeout(() => {
-        setQrStatus('QR payload detected. Verifying now...', 'muted');
+        setQrStatus('Flight plan QR detected. Verifying now...', 'muted');
         submitQrLookup();
     }, delay);
 };
@@ -173,7 +173,7 @@ const initImportScanQrPage = () => {
             const decodedText = await fileReader.scanFile(file, true);
 
             fillQrPayload(decodedText);
-            setQrStatus('QR payload loaded from image. Verifying now...', 'success');
+            setQrStatus('Flight plan QR loaded from image. Verifying now...', 'success');
         } catch (error) {
             setQrStatus('Unable to decode that image. Try a clearer QR image or use the webcam scanner.', 'danger');
         }
@@ -195,7 +195,7 @@ const initImportScanQrPage = () => {
                 },
                 async (decodedText) => {
                     fillQrPayload(decodedText);
-                    setQrStatus('QR payload captured from camera. Verifying now...', 'success');
+                    setQrStatus('Flight plan QR captured from camera. Verifying now...', 'success');
                     await stopImportScanQrCamera();
                 },
                 () => {}
