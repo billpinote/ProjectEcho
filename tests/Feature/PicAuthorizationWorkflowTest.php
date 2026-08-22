@@ -397,6 +397,8 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Back to Dashboard')
             ->assertSee('href="'.url('/atmo').'"', false)
+            ->assertSee('echo-preview-dashboard-button', false)
+            ->assertDontSee('<a href="'.url('/atmo').'">', false)
             ->assertDontSee('BACK TO PIC AUTHORIZATION SCANNER', false)
             ->assertDontSee('/admin', false);
     }

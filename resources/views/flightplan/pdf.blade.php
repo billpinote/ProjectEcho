@@ -191,6 +191,49 @@
             font-weight: bold;
             margin-bottom: 2px;
         }
+
+        .echo-preview-dashboard-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            padding: 10px 18px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: #fff;
+            color: #374151;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.25;
+            text-decoration: none;
+            transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
+        }
+
+        .echo-preview-dashboard-button:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+            color: #111827;
+        }
+
+        .echo-preview-dashboard-button:focus-visible {
+            outline: 2px solid #60a5fa;
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, .25);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .echo-preview-dashboard-button {
+                border-color: #4b5563;
+                background: #1f2937;
+                color: #f9fafb;
+            }
+
+            .echo-preview-dashboard-button:hover {
+                background: #374151;
+                border-color: #6b7280;
+                color: #fff;
+            }
+        }
     </style>
 </head>
 <body class="{{ isset($isPreview) ? 'preview' : '' }}">
@@ -1034,9 +1077,18 @@
 
     @if(isset($isPreview) && isset($backActionUrl) && $backActionUrl)
     <div style="display:flex; justify-content:center; margin-top:10px;">
-        <x-filament::button tag="a" :href="$backActionUrl" color="gray">
-            {{ $backActionLabel ?? 'Back' }}
-        </x-filament::button>
+        @if($backActionIsDashboard ?? false)
+            <x-filament::button
+                tag="a"
+                :href="$backActionUrl"
+                color="gray"
+                class="echo-preview-dashboard-button"
+            >
+                {{ $backActionLabel ?? 'Back' }}
+            </x-filament::button>
+        @else
+            <a href="{{ $backActionUrl }}">{{ $backActionLabel ?? 'Back' }}</a>
+        @endif
     </div>
     @endif
 

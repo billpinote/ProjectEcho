@@ -205,6 +205,7 @@ class FlightController extends Controller
                 && ! $flight->isPendingExpired(),
             'backActionUrl' => $backActionUrl,
             'backActionLabel' => 'Back to Dashboard',
+            'backActionIsDashboard' => true,
             'acceptActionUrl' => route('flights.accept', $flight),
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->resolveAtcWiresign(),
