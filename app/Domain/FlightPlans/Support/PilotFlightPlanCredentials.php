@@ -35,7 +35,7 @@ class PilotFlightPlanCredentials
         $licenseExpiry = $profile?->license_expiry_date;
 
         return [
-            'pilot_name' => trim((string) $user->fullName()) ?: null,
+            'pilot_name' => ($name = strtoupper(trim((string) $user->fullName()))) !== '' ? $name : null,
             'license' => $profile?->formattedLicense(),
             'ratings' => self::ratingsSnapshot($profile, $effectiveDate),
             'license_expiry_date' => $licenseExpiry?->toDateString(),

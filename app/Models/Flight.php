@@ -574,6 +574,12 @@ class Flight extends Model
         ), true);
     }
 
+    public function isPilotInCommand(User $user): bool
+    {
+        return $this->pilot_in_command_user_id !== null
+            && (int) $this->pilot_in_command_user_id === (int) $user->getKey();
+    }
+
     public function hasOperationalActivity(): bool
     {
         return filled($this->time_start_up)

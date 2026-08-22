@@ -114,7 +114,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         Livewire::actingAs($pilot)
             ->test(CreateFlight::class)
             ->assertFormSet([
-                'pilot_in_command' => 'Verified Pilot',
+                'pilot_in_command' => 'VERIFIED PILOT',
                 'pilot_license_no' => 'CPL-123456',
                 'pilot_ratings' => 'C172',
                 'license_expiry_date' => $profile->license_expiry_date->toDateString(),
@@ -369,8 +369,29 @@ class FlightPlanPilotAuthorizationTest extends TestCase
 
         $this->assertTrue($chezka->can('view', $picCurrent));
         $this->assertFalse($unrelated->can('view', $picCurrent));
-        $this->assertFalse($chezka->can('delay', $picCurrent));
-        $this->assertFalse($chezka->can('cancel', $picCurrent));
+        $this->assertFalse($jesse->can('delay', $picCurrent));
+        $this->assertFalse($jesse->can('cancel', $picCurrent));
+        $this->assertTrue($chezka->can('delay', $picCurrent));
+        $this->assertTrue($chezka->can('cancel', $picCurrent));
+    }
+
+    public function test_preparer_loses_actions_when_another_pilot_becomes_pic_in_the_reverse_direction(): void
+    {
+        $chezka = $this->user(UserRole::Pilot);
+        $jesse = $this->user(UserRole::Pilot);
+        $flight = $this->flight([
+            'filed_by_user_id' => $chezka->id,
+            'prepared_by_user_id' => $chezka->id,
+            'pilot_in_command_user_id' => $jesse->id,
+            'status' => FlightPlanStatus::Accepted,
+        ]);
+
+        $this->assertTrue($chezka->can('view', $flight));
+        $this->assertTrue($jesse->can('view', $flight));
+        $this->assertFalse($chezka->can('delay', $flight));
+        $this->assertFalse($chezka->can('cancel', $flight));
+        $this->assertTrue($jesse->can('delay', $flight));
+        $this->assertTrue($jesse->can('cancel', $flight));
     }
 
     public function test_pilot_sees_their_own_flights_in_current_completed_and_archived_sections_only(): void
@@ -451,6 +472,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         $pilot = $this->user(UserRole::Pilot);
         $flight = $this->flight([
             'filed_by_user_id' => $pilot->id,
+            'pilot_in_command_user_id' => $pilot->id,
             'status' => FlightPlanStatus::Accepted,
             'route' => 'DCT TEST',
         ]);
@@ -489,6 +511,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         ] as $attributes) {
             $flight = $this->flight([
                 'filed_by_user_id' => $pilot->id,
+                'pilot_in_command_user_id' => $pilot->id,
                 'status' => FlightPlanStatus::Accepted,
                 ...$attributes,
             ]);
@@ -505,6 +528,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
         $flight = $this->flight([
             'filed_by_user_id' => $pilot->id,
+            'pilot_in_command_user_id' => $pilot->id,
             'status' => FlightPlanStatus::Accepted,
         ]);
 

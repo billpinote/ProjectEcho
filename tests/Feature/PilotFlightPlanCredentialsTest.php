@@ -40,7 +40,7 @@ class PilotFlightPlanCredentialsTest extends TestCase
 
         $credentials = PilotFlightPlanCredentials::forUser($pilot, '2026-08-14');
 
-        $this->assertSame('Verified Pilot', $credentials['pilot_name']);
+        $this->assertSame('VERIFIED PILOT', $credentials['pilot_name']);
         $this->assertSame('CPL-123456', $credentials['license']);
         $this->assertSame('C172 IR NIGHT', $credentials['ratings']);
         $this->assertSame('2026-08-31', $credentials['license_expiry_date']);

@@ -208,6 +208,30 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->assertSame(FlightPlanStatus::Pending, $flight->status);
     }
 
+    public function test_pic_authorization_regenerates_the_official_pdf_with_uppercase_credentials(): void
+    {
+        Storage::fake('public');
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $pilot->forceFill(['first_name' => 'Jesse', 'last_name' => 'James'])->save();
+        $pilot->refresh();
+        $flight = $this->awaitingFlight($pilot);
+        $pdfService = app(\App\Domain\FlightPlans\Services\FlightPlanPdfService::class);
+        $path = $pdfService->regenerate($flight);
+        $before = Storage::disk('public')->get($path);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        app(PicAuthorizationService::class)->authorizeFromHandoff($token, $pilot);
+
+        $flight->refresh();
+        $expectedPilotName = strtoupper($pilot->fullName());
+        $this->assertSame($expectedPilotName, $flight->pilot_in_command);
+        $this->assertNotSame($before, Storage::disk('public')->get($path));
+        $this->assertCount(1, Storage::disk('public')->allFiles('flight-plans'));
+        $this->actingAs($pilot)
+            ->get(route('flights.view', $flight))
+            ->assertSee($expectedPilotName, false);
+    }
+
     public function test_real_jesse_filing_to_chezka_authorization_reports_no_pre_authorization_mismatch(): void
     {
         Storage::fake('public');

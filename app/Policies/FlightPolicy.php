@@ -108,14 +108,14 @@ class FlightPolicy
     public function delay(User $user, Flight $flight): bool
     {
         return $user->isPilot()
-            && $flight->isOwnedBy($user)
+            && $flight->isPilotInCommand($user)
             && $flight->canBeDelayedByPilot();
     }
 
     public function cancel(User $user, Flight $flight): bool
     {
         return $user->isPilot()
-            && $flight->isOwnedBy($user)
+            && $flight->isPilotInCommand($user)
             && $flight->canBeCancelledByPilot();
     }
 }

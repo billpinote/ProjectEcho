@@ -111,7 +111,7 @@ class FlightPlanPreparerContextFormTest extends TestCase
             ->assertDontSee('Awaiting PIC identification. Verified PIC credentials will be completed during PIC authorization.')
             ->assertFormSet([
                 'filing_capacity' => 'self_pic',
-                'pilot_in_command' => 'Verified Pilot',
+                'pilot_in_command' => 'VERIFIED PILOT',
                 'pilot_license_no' => 'CPL-123456',
                 'pilot_ratings' => 'C172',
                 'license_expiry_date' => '2028-12-31',
@@ -169,7 +169,7 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'authorized_representative_role' => null,
                 'authorized_representative_id_license' => null,
                 'authorized_representative_expiry_date' => null,
-                'pilot_in_command' => 'Verified Pilot',
+                'pilot_in_command' => 'VERIFIED PILOT',
                 'pilot_license_no' => 'CPL-123456',
                 'pilot_ratings' => 'C172',
                 'license_expiry_date' => '2028-12-31',

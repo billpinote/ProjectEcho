@@ -79,7 +79,7 @@ class PicAuthorizationService
         $this->guardPicAccess($flight, $authorizer);
         $credentials = $this->eligibleCredentials($authorizer, $flight);
 
-        return DB::transaction(function () use ($flight, $authorizer, $credentials, $token): Flight {
+        $authorizedFlight = DB::transaction(function () use ($flight, $authorizer, $credentials, $token): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $this->guardCurrentAuthorizationState($flight, $authorizer);
             $this->guardHandoffToken($flight, $token);
@@ -106,6 +106,10 @@ class PicAuthorizationService
 
             return $flight->refresh();
         });
+
+        app(FlightPlanPdfService::class)->regenerate($authorizedFlight);
+
+        return $authorizedFlight;
     }
 
     public function declineFromPayload(string $payload, User $user, ?string $reason = null): Flight

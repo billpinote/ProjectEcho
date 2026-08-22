@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanPdfService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
@@ -723,18 +724,7 @@ class FlightController extends Controller
      */
     private function storeFlightPlanPdf(Flight $flight): string
     {
-        $folderName = now('UTC')->format('Ymd');
-        $fileName = $this->resolveFlightPlanPdfFileName($flight, $folderName);
-        $storagePath = 'flight-plans/'.$folderName.'/'.$fileName;
-
-        $pdf = Pdf::loadView('flightplan.pdf', [
-            'flight' => $flight,
-            'qrCodeBase64' => $this->generateFlightPlanQrCodeBase64($flight),
-        ])->setPaper('a4', 'portrait');
-
-        Storage::disk('public')->put($storagePath, $pdf->output());
-
-        return $storagePath;
+        return app(FlightPlanPdfService::class)->regenerate($flight);
     }
 
     /**
@@ -1233,13 +1223,7 @@ class FlightController extends Controller
      */
     private function deleteStoredFlightPlanPdfs(Flight $flight): void
     {
-        $paths = $this->findStoredFlightPlanPdfPaths($flight);
-
-        if ($paths->isEmpty()) {
-            return;
-        }
-
-        Storage::disk('public')->delete($paths->all());
+        app(FlightPlanPdfService::class)->deleteExisting($flight);
     }
 
     /**
@@ -1247,18 +1231,7 @@ class FlightController extends Controller
      */
     private function findStoredFlightPlanPdfPaths(Flight $flight)
     {
-        $baseName = $this->buildFlightPlanPdfBaseName($flight);
-
-        if ($baseName === '') {
-            return collect();
-        }
-
-        $pattern = '/\/'.preg_quote($baseName, '/').'\d{2}\.pdf$/';
-
-        return collect(Storage::disk('public')->allFiles('flight-plans'))
-            ->filter(fn (string $path) => preg_match($pattern, $path) === 1)
-            ->sortByDesc(fn (string $path) => Storage::disk('public')->lastModified($path))
-            ->values();
+        return app(FlightPlanPdfService::class)->storedPaths($flight);
     }
 
     /**
@@ -1278,30 +1251,6 @@ class FlightController extends Controller
             ->first(function (string $path) use ($safeFileName) {
                 return basename($path) === $safeFileName;
             });
-    }
-
-    /**
-     * Resolve a unique PDF file name with a required 00-99 suffix.
-     */
-    private function resolveFlightPlanPdfFileName(Flight $flight, string $folderName): string
-    {
-        $baseName = $this->buildFlightPlanPdfBaseName($flight);
-
-        if ($baseName === '') {
-            $baseName = 'FLIGHTPLAN'.$flight->id.now('UTC')->format('YmdHi');
-        }
-
-        $directory = 'flight-plans/'.$folderName;
-
-        for ($suffix = 0; $suffix <= 99; $suffix++) {
-            $candidate = $baseName.sprintf('%02d', $suffix).'.pdf';
-
-            if (! Storage::disk('public')->exists($directory.'/'.$candidate)) {
-                return $candidate;
-            }
-        }
-
-        return $baseName.now('UTC')->format('s').'.pdf';
     }
 
     /**
