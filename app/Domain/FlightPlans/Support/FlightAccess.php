@@ -15,7 +15,7 @@ class FlightAccess
         }
 
         if ($user->isPilot()) {
-            return $flight->isOwnedBy($user);
+            return $flight->isPilotInvolved($user);
         }
 
         if ($user->isDispatch()) {
@@ -75,7 +75,7 @@ class FlightAccess
         }
 
         if ($user->isPilot()) {
-            return $query->where('filed_by_user_id', $user->getKey());
+            return self::restrictQueryToPilotInvolvement($query, $user);
         }
 
         if ($user->isDispatch()) {
@@ -91,5 +91,22 @@ class FlightAccess
         }
 
         return $query;
+    }
+
+    public static function restrictQueryToPilotInvolvement(Builder $query, ?User $user): Builder
+    {
+        if ($user === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $userId = $user->getKey();
+
+        return $query->where(function (Builder $query) use ($userId): void {
+            $query
+                ->where('filed_by_user_id', $userId)
+                ->orWhere('prepared_by_user_id', $userId)
+                ->orWhere('pilot_in_command_user_id', $userId)
+                ->orWhere('pilot_id', $userId);
+        });
     }
 }

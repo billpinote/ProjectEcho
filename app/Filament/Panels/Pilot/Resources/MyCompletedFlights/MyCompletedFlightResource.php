@@ -23,7 +23,7 @@ class MyCompletedFlightResource extends MyFlightPlanResource
 
     public static function getEloquentQuery(): Builder
     {
-        return static::getOwnedFlightQuery()->completed();
+        return static::getInvolvedFlightQuery()->completed();
     }
 
     public static function getPages(): array

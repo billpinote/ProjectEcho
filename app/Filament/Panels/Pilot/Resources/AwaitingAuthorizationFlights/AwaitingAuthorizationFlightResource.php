@@ -25,7 +25,7 @@ class AwaitingAuthorizationFlightResource extends MyFlightPlanResource
 
     public static function getEloquentQuery(): Builder
     {
-        return static::getOwnedFlightQuery()->awaitingPicAuthorization();
+        return static::getInvolvedFlightQuery()->awaitingPicAuthorization();
     }
 
     public static function getPages(): array

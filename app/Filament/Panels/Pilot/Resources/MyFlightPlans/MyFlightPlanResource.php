@@ -3,6 +3,7 @@
 namespace App\Filament\Panels\Pilot\Resources\MyFlightPlans;
 
 use App\Domain\Users\Enums\UserRole;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Filament\Shared\Resources\AllFlightPlans\AllFlightResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -42,10 +43,12 @@ abstract class MyFlightPlanResource extends AllFlightResource
         return false;
     }
 
-    protected static function getOwnedFlightQuery(): Builder
+    protected static function getInvolvedFlightQuery(): Builder
     {
-        return static::getFlightPlanBaseQuery()
-            ->where('filed_by_user_id', Auth::id());
+        return FlightAccess::restrictQueryToPilotInvolvement(
+            static::getFlightPlanBaseQuery(),
+            Auth::user(),
+        );
     }
 
     protected static function getPilotStatusTableName(): string

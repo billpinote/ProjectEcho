@@ -23,7 +23,7 @@ class MyArchivedFlightResource extends MyFlightPlanResource
 
     public static function getEloquentQuery(): Builder
     {
-        return static::getOwnedFlightQuery()->archivedForPilot();
+        return static::getInvolvedFlightQuery()->archivedForPilot();
     }
 
     public static function getPages(): array

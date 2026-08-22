@@ -23,7 +23,7 @@ class MyCurrentFlightResource extends MyFlightPlanResource
 
     public static function getEloquentQuery(): Builder
     {
-        return static::getOwnedFlightQuery()->currentForPilot();
+        return static::getInvolvedFlightQuery()->currentForPilot();
     }
 
     public static function getPages(): array

@@ -559,6 +559,21 @@ class Flight extends Model
         return $this->filed_by_user_id !== null && $this->filed_by_user_id === $user->getKey();
     }
 
+    public function isPilotInvolved(User $user): bool
+    {
+        $userId = (int) $user->getKey();
+
+        return in_array($userId, array_map(
+            static fn (mixed $value): int => (int) $value,
+            [
+                $this->filed_by_user_id,
+                $this->prepared_by_user_id,
+                $this->pilot_in_command_user_id,
+                $this->pilot_id,
+            ],
+        ), true);
+    }
+
     public function hasOperationalActivity(): bool
     {
         return filled($this->time_start_up)

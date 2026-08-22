@@ -5,6 +5,7 @@ namespace App\Filament\Panels\Pilot\Widgets;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Models\Flight;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Models\User;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Builder;
@@ -194,7 +195,7 @@ class PilotDashboardWidget extends Widget
 
     private function flightQuery(User $user): Builder
     {
-        return Flight::query()
+        $query = Flight::query()
             ->select([
                 'id',
                 'filed_by_user_id',
@@ -212,8 +213,9 @@ class PilotDashboardWidget extends Widget
                 'time_touchdown',
                 'time_block_on',
                 'time_shutdown',
-            ])
-            ->where('filed_by_user_id', $user->id);
+            ]);
+
+        return FlightAccess::restrictQueryToPilotInvolvement($query, $user);
     }
 
     private function isReady(Flight $flight): bool

@@ -10,6 +10,9 @@ use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\Pages\ListMyArchivedFlights;
 use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\Pages\ListMyCompletedFlights;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\Pages\ListMyCurrentFlights;
+use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
@@ -297,6 +300,77 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             ->get(route('filament.pilot.resources.my-completed-flights.index'))
             ->assertOk()
             ->assertSeeText((string) $completedFlight->aircraft_identification);
+    }
+
+    public function test_pilot_sections_use_filer_preparer_and_pic_involvement_without_duplicates(): void
+    {
+        $jesse = $this->user(UserRole::Pilot);
+        $chezka = $this->user(UserRole::Pilot);
+        $unrelated = $this->user(UserRole::Pilot);
+        $dispatcher = $this->user(UserRole::Dispatch);
+
+        $preparedCurrent = $this->flight([
+            'aircraft_identification' => 'PREP001',
+            'filed_by_user_id' => $dispatcher->id,
+            'prepared_by_user_id' => $jesse->id,
+            'pilot_in_command_user_id' => null,
+            'pilot_id' => null,
+            'status' => FlightPlanStatus::Accepted,
+        ]);
+        $picCurrent = $this->flight([
+            'aircraft_identification' => 'PIC001',
+            'filed_by_user_id' => $dispatcher->id,
+            'prepared_by_user_id' => $jesse->id,
+            'pilot_in_command_user_id' => $chezka->id,
+            'pilot_id' => $chezka->id,
+            'status' => FlightPlanStatus::Accepted,
+        ]);
+        $picCompleted = $this->flight([
+            'aircraft_identification' => 'PIC002',
+            'filed_by_user_id' => $dispatcher->id,
+            'prepared_by_user_id' => $jesse->id,
+            'pilot_in_command_user_id' => $chezka->id,
+            'status' => FlightPlanStatus::Accepted,
+            'time_start_up' => '08:10',
+            'time_block_off' => '08:20',
+            'time_airborne' => '08:30',
+            'time_touchdown' => '09:10',
+            'time_shutdown' => '09:20',
+        ]);
+        $picArchived = $this->flight([
+            'aircraft_identification' => 'PIC003',
+            'filed_by_user_id' => $dispatcher->id,
+            'prepared_by_user_id' => $jesse->id,
+            'pilot_id' => $chezka->id,
+            'status' => FlightPlanStatus::Rejected,
+        ]);
+
+        $this->actingAs($chezka);
+        $this->assertSame(1, MyCurrentFlightResource::getEloquentQuery()->whereKey($picCurrent)->count());
+        $this->assertSame(1, MyCompletedFlightResource::getEloquentQuery()->whereKey($picCompleted)->count());
+        $this->assertSame(1, MyArchivedFlightResource::getEloquentQuery()->whereKey($picArchived)->count());
+
+        Livewire::actingAs($chezka)
+            ->test(ListMyCurrentFlights::class)
+            ->assertSee('PIC001')
+            ->assertDontSee('PREP001');
+
+        $this->actingAs($jesse);
+        Livewire::actingAs($jesse)
+            ->test(ListMyCurrentFlights::class)
+            ->assertSee('PREP001')
+            ->assertSee('PIC001');
+
+        $this->actingAs($unrelated);
+        Livewire::actingAs($unrelated)
+            ->test(ListMyCurrentFlights::class)
+            ->assertDontSee('PIC001')
+            ->assertDontSee('PREP001');
+
+        $this->assertTrue($chezka->can('view', $picCurrent));
+        $this->assertFalse($unrelated->can('view', $picCurrent));
+        $this->assertFalse($chezka->can('delay', $picCurrent));
+        $this->assertFalse($chezka->can('cancel', $picCurrent));
     }
 
     public function test_pilot_sees_their_own_flights_in_current_completed_and_archived_sections_only(): void
