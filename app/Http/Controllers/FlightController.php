@@ -193,7 +193,7 @@ class FlightController extends Controller
             $flight->markAsReviewed();
         }
 
-        $backActionUrl = $this->resolveReviewBackUrl($request, $flight);
+        $backActionUrl = $this->roleAwarePanelUrl();
 
         return view('flightplan.pdf', [
             'flight' => $flight,
@@ -204,7 +204,7 @@ class FlightController extends Controller
                 && $flight->status === FlightPlanStatus::Pending
                 && ! $flight->isPendingExpired(),
             'backActionUrl' => $backActionUrl,
-            'backActionLabel' => 'BACK TO FLIGHTS',
+            'backActionLabel' => 'Back to Dashboard',
             'acceptActionUrl' => route('flights.accept', $flight),
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->resolveAtcWiresign(),

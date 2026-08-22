@@ -6,6 +6,7 @@ use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
+use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
@@ -91,6 +92,10 @@ class CreateFlight extends CreateRecord
     protected function getRedirectUrl(): string
     {
         if (auth()->user()?->isPilot()) {
+            if ($this->getRecord()?->requiresPicAuthorization()) {
+                return AwaitingAuthorizationFlightResource::getUrl('index', panel: 'pilot');
+            }
+
             return MyCurrentFlightResource::getUrl('index', panel: 'pilot');
         }
 

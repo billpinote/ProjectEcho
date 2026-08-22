@@ -395,9 +395,39 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
             ->assertOk()
-            ->assertSee('BACK TO FLIGHTS', false)
+            ->assertSee('Back to Dashboard')
+            ->assertSee('href="'.url('/atmo').'"', false)
             ->assertDontSee('BACK TO PIC AUTHORIZATION SCANNER', false)
             ->assertDontSee('/admin', false);
+    }
+
+    public function test_pilot_saved_flight_preview_uses_pilot_dashboard_back_destination(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot, [
+            'pilot_in_command_user_id' => $pilot->id,
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSee('Back to Dashboard')
+            ->assertSee('href="'.url('/pilot').'"', false);
+    }
+
+    public function test_dispatch_saved_flight_preview_uses_dispatch_dashboard_back_destination(): void
+    {
+        $dispatch = $this->user(UserRole::Dispatch);
+        $flight = $this->awaitingFlight($dispatch, [
+            'status' => FlightPlanStatus::Pending,
+            'prepared_by_user_id' => $dispatch->id,
+        ]);
+
+        $this->actingAs($dispatch)
+            ->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSee('Back to Dashboard')
+            ->assertSee('href="'.url('/dispatch').'"', false);
     }
 
     public function test_pic_authorization_preview_rejects_stale_handoff_after_revision_change(): void

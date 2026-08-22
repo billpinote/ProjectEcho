@@ -8,6 +8,9 @@ use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Dispatch\Resources\Flights\Pages\CreateFlight as DispatchCreateFlight;
+use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource as DispatchAwaitingAuthorizationFlightResource;
+use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Models\Flight;
 use App\Models\Operator;
@@ -139,7 +142,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'authorized_representative_expiry_date' => '2035-01-01',
             ]))
             ->call('create')
-            ->assertHasNoFormErrors();
+            ->assertHasNoFormErrors()
+            ->assertRedirect(MyCurrentFlightResource::getUrl('index', panel: 'pilot'));
 
         $flight = Flight::query()->latest('id')->firstOrFail();
 
@@ -292,7 +296,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'pilot_license_no' => '123456',
             ]))
             ->call('create')
-            ->assertHasNoFormErrors();
+            ->assertHasNoFormErrors()
+            ->assertRedirect(AwaitingAuthorizationFlightResource::getUrl('index', panel: 'pilot'));
 
         $flight = Flight::query()->latest('id')->firstOrFail();
 
@@ -392,7 +397,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'license_expiry_date' => '2035-01-01',
             ]))
             ->call('create')
-            ->assertHasNoFormErrors();
+            ->assertHasNoFormErrors()
+            ->assertRedirect(DispatchAwaitingAuthorizationFlightResource::getUrl('index', panel: 'dispatch'));
 
         $flight = Flight::latest('id')->firstOrFail();
 
@@ -427,7 +433,8 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'license_expiry_date' => '2035-01-01',
             ]))
             ->call('create')
-            ->assertHasNoFormErrors();
+            ->assertHasNoFormErrors()
+            ->assertRedirect(AwaitingAuthorizationFlightResource::getUrl('index', panel: 'pilot'));
 
         $flight = Flight::latest('id')->firstOrFail();
 

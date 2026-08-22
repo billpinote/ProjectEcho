@@ -168,8 +168,8 @@ class PilotDashboardWidget extends Widget
             ->get()
             ->map(fn (Flight $flight): array => $this->flightCard(
                 $flight,
-                $this->isReady($flight) ? 'Show QR' : 'View',
-                $this->isReady($flight) ? route('flights.qr', $flight) : route('flights.view', $flight),
+                'View',
+                route('flights.view', $flight),
             ))
             ->all();
     }

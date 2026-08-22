@@ -1034,7 +1034,9 @@
 
     @if(isset($isPreview) && isset($backActionUrl) && $backActionUrl)
     <div style="display:flex; justify-content:center; margin-top:10px;">
-        <a href="{{ $backActionUrl }}">{{ $backActionLabel ?? 'BACK' }}</a>
+        <x-filament::button tag="a" :href="$backActionUrl" color="gray">
+            {{ $backActionLabel ?? 'Back' }}
+        </x-filament::button>
     </div>
     @endif
 
