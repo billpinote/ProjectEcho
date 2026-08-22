@@ -212,7 +212,7 @@ class FlightPlanPreviewActionsTest extends TestCase
         $this->assertDatabaseCount('flights', 0);
     }
 
-    public function test_qr_page_shows_large_qr_and_pdf_download_button(): void
+    public function test_qr_page_shows_compact_mobile_pass_and_save_actions(): void
     {
         Storage::fake('public');
 
@@ -230,16 +230,45 @@ class FlightPlanPreviewActionsTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee('Flight Plan Ready')
-            ->assertSee('Show This QR To ATC')
-            ->assertSee('Download QR')
-            ->assertSee('Download PDF')
+            ->assertSee('ECHO · FLIGHT PLAN')
+            ->assertSee('READY FOR ATC')
+            ->assertSee('N12345')
+            ->assertSee('KJFK')
+            ->assertSee('LFPG')
+            ->assertSee(strtoupper(now('UTC')->addDay()->format('d M Y')))
+            ->assertSee('REV 1')
+            ->assertSee('Save QR to Device')
+            ->assertSee('Share')
+            ->assertSee('Back to Dashboard')
+            ->assertDontSee('Show This QR To ATC')
             ->assertSee(route('flights.qr.download', ['flight' => $flight]), false)
             ->assertSee(route('flights.pdf.download', [
                 'flight' => $flight,
                 'file' => basename($storedPdfPath),
             ]), false)
             ->assertSee('data:image/svg+xml;base64,', false);
+    }
+
+    public function test_qr_page_back_to_dashboard_uses_the_authenticated_role_panel(): void
+    {
+        $pilot = User::factory()->create([
+            'role' => UserRole::Pilot,
+            'is_active' => true,
+        ]);
+        $flight = Flight::create($this->previewFlightPlanData([
+            'filed_by_user_id' => $pilot->getKey(),
+            'pilot_id' => $pilot->getKey(),
+            'pilot_in_command_user_id' => $pilot->getKey(),
+        ]));
+
+        $response = $this
+            ->actingAs($pilot)
+            ->get(route('flights.qr', ['flight' => $flight]));
+
+        $response
+            ->assertOk()
+            ->assertSee('href="'.url('/pilot').'"', false)
+            ->assertSee('Back to Dashboard');
     }
 
     public function test_qr_image_download_returns_server_generated_png(): void
@@ -257,7 +286,7 @@ class FlightPlanPreviewActionsTest extends TestCase
         $response
             ->assertOk()
             ->assertHeader('Content-Type', 'image/png')
-            ->assertHeader('Content-Disposition', 'attachment; filename="flight-plan-qr-SUMAIR1.png"');
+            ->assertHeader('Content-Disposition', 'attachment; filename="ECHO-SUMAIR1-'.str_replace('/', '-', (string) $flight->date_of_flight).'.png"');
 
         $this->assertStringStartsWith("\x89PNG", $response->getContent());
     }

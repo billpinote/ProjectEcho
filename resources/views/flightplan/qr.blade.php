@@ -22,9 +22,7 @@
             min-height: 100vh;
             margin: 0;
             color: var(--qr-ink);
-            background:
-                radial-gradient(circle at top left, rgba(15, 95, 74, 0.18), transparent 34rem),
-                linear-gradient(145deg, #f8f4e8 0%, var(--qr-bg) 55%, #dfe9df 100%);
+            background: var(--qr-bg);
             font-family: Helvetica, Arial, sans-serif;
         }
 
@@ -37,12 +35,12 @@
         }
 
         .qr-card {
-            width: min(100%, 520px);
+            width: min(100%, 460px);
             border: 1px solid rgba(22, 32, 24, 0.16);
-            border-radius: 28px;
+            border-radius: 22px;
             background: rgba(255, 253, 247, 0.94);
             box-shadow: 0 24px 70px rgba(22, 32, 24, 0.18);
-            padding: 22px;
+            padding: 18px;
             text-align: center;
         }
 
@@ -57,16 +55,41 @@
 
         .qr-title {
             margin: 0;
-            font-size: clamp(28px, 8vw, 46px);
-            line-height: 0.95;
-            letter-spacing: -0.04em;
+            font-size: clamp(30px, 8vw, 42px);
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .qr-status {
+            margin: 8px 0 0;
+            color: var(--qr-accent);
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+        }
+
+        .qr-route,
+        .qr-datetime,
+        .qr-reference {
+            margin: 8px 0 0;
+            font-weight: 700;
+        }
+
+        .qr-route {
+            font-size: 18px;
+        }
+
+        .qr-datetime,
+        .qr-reference {
+            color: rgba(22, 32, 24, 0.66);
+            font-size: 13px;
         }
 
         .qr-subtitle {
-            margin: 12px auto 18px;
+            margin: 12px auto 14px;
             max-width: 31rem;
             color: rgba(22, 32, 24, 0.72);
-            font-size: 15px;
+            font-size: 14px;
             line-height: 1.45;
         }
 
@@ -74,52 +97,20 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 18px;
-            border-radius: 24px;
+            margin: 14px auto 12px;
+            border-radius: 18px;
             background: #fff;
-            padding: clamp(18px, 5vw, 28px);
+            padding: clamp(14px, 4vw, 22px);
             box-shadow: inset 0 0 0 1px rgba(22, 32, 24, 0.12);
             overflow: visible;
         }
 
         .qr-frame img {
             display: block;
-            width: min(85vw, 370px);
-            height: min(85vw, 370px);
+            width: min(82vw, 350px);
+            height: min(82vw, 350px);
             object-fit: contain;
             aspect-ratio: 1 / 1; /* ensures square */
-        }
-
-        .qr-meta {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 18px;
-            text-align: left;
-        }
-
-        .qr-meta-item {
-            border-radius: 16px;
-            background: rgba(15, 95, 74, 0.08);
-            padding: 12px;
-        }
-
-        .qr-meta-label {
-            display: block;
-            margin-bottom: 4px;
-            color: rgba(22, 32, 24, 0.58);
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-        }
-
-        .qr-meta-value {
-            display: block;
-            overflow-wrap: anywhere;
-            font-size: 17px;
-            font-weight: 700;
-            text-align: center;
         }
 
         .qr-download {
@@ -160,6 +151,17 @@
             background: rgba(15, 95, 74, 0.08);
         }
 
+        .qr-share-button[hidden] {
+            display: none;
+        }
+
+        .qr-back {
+            color: var(--qr-accent-dark);
+            background: transparent;
+            border-color: rgba(15, 95, 74, 0.26);
+            box-shadow: none;
+        }
+
         .qr-download:disabled {
             cursor: wait;
             opacity: 0.72;
@@ -176,53 +178,77 @@
                 padding: 16px;
             }
 
-            .qr-meta {
-                grid-template-columns: 1fr;
-            }
         }
     </style>
 </head>
 <body>
     <main class="qr-shell">
         <section id="flightplan-qr-card" class="qr-card" aria-labelledby="qr-title">
-            <p class="qr-eyebrow">Flight Plan Ready</p>
-            <h1 id="qr-title" class="qr-title">Show This QR To ATC</h1>
-            <p class="qr-subtitle">
-                Present this screen to the air traffic controller for processing. Keep the QR code fully visible and your screen brightness high.
+            <p class="qr-eyebrow">ECHO · FLIGHT PLAN</p>
+            <p class="qr-status">READY FOR ATC</p>
+            <h1 id="qr-title" class="qr-title">{{ $flight->aircraft_identification ?? 'N/A' }}</h1>
+            <p class="qr-route">
+                {{ $flight->departure_aerodrome ?? 'N/A' }} → {{ $flight->destination_aerodrome ?? 'N/A' }}
+            </p>
+            <p class="qr-datetime">
+                {{ $flight->date_of_flight ? strtoupper(\Carbon\Carbon::parse($flight->date_of_flight)->format('d M Y')) : 'N/A' }} ·
+                {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? 'N/A' }}Z
             </p>
 
             <div class="qr-frame">
                 <img src="{{ $qrCodeBase64 }}" alt="Flight plan QR code for {{ $flight->aircraft_identification ?? 'approved flight plan' }}">
             </div>
 
-            <div class="qr-meta" aria-label="Flight plan summary">
-                <div class="qr-meta-item">
-                    <span class="qr-meta-label">Call Sign</span>
-                    <span class="qr-meta-value">{{ $flight->aircraft_identification ?? 'N/A' }}</span>
-                </div>
-                <div class="qr-meta-item">
-                    <span class="qr-meta-label">DOF</span>
-                    <span class="qr-meta-value">{{ $flight->date_of_flight ? \Carbon\Carbon::parse($flight->date_of_flight)->format('d M Y') : 'N/A' }}</span>
-                </div>
-                <div class="qr-meta-item">
-                    <span class="qr-meta-label">Departure</span>
-                    <span class="qr-meta-value">{{ $flight->departure_aerodrome ?? 'N/A' }}</span>
-                </div>
-                <div class="qr-meta-item">
-                    <span class="qr-meta-label">PTD</span>
-                    <span class="qr-meta-value">{{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? 'N/A' }}&nbsp; Z</span>
-                </div>
-            </div>
-
-            <div class="qr-actions">
-                <a class="qr-download qr-download-secondary" href="{{ $qrImageDownloadUrl }}">
-                    Download QR
-                </a>
-                <a class="qr-download" href="{{ $pdfDownloadUrl }}">
-                    Download PDF
-                </a>
-            </div>
+            <p class="qr-subtitle">Present to ATC for processing.</p>
+            <p class="qr-reference">REV {{ (int) ($flight->revision_number ?? 1) }} · {{ $flight->aircraft_identification ?? 'FLIGHT' }}-{{ $flight->date_of_flight ? \Carbon\Carbon::parse($flight->date_of_flight)->format('md') : '----' }}</p>
         </section>
+
+        <div class="qr-actions" aria-label="QR actions">
+            <a class="qr-download" href="{{ $qrImageDownloadUrl }}">Save QR to Device</a>
+            <button
+                id="qr-share-button"
+                type="button"
+                class="qr-download qr-download-secondary qr-share-button"
+                hidden
+                data-qr-url="{{ $qrImageDownloadUrl }}"
+                data-qr-filename="{{ $qrImageFileName }}"
+            >Share</button>
+            <a class="qr-download qr-download-secondary" href="{{ $pdfDownloadUrl }}">Download PDF</a>
+            <a class="qr-download qr-download-secondary qr-back" href="{{ $backActionUrl }}">Back to Dashboard</a>
+        </div>
     </main>
+    <script>
+        (() => {
+            const shareButton = document.getElementById('qr-share-button');
+
+            if (!shareButton || !navigator.share) {
+                return;
+            }
+
+            shareButton.hidden = false;
+            shareButton.addEventListener('click', async () => {
+                shareButton.disabled = true;
+
+                try {
+                    const response = await fetch(shareButton.dataset.qrUrl, { credentials: 'same-origin' });
+                    const blob = await response.blob();
+                    const file = new File([blob], shareButton.dataset.qrFilename, { type: 'image/png' });
+                    const shareData = { title: 'Echo Flight Plan', text: 'Flight plan QR for ATC processing.', files: [file] };
+
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share(shareData);
+                    } else {
+                        await navigator.share({ title: shareData.title, text: shareData.text, url: window.location.href });
+                    }
+                } catch (error) {
+                    if (error?.name !== 'AbortError') {
+                        shareButton.hidden = true;
+                    }
+                } finally {
+                    shareButton.disabled = false;
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

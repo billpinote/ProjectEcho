@@ -178,6 +178,8 @@ class FlightController extends Controller
             'qrImageDownloadUrl' => route('flights.qr.download', [
                 'flight' => $flight,
             ]),
+            'qrImageFileName' => $this->buildQrImageFileName($flight),
+            'backActionUrl' => $this->roleAwarePanelUrl(),
         ]);
     }
 
@@ -759,7 +761,7 @@ class FlightController extends Controller
         }
 
         $width = 1080;
-        $height = 1680;
+        $height = 1350;
         $image = imagecreatetruecolor($width, $height);
 
         $background = imagecolorallocate($image, 244, 246, 238);
@@ -777,28 +779,31 @@ class FlightController extends Controller
         $regularFont = $this->resolveQrFontPath(false);
         $boldFont = $this->resolveQrFontPath(true);
 
-        $this->drawCenteredText($image, 'FLIGHT PLAN READY', 22, 190, $accent, $boldFont, 2);
-        $this->drawCenteredText($image, 'Show This QR To ATC', 52, 280, $ink, $regularFont);
-        $this->drawCenteredText($image, 'Keep this image on your phone or tablet', 24, 345, $muted, $regularFont);
-        $this->drawCenteredText($image, 'and show it to ATC for processing.', 24, 385, $muted, $regularFont);
+        $this->drawCenteredText($image, 'ECHO · FLIGHT PLAN', 22, 150, $accent, $boldFont, 2);
+        $this->drawCenteredText($image, 'READY FOR ATC', 26, 215, $accent, $boldFont);
+        $this->drawCenteredText($image, strtoupper((string) ($flight->aircraft_identification ?? 'N/A')), 52, 300, $ink, $boldFont);
+        $this->drawCenteredText($image, strtoupper(sprintf(
+            '%s → %s',
+            (string) ($flight->departure_aerodrome ?? 'N/A'),
+            (string) ($flight->destination_aerodrome ?? 'N/A'),
+        )), 28, 355, $ink, $regularFont);
+        $this->drawCenteredText($image, strtoupper($this->formatQrDate($flight).' · '.$this->formatQrTime($flight)), 24, 405, $muted, $regularFont);
 
-        $qrOuterX = 100;
-        $qrOuterY = 450;
-        $qrOuterSize = 880;
+        $qrOuterX = 180;
+        $qrOuterY = 455;
+        $qrOuterSize = 720;
         $this->drawRoundedRectangle($image, $qrOuterX, $qrOuterY, $qrOuterX + $qrOuterSize, $qrOuterY + $qrOuterSize, 34, $soft);
         imagefilledrectangle($image, $qrOuterX + 42, $qrOuterY + 42, $qrOuterX + $qrOuterSize - 42, $qrOuterY + $qrOuterSize - 42, $white);
         $this->drawQrCode($image, $payload, $qrOuterX + 78, $qrOuterY + 78, $qrOuterSize - 156, 4, $black, $white);
 
-        $metaTop = 1380;
-        $boxWidth = 410;
-        $boxHeight = 110;
-        $leftX = 100;
-        $rightX = $width - 100 - $boxWidth;
-
-        $this->drawMetaBox($image, $leftX, $metaTop, $boxWidth, $boxHeight, 'CALL SIGN', (string) ($flight->aircraft_identification ?? 'N/A'), $soft, $muted, $ink, $regularFont, $boldFont);
-        $this->drawMetaBox($image, $rightX, $metaTop, $boxWidth, $boxHeight, 'DOF', $this->formatQrDate($flight), $soft, $muted, $ink, $regularFont, $boldFont);
-        $this->drawMetaBox($image, $leftX, $metaTop + 140, $boxWidth, $boxHeight, 'DEPARTURE', (string) ($flight->departure_aerodrome ?? 'N/A'), $soft, $muted, $ink, $regularFont, $boldFont);
-        $this->drawMetaBox($image, $rightX, $metaTop + 140, $boxWidth, $boxHeight, 'PTD', $this->formatQrTime($flight), $soft, $muted, $ink, $regularFont, $boldFont);
+        $this->drawCenteredText($image, 'PRESENT TO ATC FOR PROCESSING', 24, 1235, $accent, $boldFont);
+        $referenceDate = $flight->date_of_flight ? Carbon::parse($flight->date_of_flight)->format('md') : '----';
+        $this->drawCenteredText($image, sprintf(
+            'REV %d · %s-%s',
+            (int) ($flight->revision_number ?? 1),
+            strtoupper((string) ($flight->aircraft_identification ?? 'FLIGHT')),
+            $referenceDate,
+        ), 20, 1285, $muted, $regularFont);
 
         ob_start();
         imagepng($image);
@@ -937,8 +942,11 @@ class FlightController extends Controller
     private function buildQrImageFileName(Flight $flight): string
     {
         $aircraftIdentification = Str::upper(preg_replace('/[^A-Z0-9]/', '', (string) $flight->aircraft_identification));
+        $date = $flight->date_of_flight
+            ? Carbon::parse($flight->date_of_flight)->format('Y-m-d')
+            : 'undated';
 
-        return 'flight-plan-qr-'.($aircraftIdentification !== '' ? $aircraftIdentification : $flight->id).'.png';
+        return 'ECHO-'.($aircraftIdentification !== '' ? $aircraftIdentification : 'FLIGHT-'.$flight->id).'-'.$date.'.png';
     }
 
     private function formatQrDate(Flight $flight): string
