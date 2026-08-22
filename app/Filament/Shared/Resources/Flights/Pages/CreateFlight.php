@@ -46,7 +46,6 @@ class CreateFlight extends CreateRecord
     public function togglePilotPicCapacity(): void
     {
         $this->data = FlightForm::togglePilotPicCapacityState($this->data);
-        $this->form->fill($this->data);
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array

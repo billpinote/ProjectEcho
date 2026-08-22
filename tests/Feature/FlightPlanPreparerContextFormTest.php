@@ -208,6 +208,54 @@ class FlightPlanPreparerContextFormTest extends TestCase
             ->assertSee('Not the PIC for this flight?');
     }
 
+    public function test_pilot_capacity_toggle_preserves_unrelated_flight_plan_state(): void
+    {
+        $pilot = $this->pilotWithCredentials();
+        $unrelatedFields = [
+            'emergency_radio_uhf' => true,
+            'emergency_radio_vhf' => false,
+            'emergency_radio_elt' => true,
+            'survival_equipment_polar' => false,
+            'survival_equipment_desert' => true,
+            'survival_equipment_maritime' => false,
+            'survival_equipment_jungle' => true,
+            'jackets_light' => false,
+            'jackets_fluores' => true,
+            'jackets_uhf' => false,
+            'jackets_vhf' => true,
+            'dinghies_enabled' => false,
+            'dinghies_number' => '2',
+            'dinghies_capacity' => '4',
+            'dinghies_cover' => 'Y',
+            'dinghies_color' => 'ORANGE',
+            'endurance' => '0400',
+            'persons_on_board' => '3',
+            'aircraft_colour_and_markings' => 'WHITE BLUE',
+            'remarks' => 'PRESERVE THIS REMARK',
+        ];
+
+        $component = Livewire::actingAs($pilot)
+            ->test(CreateFlight::class)
+            ->fillForm($unrelatedFields);
+        $before = $component->get('data');
+
+        $component->callFormComponentAction('pilot-pic-capacity-actions', 'prepareForAnotherPic');
+        $forAnotherPic = $component->get('data');
+
+        foreach (array_keys($unrelatedFields) as $field) {
+            $this->assertSame($before[$field] ?? null, $forAnotherPic[$field] ?? null, $field.' changed while preparing for another PIC.');
+        }
+        $this->assertSame(FlightPlanPreparerContext::CAPACITY_FOR_ANOTHER_PIC, $forAnotherPic['filing_capacity']);
+
+        $component->callFormComponentAction('pilot-pic-capacity-actions', 'prepareAsSelfPic');
+        $selfPic = $component->get('data');
+
+        foreach (array_keys($unrelatedFields) as $field) {
+            $this->assertSame($before[$field] ?? null, $selfPic[$field] ?? null, $field.' changed while returning to self PIC.');
+        }
+        $this->assertSame(FlightPlanPreparerContext::CAPACITY_SELF_PIC, $selfPic['filing_capacity']);
+    }
+
     public function test_non_student_pilot_licenses_retain_self_pic_capacity_behavior(): void
     {
         foreach ([
