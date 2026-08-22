@@ -523,6 +523,9 @@ class FlightController extends Controller
             return $flight;
         });
 
+        // Hydrate database defaults, especially revision_number, before the QR/PDF snapshot is signed.
+        $flight->refresh();
+
         // Generate PDF and QR code
         $storedPdfPath = $this->storeFlightPlanPdf($flight);
 

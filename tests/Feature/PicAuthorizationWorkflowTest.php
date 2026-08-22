@@ -16,6 +16,7 @@ use App\Models\Operator;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 use Livewire\Livewire;
@@ -177,7 +178,7 @@ class PicAuthorizationWorkflowTest extends TestCase
     public function test_jesse_to_chezka_current_qr_authorization_succeeds(): void
     {
         $operator = Operator::factory()->create();
-        $jesse = $this->user(UserRole::Dispatch, null, $operator);
+        $jesse = $this->user(UserRole::Pilot, null, $operator);
         $chezka = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
         $flight = $this->awaitingFlight($jesse, [
             'operator_id' => $operator->id,
@@ -197,6 +198,75 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
         $this->assertSame(FlightPlanStatus::Pending, $flight->status);
+    }
+
+    public function test_real_jesse_filing_to_chezka_authorization_reports_no_pre_authorization_mismatch(): void
+    {
+        Storage::fake('public');
+        $operator = Operator::factory()->create(['name' => 'Jesse Air', 'short_name' => 'JSA']);
+        $jesse = $this->user(UserRole::Pilot, null, $operator);
+        $jesse->pilotProfile()->create([
+            'license_type' => PilotLicenseType::StudentPilot,
+            'license_number' => 'SPL-JESSE',
+            'license_expiry_date' => now()->addYear()->toDateString(),
+        ]);
+        $jesse->refresh();
+        $chezka = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $date = now('Asia/Manila')->addDay()->toDateString();
+
+        $this->actingAs($jesse)
+            ->post(route('flightplan.store'), [
+                'date_of_flight' => $date,
+                'aircraft_identification' => 'JSA001',
+                'flight_rules' => 'I',
+                'type_of_flight' => 'S',
+                'number' => '1',
+                'type_of_aircraft' => 'C172',
+                'wake_turbulence_cat' => 'L',
+                'equipment_10a' => 'S',
+                'equipment_10b' => 'C',
+                'departure_aerodrome' => 'RPUS',
+                'proposed_time' => '1430',
+                'cruising_speed' => 'N100',
+                'level' => 'F150',
+                'route' => 'DCT',
+                'destination_aerodrome' => 'RPLL',
+                'total_eet' => '0130',
+                'endurance' => '0400',
+                'persons_on_board' => '2',
+                'other_information' => 'DOF/'.str_replace('-', '', $date),
+            ])
+            ->assertRedirect(route('flightplan.preview'));
+
+        $this->actingAs($jesse)
+            ->post(route('flightplan.approve'))
+            ->assertRedirect();
+
+        $flight = Flight::query()->where('aircraft_identification', 'JSA001')->latest('id')->firstOrFail();
+        $payload = app(FlightPlanQrPayloadService::class)->buildPayload($flight);
+        $parsed = app(FlightPlanQrPayloadService::class)->parsePayload((string) $payload);
+        $this->assertIsArray($parsed);
+        $mismatches = app(FlightPlanQrPayloadService::class)->snapshotMismatches($parsed['snapshot'], $flight);
+        $this->assertSame([], $mismatches, json_encode(array_map(
+            fn (string $field): array => [
+                'field' => $field,
+                'qr' => $parsed['snapshot'][$field] ?? null,
+                'db' => $flight->getAttribute($field),
+            ],
+            $mismatches,
+        ), JSON_THROW_ON_ERROR));
+
+        $this->actingAs($chezka)->withSession([])
+            ->get(route('flightplan.pic-authorization.preview', [
+                'token' => app(PicAuthorizationService::class)->createAuthorizationHandoff($flight),
+            ]))
+            ->assertOk();
+
+        $this->actingAs($chezka);
+        Livewire::test(ScanAuthorizationQr::class)
+            ->set('payload', $payload)
+            ->call('authorizeAsPic')
+            ->assertHasNoErrors();
     }
 
     public function test_pic_authorization_rejects_material_changes_to_the_signed_qr_revision(): void

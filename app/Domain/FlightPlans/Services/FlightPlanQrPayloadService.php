@@ -234,27 +234,6 @@ class FlightPlanQrPayloadService
         ));
     }
 
-    /**
-     * Validate the material revision presented for PIC authorization.
-     *
-     * PIC credentials are intentionally completed by the authorization action,
-     * so they are not part of this pre-authorization comparison. The flight
-     * revision and all operational S1 fields remain protected.
-     *
-     * @param  array<string, mixed>  $snapshot
-     */
-    public function picAuthorizationSnapshotMatchesFlight(array $snapshot, Flight $flight): bool
-    {
-        $ignoredFields = [
-            'pilot_in_command',
-            'pilot_license_no',
-            'pilot_ratings',
-            'license_expiry_date',
-        ];
-
-        return array_diff($this->snapshotMismatches($snapshot, $flight), $ignoredFields) === [];
-    }
-
     public function invalidPayloadMessage(string $payload): string
     {
         $normalizedPayload = trim($payload);
