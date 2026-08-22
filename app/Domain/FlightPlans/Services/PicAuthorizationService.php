@@ -157,7 +157,7 @@ class PicAuthorizationService
             throw ValidationException::withMessages(['payload' => $message]);
         }
 
-        if (! $payloadService->snapshotMatchesFlight($parsed['snapshot'], $flight)) {
+        if (! $payloadService->picAuthorizationSnapshotMatchesFlight($parsed['snapshot'], $flight)) {
             throw ValidationException::withMessages(['payload' => 'This QR payload is stale. Scan the current flight-plan QR again.']);
         }
 

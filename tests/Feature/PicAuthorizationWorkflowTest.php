@@ -174,6 +174,53 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertSee('FLIGHT PLAN', false);
     }
 
+    public function test_jesse_to_chezka_current_qr_authorization_succeeds(): void
+    {
+        $operator = Operator::factory()->create();
+        $jesse = $this->user(UserRole::Dispatch, null, $operator);
+        $chezka = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $flight = $this->awaitingFlight($jesse, [
+            'operator_id' => $operator->id,
+            'prepared_by_user_id' => $jesse->id,
+            'pilot_in_command_user_id' => null,
+        ]);
+        $payload = $this->payload($flight);
+        $parsed = app(FlightPlanQrPayloadService::class)->parsePayload($payload);
+        $this->assertIsArray($parsed);
+        $this->assertSame([], app(FlightPlanQrPayloadService::class)->snapshotMismatches($parsed['snapshot'], $flight));
+
+        $this->actingAs($chezka);
+        Livewire::test(ScanAuthorizationQr::class)
+            ->set('payload', $payload)
+            ->call('authorizeAsPic')
+            ->assertHasNoErrors();
+
+        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertSame(FlightPlanStatus::Pending, $flight->status);
+    }
+
+    public function test_pic_authorization_rejects_material_changes_to_the_signed_qr_revision(): void
+    {
+        foreach (['route', 'destination_aerodrome', 'date_of_flight'] as $field) {
+            $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+            $flight = $this->awaitingFlight($pilot);
+            $payload = $this->payload($flight);
+
+            $flight->forceFill([
+                $field => $field === 'date_of_flight'
+                    ? now('Asia/Manila')->addDays(2)->toDateString()
+                    : $flight->{$field}.'-CHANGED',
+            ])->save();
+
+            try {
+                app(PicAuthorizationService::class)->authorizeFromPayload($payload, $pilot);
+                $this->fail('A material flight-plan change must invalidate the signed QR payload.');
+            } catch (ValidationException $exception) {
+                $this->assertStringContainsString('stale', implode(' ', $exception->errors()['payload'] ?? []));
+            }
+        }
+    }
+
     public function test_consumed_pic_authorization_handoff_cannot_be_reused(): void
     {
         $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
