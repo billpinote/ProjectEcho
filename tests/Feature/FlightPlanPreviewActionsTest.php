@@ -231,16 +231,25 @@ class FlightPlanPreviewActionsTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('ECHO · FLIGHT PLAN')
-            ->assertSee('READY FOR ATC')
+            ->assertSee('FLIGHT PLAN READY')
             ->assertSee('N12345')
             ->assertSee('KJFK')
             ->assertSee('LFPG')
             ->assertSee(strtoupper(now('UTC')->addDay()->format('d M Y')))
             ->assertSee('REV 1')
+            ->assertDontSee('READY FOR ATC')
             ->assertSee('Save QR to Device')
             ->assertSee('Share')
             ->assertSee('Back to Dashboard')
             ->assertDontSee('Show This QR To ATC')
+            ->assertSeeInOrder([
+                '</section>',
+                '<div class="qr-actions"',
+                'Save QR to Device',
+                'Share',
+                'Download PDF',
+                'Back to Dashboard',
+            ], false)
             ->assertSee(route('flights.qr.download', ['flight' => $flight]), false)
             ->assertSee(route('flights.pdf.download', [
                 'flight' => $flight,

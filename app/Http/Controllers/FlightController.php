@@ -780,8 +780,8 @@ class FlightController extends Controller
         $boldFont = $this->resolveQrFontPath(true);
 
         $this->drawCenteredText($image, 'ECHO · FLIGHT PLAN', 22, 150, $accent, $boldFont, 2);
-        $this->drawCenteredText($image, 'READY FOR ATC', 26, 215, $accent, $boldFont);
-        $this->drawCenteredText($image, strtoupper((string) ($flight->aircraft_identification ?? 'N/A')), 52, 300, $ink, $boldFont);
+        $this->drawCenteredText($image, 'FLIGHT PLAN READY', 26, 215, $accent, $boldFont);
+        $this->drawCenteredText($image, strtoupper((string) ($flight->aircraft_identification ?? 'N/A')), 44, 300, $ink, $boldFont);
         $this->drawCenteredText($image, strtoupper(sprintf(
             '%s → %s',
             (string) ($flight->departure_aerodrome ?? 'N/A'),
@@ -803,7 +803,7 @@ class FlightController extends Controller
             (int) ($flight->revision_number ?? 1),
             strtoupper((string) ($flight->aircraft_identification ?? 'FLIGHT')),
             $referenceDate,
-        ), 20, 1285, $muted, $regularFont);
+        ), 16, 1285, $muted, $regularFont);
 
         ob_start();
         imagepng($image);

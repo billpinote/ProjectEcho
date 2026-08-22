@@ -31,10 +31,13 @@
             min-height: 100vh;
             align-items: center;
             justify-content: center;
+            flex-direction: column;
+            gap: 18px;
             padding: 20px;
         }
 
         .qr-card {
+            box-sizing: border-box;
             width: min(100%, 460px);
             border: 1px solid rgba(22, 32, 24, 0.16);
             border-radius: 22px;
@@ -55,7 +58,7 @@
 
         .qr-title {
             margin: 0;
-            font-size: clamp(30px, 8vw, 42px);
+            font-size: clamp(28px, 7vw, 36px);
             line-height: 1;
             letter-spacing: -0.03em;
         }
@@ -79,10 +82,18 @@
             font-size: 18px;
         }
 
-        .qr-datetime,
-        .qr-reference {
+        .qr-datetime {
             color: rgba(22, 32, 24, 0.66);
             font-size: 13px;
+        }
+
+        .qr-reference {
+            margin: 8px 0 0;
+            color: rgba(22, 32, 24, 0.46);
+            font-size: 10px;
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            line-height: 1.3;
         }
 
         .qr-subtitle {
@@ -136,7 +147,10 @@
         }
 
         .qr-actions {
+            box-sizing: border-box;
             display: grid;
+            width: min(100%, 460px);
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 10px;
         }
 
@@ -169,7 +183,8 @@
 
         @media (max-width: 420px) {
             .qr-shell {
-                align-items: flex-start;
+                align-items: center;
+                justify-content: flex-start;
                 padding: 12px;
             }
 
@@ -179,13 +194,19 @@
             }
 
         }
+
+        @media (max-width: 360px) {
+            .qr-actions {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <main class="qr-shell">
         <section id="flightplan-qr-card" class="qr-card" aria-labelledby="qr-title">
             <p class="qr-eyebrow">ECHO · FLIGHT PLAN</p>
-            <p class="qr-status">READY FOR ATC</p>
+            <p class="qr-status">FLIGHT PLAN READY</p>
             <h1 id="qr-title" class="qr-title">{{ $flight->aircraft_identification ?? 'N/A' }}</h1>
             <p class="qr-route">
                 {{ $flight->departure_aerodrome ?? 'N/A' }} → {{ $flight->destination_aerodrome ?? 'N/A' }}
