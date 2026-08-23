@@ -280,6 +280,32 @@
         white-space: nowrap;
     }
 
+    /* Keep flight-row utilities in fixed columns so long row content cannot shift them. */
+    .fi-ta-actions:has(.echo-flight-row-action) {
+        align-items: center;
+        column-gap: 0.25rem;
+        display: grid !important;
+        flex: 0 0 auto;
+        grid-template-columns: repeat(3, 2rem);
+        justify-items: center;
+        min-width: 6.5rem;
+        white-space: nowrap;
+    }
+
+    .fi-ta-actions:has(.echo-flight-row-action-more) {
+        grid-template-columns: repeat(4, 2rem);
+        min-width: 8.75rem;
+    }
+
+    .fi-ta-actions .echo-flight-row-action {
+        align-items: center;
+        display: inline-flex;
+        height: 2rem;
+        justify-content: center;
+        margin: 0;
+        width: 2rem;
+    }
+
     .echo-flight-status-cell[data-flight-status='pending'] .fi-badge {
         background: transparent;
         color: var(--gray-600);
