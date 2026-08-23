@@ -25,6 +25,7 @@ use App\Filament\Shared\Resources\Reports\ActiveFlightDataResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Models\Flight;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -1100,14 +1101,23 @@ class FlightsTable
         $actions = [
             Action::make('qr')
                 ->label('QR')
+                ->icon('heroicon-o-qr-code')
+                ->iconButton()
+                ->tooltip('View QR code')
                 ->url(fn (Flight $record): string => route('flights.qr', $record))
                 ->openUrlInNewTab(),
             Action::make('view')
                 ->label('View')
+                ->icon('heroicon-o-eye')
+                ->iconButton()
+                ->tooltip('View flight plan')
                 ->url(fn (Flight $record): string => route('flights.view', $record))
                 ->openUrlInNewTab(),
             Action::make('pdf')
                 ->label('PDF')
+                ->icon('heroicon-o-document-text')
+                ->iconButton()
+                ->tooltip('Download PDF')
                 ->url(fn (Flight $record): string => route('flights.pdf.download', $record))
                 ->openUrlInNewTab(),
         ];
@@ -1119,14 +1129,32 @@ class FlightsTable
             return $actions;
         }
 
-        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class, AwaitingAuthorizationFlightResource::class, DispatchAwaitingAuthorizationFlightResource::class], true)) {
-            if ($resourceClass === MyArchivedFlightResource::class) {
-                $actions[] = Action::make('correctResubmit')
+        if ($resourceClass === AwaitingAuthorizationFlightResource::class) {
+            $actions[] = ActionGroup::make([
+                Action::make('correctResubmit')
                     ->label('Correct & Resubmit')
+                    ->icon('heroicon-o-pencil-square')
                     ->url(fn (Flight $record): string => \App\Filament\Panels\Pilot\Resources\Flights\FlightResource::getUrl('create', ['correct_from' => $record->getKey()], panel: 'pilot'))
                     ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
-                        && (int) $record->prepared_by_user_id === (int) Auth::id());
-            }
+                        && (int) $record->prepared_by_user_id === (int) Auth::id()),
+                Action::make('archive')
+                    ->label('Archive')
+                    ->icon('heroicon-o-archive-box')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->action(function (Flight $record): void {
+                        abort_unless($record->pic_authorization_status === 'declined'
+                            && (int) $record->prepared_by_user_id === (int) Auth::id(), 403);
+                        $record->archivePicDecline();
+                    })
+                    ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
+                        && (int) $record->prepared_by_user_id === (int) Auth::id()),
+            ])->label('More')->icon('heroicon-m-ellipsis-vertical')->iconButton()->tooltip('Workflow actions');
+
+            return $actions;
+        }
+
+        if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class, DispatchAwaitingAuthorizationFlightResource::class], true)) {
 
             return $actions;
         }

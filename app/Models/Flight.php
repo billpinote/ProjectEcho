@@ -59,6 +59,7 @@ class Flight extends Model
         'revision_of_id' => 'integer',
         'pic_authorized_revision' => 'integer',
         'pic_authorization_declined_at' => 'datetime',
+        'pic_authorization_archived_at' => 'datetime',
     ];
 
     protected $fillable = [
@@ -151,6 +152,7 @@ class Flight extends Model
         'pic_authorization_declined_by_user_id',
         'pic_authorization_declined_at',
         'pic_authorization_decline_reason',
+        'pic_authorization_archived_at',
         'authorized_representative_enabled',
         'authorized_representative_name',
         'authorized_representative_role',
@@ -400,6 +402,18 @@ class Flight extends Model
                     ->orWhereNull('pic_authorized_at')
                     ->orWhereNull('pic_authorized_revision')
                     ->orWhereRaw('pic_authorized_revision != COALESCE(revision_number, 1)');
+            })
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNull('pic_authorization_status')
+                    ->orWhere('pic_authorization_status', '!=', 'declined')
+                    ->orWhere(function (Builder $query): void {
+                        $query
+                            ->where('pic_authorization_status', 'declined')
+                            ->whereNull('pic_authorization_archived_at')
+                            ->where('pic_authorization_declined_at', '>', now()->subHours(6))
+                            ->whereDoesntHave('revisions');
+                    });
             });
     }
 
@@ -528,6 +542,11 @@ class Flight extends Model
         if ($this->exists) {
             $this->saveQuietly();
         }
+    }
+
+    public function archivePicDecline(): void
+    {
+        $this->forceFill(['pic_authorization_archived_at' => now()])->saveQuietly();
     }
 
     public static function hasReviewedAtColumn(): bool
