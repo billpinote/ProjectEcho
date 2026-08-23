@@ -300,6 +300,7 @@
     .fi-ta-actions .echo-flight-row-action {
         align-items: center;
         display: inline-flex;
+        flex: 0 0 2rem;
         height: 2rem;
         justify-content: center;
         margin: 0;
