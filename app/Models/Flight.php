@@ -56,6 +56,7 @@ class Flight extends Model
         'pic_authorized_at' => 'datetime',
         'pic_authorization_token_expires_at' => 'datetime',
         'revision_number' => 'integer',
+        'revision_of_id' => 'integer',
         'pic_authorized_revision' => 'integer',
         'pic_authorization_declined_at' => 'datetime',
     ];
@@ -144,6 +145,7 @@ class Flight extends Model
         'pic_authorization_token',
         'pic_authorization_token_expires_at',
         'revision_number',
+        'revision_of_id',
         'pic_authorized_revision',
         'pic_authorization_status',
         'pic_authorization_declined_by_user_id',
@@ -205,6 +207,16 @@ class Flight extends Model
         return $this->hasMany(FlightPlanEvent::class);
     }
 
+    public function revisionOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'revision_of_id');
+    }
+
+    public function revisions(): HasMany
+    {
+        return $this->hasMany(self::class, 'revision_of_id');
+    }
+
     public function pilot(): BelongsTo
     {
         return $this->belongsTo(User::class, 'pilot_id');
@@ -218,6 +230,11 @@ class Flight extends Model
     public function picAuthorizedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'pic_authorized_by_user_id');
+    }
+
+    public function picAuthorizationDeclinedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'pic_authorization_declined_by_user_id');
     }
 
     public function scopePendingActive(Builder $query): Builder
@@ -341,6 +358,7 @@ class Flight extends Model
             $query
                 ->pendingExpired()
                 ->orWhere(fn (Builder $query): Builder => $query->rejected())
+                ->orWhere('pic_authorization_status', 'declined')
                 ->orWhere('status', FlightPlanStatus::Cancelled);
         });
     }

@@ -449,11 +449,12 @@
                             @endif
 
                             @if(! $this->isPicAuthorizationPreparer())
-                                <form wire:submit="declineAuthorization" style="margin-top: 1rem;">
-                                    <label for="decline-reason" class="echo-field-label echo-title">Decline reason (optional)</label>
-                                    <textarea id="decline-reason" wire:model="declineReason" rows="2" class="echo-payload-textarea" placeholder="Optional reason"></textarea>
+                                <form wire:submit="declineAuthorization" onsubmit="return confirm('Decline this authorization request? The version will become read-only historical record.');" style="margin-top: 1rem;">
+                                    <label for="decline-reason" class="echo-field-label echo-title">Reason for declining</label>
+                                    <textarea id="decline-reason" wire:model="declineReason" required maxlength="500" rows="2" class="echo-payload-textarea" placeholder="Explain what needs correction"></textarea>
+                                    @error('declineReason') <div class="echo-help" style="color:#b91c1c;">{{ $message }}</div> @enderror
                                     <button type="submit" wire:loading.attr="disabled" class="echo-button echo-button-secondary" style="margin-top: 0.75rem;">
-                                        Decline Authorization
+                                        Decline
                                     </button>
                                 </form>
                             @endif

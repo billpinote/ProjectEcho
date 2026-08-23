@@ -2,6 +2,15 @@
 
 namespace App\Filament\Shared\Resources\Flights\Tables;
 
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
+use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource as DispatchAwaitingAuthorizationFlightResource;
+use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Filament\Shared\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Shared\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Shared\Resources\AirborneFlights\AirborneFlightResource;
@@ -10,20 +19,11 @@ use App\Filament\Shared\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\LandedFlights\LandedFlightResource;
-use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
-use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
-use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource as DispatchAwaitingAuthorizationFlightResource;
-use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
-use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
-use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Filament\Shared\Resources\RejectedFlights\RejectedFlightResource;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\ActiveFlightDataResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Models\Flight;
-use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
-use App\Domain\FlightPlans\Services\FlightPlanMutationService;
-use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -1120,6 +1120,14 @@ class FlightsTable
         }
 
         if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class, AwaitingAuthorizationFlightResource::class, DispatchAwaitingAuthorizationFlightResource::class], true)) {
+            if ($resourceClass === MyArchivedFlightResource::class) {
+                $actions[] = Action::make('correctResubmit')
+                    ->label('Correct & Resubmit')
+                    ->url(fn (Flight $record): string => \App\Filament\Panels\Pilot\Resources\Flights\FlightResource::getUrl('create', ['correct_from' => $record->getKey()], panel: 'pilot'))
+                    ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
+                        && (int) $record->prepared_by_user_id === (int) Auth::id());
+            }
+
             return $actions;
         }
 

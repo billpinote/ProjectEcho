@@ -267,6 +267,15 @@
     @endif
 
     @if(isset($isPreview))
+        @if(($picDeclineDetails ?? false))
+            <div style="width: 794px; margin: 0 auto 12px; padding: 12px 14px; border: 2px solid #b45309; background: #fffbeb; color: #78350f; font-size: 12px;">
+                <strong style="display:block; font-size: 14px; margin-bottom: 6px;">PIC Authorization Declined</strong>
+                <div>This version was declined by the Pilot-in-Command.</div>
+                <div style="margin-top: 6px;"><strong>Reason:</strong> {{ $flight->pic_authorization_decline_reason }}</div>
+                <div><strong>Declined by:</strong> {{ $flight->picAuthorizationDeclinedBy?->name ?? 'PIC' }}</div>
+                <div><strong>Date/Time:</strong> {{ $flight->pic_authorization_declined_at?->format('M j, Y H:i:s') }}</div>
+            </div>
+        @endif
         @if(!(($showPreviewActions ?? true)))
             <div style="width: 794px; margin: 0 auto 10px;">
                 @if(session('review_status'))

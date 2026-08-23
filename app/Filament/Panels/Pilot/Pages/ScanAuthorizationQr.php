@@ -87,6 +87,13 @@ class ScanAuthorizationQr extends ImportScanQr
 
     public function declineAuthorization(): void
     {
+        $this->resetErrorBag();
+        if (blank(trim($this->declineReason)) || mb_strlen(trim($this->declineReason)) > 500) {
+            $this->addError('declineReason', 'A reason for declining is required and must not exceed 500 characters.');
+
+            return;
+        }
+
         try {
             app(PicAuthorizationService::class)->declineFromHandoff($this->picAuthorizationHandoffToken ?? '', auth()->user(), $this->declineReason);
             $this->picAuthorizationHandoffToken = null;

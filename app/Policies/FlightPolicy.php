@@ -37,7 +37,9 @@ class FlightPolicy
      */
     public function update(User $user, Flight $flight): bool
     {
-        return $user->is_active && $user->hasFullFlightAccess();
+        return $user->is_active
+            && $user->hasFullFlightAccess()
+            && $flight->pic_authorization_status !== 'declined';
     }
 
     /**

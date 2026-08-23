@@ -4,12 +4,14 @@ namespace App\Filament\Shared\Resources\Flights\Pages;
 
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
+use App\Models\Flight;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Alignment;
@@ -32,6 +34,31 @@ class CreateFlight extends CreateRecord
     public function getTitle(): string
     {
         return 'Create New Flight Plan';
+    }
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $sourceId = request()->integer('correct_from');
+        if ($sourceId <= 0) {
+            return;
+        }
+
+        $source = Flight::query()->find($sourceId);
+        abort_unless($source !== null
+            && $source->pic_authorization_status === 'declined'
+            && (int) $source->prepared_by_user_id === (int) auth()->id()
+            && FlightAccess::canView(auth()->user(), $source), 403);
+
+        $excluded = ['id', 'created_at', 'updated_at', 'status', 'revision_number', 'revision_of_id',
+            'pic_authorized_by_user_id', 'pic_authorized_at', 'pic_authorization_method',
+            'pic_authorization_token', 'pic_authorization_token_expires_at', 'pic_authorized_revision',
+            'pic_authorization_status', 'pic_authorization_declined_by_user_id',
+            'pic_authorization_declined_at', 'pic_authorization_decline_reason', 'accepted_by_user_id',
+            'accepted_by_wiresign', 'rejected_by_wiresign', 'rejection_reason', 'reviewed_at'];
+        $this->form->fill(collect($source->getAttributes())->except($excluded)->all());
+        $this->data['revision_of_id'] = $source->getKey();
     }
 
     public static function authorizeResourceAccess(): void
@@ -69,6 +96,16 @@ class CreateFlight extends CreateRecord
             }
 
             $data = PilotFlightPlanCredentials::applySnapshot($data, $user);
+        }
+
+        $sourceId = (int) ($data['revision_of_id'] ?? request()->integer('correct_from'));
+        $source = $sourceId > 0 ? Flight::query()->find($sourceId) : null;
+        if ($source !== null) {
+            abort_unless($source->pic_authorization_status === 'declined'
+                && (int) $source->prepared_by_user_id === (int) auth()->id(), 403);
+            $data['revision_of_id'] = $source->getKey();
+            $data['revision_number'] = (int) ($source->revision_number ?? 1) + 1;
+            $data['pic_authorization_status'] = 'pending';
         }
 
         return FlightResource::normalizeFormData($data);

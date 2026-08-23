@@ -21,6 +21,8 @@ class EditFlight extends EditRecord
     {
         parent::mount($record);
 
+        abort_unless($this->record->pic_authorization_status !== 'declined', 403, 'PIC-declined flight-plan versions are read-only.');
+
         if ($this->record->status?->value === 'pending' && ! $this->record->isPendingExpired()) {
             $this->record->markAsReviewed();
         }

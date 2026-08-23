@@ -9,8 +9,10 @@ use App\Domain\FlightPlans\Services\FlightPlanPdfService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
-use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
+use App\Filament\Panels\Pilot\Resources\Flights\FlightResource as PilotFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
@@ -211,6 +213,15 @@ class FlightController extends Controller
             'acceptActionUrl' => route('flights.accept', $flight),
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->resolveAtcWiresign(),
+            'picDeclineDetails' => $flight->pic_authorization_status === 'declined',
+            'backActionLabel' => $flight->pic_authorization_status === 'declined' ? 'Back to Archive' : 'Back to Dashboard',
+            'backActionUrl' => $flight->pic_authorization_status === 'declined'
+                ? MyArchivedFlightResource::getUrl('index', panel: 'pilot')
+                : $backActionUrl,
+            'correctResubmitUrl' => $flight->pic_authorization_status === 'declined'
+                && (int) $flight->prepared_by_user_id === (int) Auth::id()
+                ? PilotFlightResource::getUrl('create', ['correct_from' => $flight->getKey()], panel: 'pilot')
+                : null,
         ]);
     }
 

@@ -3,8 +3,8 @@
 namespace App\Domain\FlightPlans\Services;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
-use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Models\Flight;
 use App\Models\User;
@@ -54,7 +54,7 @@ class PicAuthorizationService
             || $flight->pic_authorization_token_expires_at?->isPast()
             || ! $flight->requiresPicAuthorization()
             || $flight->isPicAuthorizationCurrent()
-            ) {
+        ) {
             return null;
         }
 
@@ -122,6 +122,10 @@ class PicAuthorizationService
 
     public function declineFromHandoff(string $token, User $user, ?string $reason = null): Flight
     {
+        $reason = filled($reason) ? trim($reason) : null;
+        if ($reason === null || mb_strlen($reason) > 500) {
+            throw ValidationException::withMessages(['declineReason' => 'A reason for declining is required and must not exceed 500 characters.']);
+        }
         $flight = $this->resolveAuthorizationHandoff($token);
         if ($flight === null) {
             throw ValidationException::withMessages(['payload' => 'This PIC authorization handoff is invalid, expired, or no longer current.']);
@@ -138,7 +142,7 @@ class PicAuthorizationService
                 'pic_authorization_status' => 'declined',
                 'pic_authorization_declined_by_user_id' => $user->getKey(),
                 'pic_authorization_declined_at' => now(),
-                'pic_authorization_decline_reason' => filled($reason) ? trim($reason) : null,
+                'pic_authorization_decline_reason' => $reason,
                 'pic_authorization_token' => null,
                 'pic_authorization_token_expires_at' => null,
             ])->save();
