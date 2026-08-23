@@ -286,15 +286,15 @@
         column-gap: 0.25rem;
         display: grid !important;
         flex: 0 0 auto;
-        grid-template-columns: repeat(3, 2rem);
+        grid-template-columns: repeat(4, 2rem);
         justify-items: center;
-        min-width: 6.5rem;
+        min-width: 8.75rem;
+        width: 8.75rem;
         white-space: nowrap;
     }
 
     .fi-ta-actions:has(.echo-flight-row-action-more) {
         grid-template-columns: repeat(4, 2rem);
-        min-width: 8.75rem;
     }
 
     .fi-ta-actions .echo-flight-row-action {
