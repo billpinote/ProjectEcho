@@ -4,6 +4,9 @@ namespace App\Filament\Panels\Pilot\Resources\MyArchivedFlights;
 
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\Pages\ListMyArchivedFlights;
 use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlanResource;
+use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Models\Flight;
+use Illuminate\Support\Facades\Auth;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -23,7 +26,11 @@ class MyArchivedFlightResource extends MyFlightPlanResource
 
     public static function getEloquentQuery(): Builder
     {
-        return static::getInvolvedFlightQuery()->archivedForPilot();
+        return FlightAccess::restrictQueryToPilotInvolvement(
+            Flight::query(),
+            Auth::user(),
+            includePicAuthorizationDeclineActor: true,
+        )->archivedForPilot();
     }
 
     public static function getPages(): array

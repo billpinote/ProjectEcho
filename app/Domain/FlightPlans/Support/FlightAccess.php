@@ -15,7 +15,8 @@ class FlightAccess
         }
 
         if ($user->isPilot()) {
-            return $flight->isPilotInvolved($user);
+            return $flight->isPilotInvolved($user)
+                || self::isPicAuthorizationDeclineActor($user, $flight);
         }
 
         if ($user->isDispatch()) {
@@ -68,6 +69,13 @@ class FlightAccess
             && (int) $user->operator_id === (int) $flight->operator_id;
     }
 
+    public static function isPicAuthorizationDeclineActor(User $user, Flight $flight): bool
+    {
+        return $flight->isPicAuthorizationDeclined()
+            && $flight->pic_authorization_declined_by_user_id !== null
+            && (int) $flight->pic_authorization_declined_by_user_id === (int) $user->getKey();
+    }
+
     public static function restrictQueryToVisibleFlights(Builder $query, ?User $user): Builder
     {
         if ($user === null || ! $user->is_active || ! $user->canViewFlightPlans()) {
@@ -93,7 +101,7 @@ class FlightAccess
         return $query;
     }
 
-    public static function restrictQueryToPilotInvolvement(Builder $query, ?User $user): Builder
+    public static function restrictQueryToPilotInvolvement(Builder $query, ?User $user, bool $includePicAuthorizationDeclineActor = false): Builder
     {
         if ($user === null) {
             return $query->whereRaw('1 = 0');
@@ -101,12 +109,16 @@ class FlightAccess
 
         $userId = $user->getKey();
 
-        return $query->where(function (Builder $query) use ($userId): void {
+        return $query->where(function (Builder $query) use ($userId, $includePicAuthorizationDeclineActor): void {
             $query
                 ->where('filed_by_user_id', $userId)
                 ->orWhere('prepared_by_user_id', $userId)
                 ->orWhere('pilot_in_command_user_id', $userId)
                 ->orWhere('pilot_id', $userId);
+
+            if ($includePicAuthorizationDeclineActor) {
+                $query->orWhere('pic_authorization_declined_by_user_id', $userId);
+            }
         });
     }
 }

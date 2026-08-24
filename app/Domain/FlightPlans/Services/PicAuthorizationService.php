@@ -24,7 +24,9 @@ class PicAuthorizationService
 
     public function createAuthorizationHandoff(Flight $flight): string
     {
-        abort_unless($flight->requiresPicAuthorization() && ! $flight->isPicAuthorizationCurrent(), 422);
+        abort_unless($flight->requiresPicAuthorization()
+            && ! $flight->isPicAuthorizationCurrent()
+            && ! $flight->isPicAuthorizationDeclined(), 422);
 
         $token = Str::random(64);
         $revision = (int) ($flight->revision_number ?? 1);

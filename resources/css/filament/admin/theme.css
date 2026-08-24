@@ -701,6 +701,33 @@
         color: var(--color-echo-text-primary);
     }
 
+    .echo-ui-modal__input-label {
+        display: block;
+        margin-top: 1rem;
+        color: var(--color-echo-text-primary);
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    .echo-ui-modal__input {
+        display: block;
+        width: 100%;
+        min-height: 5.5rem;
+        margin-top: 0.45rem;
+        padding: 0.75rem;
+        border: 1px solid var(--color-echo-border);
+        border-radius: 0.65rem;
+        background: #fff;
+        color: var(--color-echo-text-primary);
+        resize: vertical;
+    }
+
+    .echo-ui-modal__input:focus {
+        outline: none;
+        border-color: var(--color-echo-primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-echo-primary) 18%, white);
+    }
+
     .echo-ui-modal__actions {
         display: flex;
         justify-content: flex-end;

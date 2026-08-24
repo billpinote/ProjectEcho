@@ -496,6 +496,11 @@ class Flight extends Model
         return (int) $this->prepared_by_user_id !== (int) $this->pilot_in_command_user_id;
     }
 
+    public function isPicAuthorizationDeclined(): bool
+    {
+        return $this->pic_authorization_status === 'declined';
+    }
+
     public function isPicAuthorized(): bool
     {
         return $this->pic_authorized_by_user_id !== null && $this->pic_authorized_at !== null;
@@ -510,6 +515,10 @@ class Flight extends Model
 
     public function canSubmitToAtc(): bool
     {
+        if ($this->isPicAuthorizationDeclined()) {
+            return false;
+        }
+
         if (! $this->requiresPicAuthorization()) {
             return true;
         }

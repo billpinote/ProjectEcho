@@ -5,6 +5,8 @@
         <div class="echo-ui-modal__copy">
             <h2 id="echo-ui-modal-heading" class="echo-ui-modal__heading">Notice</h2>
             <p id="echo-ui-modal-message" class="echo-ui-modal__message"></p>
+            <label id="echo-ui-modal-input-label" class="echo-ui-modal__input-label" for="echo-ui-modal-input" hidden></label>
+            <textarea id="echo-ui-modal-input" class="echo-ui-modal__input" rows="3" hidden></textarea>
         </div>
 
         <div class="echo-ui-modal__actions">
@@ -50,10 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const icon = document.getElementById('echo-ui-modal-icon');
     const heading = document.getElementById('echo-ui-modal-heading');
     const message = document.getElementById('echo-ui-modal-message');
+    const inputLabel = document.getElementById('echo-ui-modal-input-label');
+    const input = document.getElementById('echo-ui-modal-input');
     const cancelButton = document.getElementById('echo-ui-modal-cancel');
     const confirmButton = document.getElementById('echo-ui-modal-confirm');
 
-    if (! dialog || ! icon || ! heading || ! message || ! cancelButton || ! confirmButton) {
+    if (! dialog || ! icon || ! heading || ! message || ! inputLabel || ! input || ! cancelButton || ! confirmButton) {
         return;
     }
 
@@ -109,6 +113,14 @@ document.addEventListener('DOMContentLoaded', () => {
         confirmButton.textContent = buttonLabel;
         cancelButton.textContent = cancelLabel;
         cancelButton.hidden = ! isConfirm;
+        inputLabel.hidden = ! detail.inputLabel;
+        inputLabel.textContent = detail.inputLabel || '';
+        input.hidden = ! detail.inputLabel;
+        input.placeholder = detail.inputPlaceholder || '';
+        input.maxLength = detail.inputMaxLength || 500;
+        if (detail.inputLabel) {
+            input.value = detail.inputValue || '';
+        }
 
         dialog.classList.remove(...toneClasses);
 
@@ -137,10 +149,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    const promptModal = (detail = {}) => new Promise((resolve) => {
+        activeResolver = (confirmed) => resolve(confirmed ? input.value : null);
+        openModal({ ...detail, confirm: true });
+        window.setTimeout(() => input.focus(), 0);
+    });
+
     window.EchoUiModal = {
         open: openModal,
         confirm: confirmModal,
         close: () => settleModal(false),
+        prompt: promptModal,
     };
 
     window.addEventListener('echo-modal:open', (event) => openModal(event.detail || {}));

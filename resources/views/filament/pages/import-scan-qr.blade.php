@@ -393,9 +393,15 @@
                                 <h3 class="echo-display" style="margin: 0.5rem 0 0; font-size: 1.5rem;">{{ $matchedFlight['aircraft_identification'] }}</h3>
                             </div>
 
-                            <span class="echo-status-badge {{ $statusBadgeClass }}">
-                                {{ $matchedFlight['status_label'] }}
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                <span class="echo-status-badge {{ $statusBadgeClass }}">
+                                    {{ $matchedFlight['status_label'] }}
+                                </span>
+                                <button type="button" wire:click="startOver" class="echo-button echo-button-secondary" style="padding: 0.55rem 0.75rem;">
+                                    <x-filament::icon icon="heroicon-o-arrow-path" class="fi-size-4" />
+                                    <span>Start Over</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div class="echo-summary-grid">
@@ -433,6 +439,11 @@
                                     <strong>You prepared this flight plan</strong>
                                     <p style="margin: 0.4rem 0 0;">This authorization request must be acted on by another eligible PPL, CPL, or ATPL pilot from your operator.</p>
                                 </div>
+                            @elseif($this->isPicAuthorizationDeclined())
+                                <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #718096; border-radius: 0.75rem; background: #edf2f7;">
+                                    <strong>{{ $this->isPicAuthorizationDeclineActor() ? 'You declined this flight plan' : 'PIC authorization declined' }}</strong>
+                                    <p style="margin: 0.4rem 0 0;">This authorization decision is complete. A corrected or resubmitted revision is required before another PIC decision.</p>
+                                </div>
                             @elseif($this->canAuthorizeMatchedFlight())
                                 <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #b7791f; border-radius: 0.75rem; background: #fff8e1;">
                                     <strong>PIC Authorization Required</strong>
@@ -448,15 +459,19 @@
                                 </div>
                             @endif
 
-                            @if(! $this->isPicAuthorizationPreparer())
-                                <form wire:submit="declineAuthorization" onsubmit="return confirm('Decline this authorization request? The version will become read-only historical record.');" style="margin-top: 1rem;">
-                                    <label for="decline-reason" class="echo-field-label echo-title">Reason for declining</label>
-                                    <textarea id="decline-reason" wire:model="declineReason" required maxlength="500" rows="2" class="echo-payload-textarea" placeholder="Explain what needs correction"></textarea>
-                                    @error('declineReason') <div class="echo-help" style="color:#b91c1c;">{{ $message }}</div> @enderror
-                                    <button type="submit" wire:loading.attr="disabled" class="echo-button echo-button-secondary" style="margin-top: 0.75rem;">
-                                        Decline
-                                    </button>
-                                </form>
+                            @if(! $this->isPicAuthorizationPreparer() && ! $this->isPicAuthorizationDeclined())
+                                <button
+                                    type="button"
+                                    class="echo-button echo-button-secondary echo-decline-flight-trigger"
+                                    data-callsign="{{ $matchedFlight['aircraft_identification'] }}"
+                                    style="margin-top: 1rem;"
+                                >
+                                    Decline Flight Plan
+                                    <span class="sr-only">Decline Authorization</span>
+                                </button>
+                                @error('declineReason')
+                                    <div class="echo-help" style="margin-top: 0.5rem; color:#b91c1c;" role="alert">{{ $message }}</div>
+                                @enderror
                             @endif
                         @endif
                     </section>
@@ -548,6 +563,33 @@
         });
 
         document.addEventListener('echo:qr-payload-loaded', scrollToMatchedFlight);
+
+        document.addEventListener('click', async (event) => {
+            const trigger = event.target.closest('.echo-decline-flight-trigger');
+
+            if (!trigger || !window.EchoUiModal) {
+                return;
+            }
+
+            event.preventDefault();
+            const componentRoot = trigger.closest('[wire\\:id]');
+            const component = componentRoot ? Livewire.find(componentRoot.getAttribute('wire:id')) : null;
+            const reason = await window.EchoUiModal.prompt({
+                heading: 'Decline Flight Plan',
+                message: `You are declining the PIC authorization request for ${trigger.dataset.callsign || 'this aircraft'}.`,
+                inputLabel: 'Reason for declining',
+                inputPlaceholder: 'Explain what needs correction',
+                inputMaxLength: 500,
+                tone: 'danger',
+                confirmLabel: 'Decline Flight Plan',
+                cancelLabel: 'Cancel',
+                confirmTone: 'danger',
+            });
+
+            if (reason !== null && component) {
+                await component.call('declineAuthorization', reason);
+            }
+        });
 
         document.addEventListener('livewire:init', () => {
             Livewire.hook('morph.updated', () => {

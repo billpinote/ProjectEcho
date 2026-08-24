@@ -6,6 +6,7 @@ use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Resources\Flights\FlightResource;
@@ -632,6 +633,101 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->assertSame($reviewer->id, $declined->pic_authorization_declined_by_user_id);
         $this->assertSame('PIC details need correction.', $declined->pic_authorization_decline_reason);
         $this->assertTrue($declined->requiresPicAuthorization());
+    }
+
+    public function test_pic_sees_a_declined_flight_in_archive_even_when_they_did_not_prepare_it(): void
+    {
+        $operator = Operator::factory()->create();
+        $preparer = $this->user(UserRole::Dispatch, null, $operator);
+        $pic = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $otherPic = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $previouslyArchived = Flight::create([
+            'status' => FlightPlanStatus::Rejected,
+            'aircraft_identification' => 'PIC-ARCHIVED',
+            'filed_by_user_id' => $pic->id,
+            'prepared_by_user_id' => $pic->id,
+            'operator_id' => $operator->id,
+        ]);
+        $flight = $this->awaitingFlight($pic, [
+            'filed_by_user_id' => $preparer->id,
+            'prepared_by_user_id' => $preparer->id,
+            'operator_id' => $operator->id,
+            'aircraft_identification' => 'PIC-DECLINED',
+        ]);
+
+        app(PicAuthorizationService::class)->declineFromPayload(
+            $this->payload($flight),
+            $pic,
+            'Needs correction.',
+        );
+
+        $this->actingAs($pic)
+            ->get(route('filament.pilot.resources.my-archived-flights.index'))
+            ->assertOk()
+            ->assertSeeText('PIC-DECLINED')
+            ->assertSeeText('PIC-ARCHIVED');
+
+        $this->get(route('flights.view', $flight))->assertOk();
+
+        $this->actingAs($otherPic)
+            ->get(route('filament.pilot.resources.my-archived-flights.index'))
+            ->assertOk()
+            ->assertDontSeeText('PIC-DECLINED');
+
+        $this->get(route('flights.view', $flight))->assertForbidden();
+
+    }
+
+    public function test_declined_authorization_is_terminal_for_scanner_and_atmo_state(): void
+    {
+        $operator = Operator::factory()->create();
+        $jesse = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $chezka = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $otherPilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
+        $flight = $this->awaitingFlight($chezka, [
+            'filed_by_user_id' => $jesse->id,
+            'prepared_by_user_id' => $jesse->id,
+            'prepared_by_role' => UserRole::Pilot->value,
+            'operator_id' => $operator->id,
+        ]);
+
+        app(PicAuthorizationService::class)->declineFromPayload(
+            $this->payload($flight),
+            $chezka,
+            'PIC details need correction.',
+        );
+
+        Livewire::actingAs($jesse)
+            ->test(ScanAuthorizationQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSeeText('You prepared this flight plan')
+            ->assertSeeText('PIC Declined')
+            ->assertDontSeeText('PIC Authorization Required')
+            ->assertDontSeeText('Authorize as PIC');
+
+        Livewire::actingAs($chezka)
+            ->test(ScanAuthorizationQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSeeText('You declined this flight plan')
+            ->assertSeeText('PIC Declined')
+            ->assertDontSeeText('PIC Authorization Required')
+            ->assertDontSeeText('Authorize as PIC')
+            ->assertDontSee('class="echo-button echo-button-secondary echo-decline-flight-trigger"', false);
+
+        Livewire::actingAs($otherPilot)
+            ->test(ScanAuthorizationQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSeeText('PIC authorization declined')
+            ->assertSeeText('PIC Declined')
+            ->assertDontSeeText('PIC Authorization Required')
+            ->assertDontSeeText('Authorize as PIC')
+            ->assertDontSee('class="echo-button echo-button-secondary echo-decline-flight-trigger"', false);
+
+        $atmo = $this->user(UserRole::Atmo);
+        $flight->refresh();
+        $this->assertSame('PIC Declined', FlightStatusDisplay::badge($flight, UserRole::Atmo)['label']);
+        $this->assertFalse($flight->canSubmitToAtc());
+        $this->assertFalse($atmo->can('accept', $flight));
     }
 
     private function user(UserRole $role, ?string $licenseType = null, ?Operator $operator = null): User

@@ -451,7 +451,12 @@ class FlightController extends Controller
             $flight = Flight::find((int) $preview['flight_id']);
 
             if ($flight !== null && Auth::check()) {
-                abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
+                $user = Auth::user();
+                $canView = $user?->can('view', $flight) ?? false;
+                $canReadDeclinedPicScan = $flight->isPicAuthorizationDeclined()
+                    && FlightAccess::canAccessPicAuthorization($user, $flight);
+
+                abort_unless($canView || $canReadDeclinedPicScan, 403);
             }
         }
 

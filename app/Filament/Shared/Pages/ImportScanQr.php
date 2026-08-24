@@ -2,11 +2,11 @@
 
 namespace App\Filament\Shared\Pages;
 
-use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Models\Flight;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Users\Enums\UserRole;
 use BackedEnum;
 use Carbon\Carbon;
@@ -123,6 +123,16 @@ class ImportScanQr extends Page
         $this->lookupPayload($normalizedPayload, notifyOnSuccess: false, notifyOnFailure: false);
     }
 
+    public function startOver(): void
+    {
+        $this->payload = '';
+        $this->lastProcessedPayload = null;
+        $this->matchedFlight = null;
+        $this->picAuthorizationHandoffToken = null;
+
+        $this->redirect(static::getUrl());
+    }
+
     private function formatFlightDate(mixed $value): string
     {
         if ($value === null || $value === '') {
@@ -190,9 +200,9 @@ class ImportScanQr extends Page
                 return;
             }
 
-            $status = $flight?->status instanceof FlightPlanStatus
-                ? $flight->status
-                : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
+            $statusBadge = $flight !== null
+                ? FlightStatusDisplay::badge($flight, Auth::user()?->role)
+                : null;
             $previewToken = $this->storeScannedFlightPlanPreview([
                 'payload' => $parsedPayload['normalized_payload'],
                 'snapshot' => $snapshot,
@@ -203,7 +213,9 @@ class ImportScanQr extends Page
                 'schema_id' => $parsedPayload['schema_id'],
             ]);
 
-            if ($this->scannedPreviewPurpose() === 'pic_authorization' && $flight !== null) {
+            if ($this->scannedPreviewPurpose() === 'pic_authorization'
+                && $flight !== null
+                && ! $flight->isPicAuthorizationDeclined()) {
                 $handoffToken = app(\App\Domain\FlightPlans\Services\PicAuthorizationService::class)
                     ->createAuthorizationHandoff($flight);
                 session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
@@ -220,9 +232,9 @@ class ImportScanQr extends Page
                 'proposed_time' => UtcFourDigitTime::formatForDisplay($snapshot['proposed_time'] ?? null) ?? 'N/A',
                 'departure_aerodrome' => (string) ($snapshot['departure_aerodrome'] ?? 'N/A'),
                 'destination_aerodrome' => (string) ($snapshot['destination_aerodrome'] ?? 'N/A'),
-                'status' => $status?->value ?? 'verified_qr_only',
-                'status_label' => $status?->label() ?? 'Flight plan ready for review.',
-                'status_color' => $status?->filamentColor() ?? 'info',
+                'status' => $statusBadge['key'] ?? 'verified_qr_only',
+                'status_label' => $statusBadge['label'] ?? 'Flight plan ready for review.',
+                'status_color' => $statusBadge['color'] ?? 'info',
                 'view_url' => $this->scannedFlightViewUrl($flight, $previewToken),
             ];
 
@@ -261,7 +273,7 @@ class ImportScanQr extends Page
 
         $this->payload = $parsedPayload['normalized_payload'];
         $this->lastProcessedPayload = $parsedPayload['normalized_payload'];
-        $status = $flight->status instanceof FlightPlanStatus ? $flight->status : FlightPlanStatus::tryFrom((string) $flight->status);
+        $statusBadge = FlightStatusDisplay::badge($flight, Auth::user()?->role);
 
         $previewToken = null;
 
@@ -273,7 +285,7 @@ class ImportScanQr extends Page
                 'purpose' => $this->scannedPreviewPurpose(),
             ]);
 
-            if ($this->scannedPreviewPurpose() === 'pic_authorization') {
+            if ($this->scannedPreviewPurpose() === 'pic_authorization' && ! $flight->isPicAuthorizationDeclined()) {
                 $handoffToken = app(\App\Domain\FlightPlans\Services\PicAuthorizationService::class)
                     ->createAuthorizationHandoff($flight);
                 session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
@@ -289,9 +301,9 @@ class ImportScanQr extends Page
             'proposed_time' => UtcFourDigitTime::formatForDisplay($flight->proposed_time) ?? 'N/A',
             'departure_aerodrome' => (string) ($flight->departure_aerodrome ?? 'N/A'),
             'destination_aerodrome' => (string) ($flight->destination_aerodrome ?? 'N/A'),
-            'status' => $status?->value ?? (string) ($flight->status ?? 'unknown'),
-            'status_label' => $status?->label() ?? str((string) ($flight->status ?? 'unknown'))->headline()->toString(),
-            'status_color' => $status?->filamentColor() ?? 'gray',
+            'status' => $statusBadge['key'],
+            'status_label' => $statusBadge['label'],
+            'status_color' => $statusBadge['color'],
             'view_url' => $previewToken !== null
                 ? $this->scannedFlightViewUrl($flight, $previewToken)
                 : route('flights.view', $flight),

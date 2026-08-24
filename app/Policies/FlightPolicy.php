@@ -71,7 +71,9 @@ class FlightPolicy
      */
     public function accept(User $user, Flight $flight): bool
     {
-        return $user->canReviewFlightPlans() && FlightAccess::canView($user, $flight);
+        return $user->canReviewFlightPlans()
+            && $flight->canSubmitToAtc()
+            && FlightAccess::canView($user, $flight);
     }
 
     /**
@@ -79,7 +81,9 @@ class FlightPolicy
      */
     public function reject(User $user, Flight $flight): bool
     {
-        return $user->canReviewFlightPlans() && FlightAccess::canView($user, $flight);
+        return $user->canReviewFlightPlans()
+            && $flight->canSubmitToAtc()
+            && FlightAccess::canView($user, $flight);
     }
 
     public function updateStartUpTime(User $user, Flight $flight): bool
