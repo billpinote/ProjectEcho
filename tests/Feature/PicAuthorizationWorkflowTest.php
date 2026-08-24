@@ -668,6 +668,9 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertSeeText('PIC-ARCHIVED');
 
         $this->get(route('flights.view', $flight))->assertOk();
+        $flight->refresh();
+        $this->assertTrue(FlightAccess::canView($pic, $flight));
+        $this->assertTrue(Flight::query()->visibleTo($pic)->whereKey($flight)->exists());
 
         $this->actingAs($otherPic)
             ->get(route('filament.pilot.resources.my-archived-flights.index'))
@@ -675,6 +678,8 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertDontSeeText('PIC-DECLINED');
 
         $this->get(route('flights.view', $flight))->assertForbidden();
+        $this->assertFalse(FlightAccess::canView($otherPic, $flight));
+        $this->assertFalse(Flight::query()->visibleTo($otherPic)->whereKey($flight)->exists());
 
     }
 

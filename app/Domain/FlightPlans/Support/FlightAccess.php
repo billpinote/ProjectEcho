@@ -83,7 +83,11 @@ class FlightAccess
         }
 
         if ($user->isPilot()) {
-            return self::restrictQueryToPilotInvolvement($query, $user);
+            return self::restrictQueryToPilotInvolvement(
+                $query,
+                $user,
+                includePicAuthorizationDeclineActor: true,
+            );
         }
 
         if ($user->isDispatch()) {
