@@ -236,6 +236,11 @@
             padding: 0.75rem;
         }
 
+        /* Keep the live preview natural to use as a mirrored/selfie view. */
+        #qr-reader video {
+            transform: scaleX(-1);
+        }
+
         .echo-summary-header {
             display: flex;
             align-items: center;
@@ -324,10 +329,10 @@
                             id="qr-image-upload"
                             class="echo-file-input"
                             type="file"
-                            accept=".png,image/png,image/jpeg,image/jpg,image/webp"
+                            accept=".png,.jpg,.jpeg,.webp,.heic,.heif,image/png,image/jpeg,image/webp,image/heic,image/heif"
                         >
                         <p class="echo-help" style="margin: 0.75rem 0 0;">
-                            Upload a PNG, JPG, or WEBP image that contains the Echo QR code.
+                            Upload a PNG, JPG, WEBP, or HEIC image that contains the Echo QR code.
                         </p>
                         <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
                     </div>                    

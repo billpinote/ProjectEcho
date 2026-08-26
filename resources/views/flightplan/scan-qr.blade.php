@@ -9,6 +9,7 @@
     @else
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://unpkg.com/html5-qrcode"></script>
+        <script src="{{ asset('js/qr-image-decoder.js') }}"></script>
     @endif
     <link rel="stylesheet" href="{{ asset('css/flightplan.css') }}">
     <style>
@@ -61,10 +62,10 @@
                             id="qr-image-upload"
                             class="echo-file-input"
                             type="file"
-                            accept=".png,image/png,image/jpeg,image/jpg,image/webp"
+                            accept=".png,.jpg,.jpeg,.webp,.heic,.heif,image/png,image/jpeg,image/webp,image/heic,image/heif"
                         >
                         <p class="echo-help" style="margin: 0.75rem 0 0;">
-                            Upload a PNG, JPG, or WEBP image that contains the Echo QR code.
+                            Upload a PNG, JPG, WEBP, or HEIC image that contains the Echo QR code.
                         </p>
                         <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
                     </div>
@@ -376,12 +377,13 @@
                     try {
                         setQrStatus('Reading QR image...', 'muted');
 
-                        const fileReader = new Html5Qrcode(scannerRegionId);
-                        const decodedText = await fileReader.scanFile(file, true);
+                        const decodedText = await window.EchoQrImageDecoder(
+                            file, scannerRegionId, window.Html5Qrcode);
 
                         fillQrPayload(decodedText);
                         setQrStatus('QR payload loaded from image. Verifying now...', 'success');
                     } catch (error) {
+                        console.error('[Echo QR] upload decoding failed before payload production', error);
                         setQrStatus('Unable to decode that image. Try a clearer QR image or use the webcam scanner.', 'danger');
                     }
                 });

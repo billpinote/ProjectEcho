@@ -1,5 +1,6 @@
 import './bootstrap';
 import { Html5Qrcode } from 'html5-qrcode';
+import './qr-image-decoder';
 
 window.Html5Qrcode = Html5Qrcode;
 
@@ -169,12 +170,13 @@ const initImportScanQrPage = () => {
         try {
             setQrStatus('Reading QR image...', 'muted');
 
-            const fileReader = new Html5Qrcode(scannerRegionId);
-            const decodedText = await fileReader.scanFile(file, true);
+            const decodedText = await window.EchoQrImageDecoder(
+                file, scannerRegionId, Html5Qrcode);
 
             fillQrPayload(decodedText);
             setQrStatus('Flight plan QR loaded from image. Verifying now...', 'success');
         } catch (error) {
+            console.error('[Echo QR] upload decoding failed before payload production', error);
             setQrStatus('Unable to decode that image. Try a clearer QR image or use the webcam scanner.', 'danger');
         }
     });
