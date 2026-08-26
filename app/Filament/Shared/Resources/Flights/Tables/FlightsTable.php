@@ -1104,7 +1104,6 @@ class FlightsTable
                 ->icon('heroicon-o-qr-code')
                 ->iconButton()
                 ->tooltip('View QR code')
-                ->extraAttributes(['class' => 'echo-flight-row-action echo-flight-row-action-qr'])
                 ->url(fn (Flight $record): string => route('flights.qr', $record))
                 ->openUrlInNewTab(),
             Action::make('view')
@@ -1112,7 +1111,6 @@ class FlightsTable
                 ->icon('heroicon-o-eye')
                 ->iconButton()
                 ->tooltip('View flight plan')
-                ->extraAttributes(['class' => 'echo-flight-row-action echo-flight-row-action-view'])
                 ->url(fn (Flight $record): string => route('flights.view', $record))
                 ->openUrlInNewTab(),
             Action::make('pdf')
@@ -1120,7 +1118,6 @@ class FlightsTable
                 ->icon('heroicon-o-document-text')
                 ->iconButton()
                 ->tooltip('Download PDF')
-                ->extraAttributes(['class' => 'echo-flight-row-action echo-flight-row-action-pdf'])
                 ->url(fn (Flight $record): string => route('flights.pdf.download', $record))
                 ->openUrlInNewTab(),
         ];
@@ -1192,7 +1189,7 @@ class FlightsTable
             ))
                 ->label('Actions')
                 ->icon('heroicon-o-squares-2x2')
-                ->iconButton()
+                ->button()
                 ->tooltip('Actions')
                 ->extraAttributes([
                     'aria-label' => 'Flight actions',

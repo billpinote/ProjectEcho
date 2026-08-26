@@ -269,6 +269,10 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             ->assertTableActionHidden('delay', $ownedFlight->getKey())
             ->assertTableActionHidden('cancel', $ownedFlight->getKey())
             ->assertSee('aria-label="Flight actions"', false)
+            ->assertSeeText('Actions')
+            ->assertSeeText('QR Code')
+            ->assertSeeText('View Flight Plan')
+            ->assertSeeText('Download PDF')
             ->assertDontSee('OTH456');
     }
 
