@@ -240,6 +240,26 @@
         #qr-reader video {
             transform: scaleX(-1);
         }
+        #qr-reader:empty::before { content: "Camera preview will appear here\\A\\APlace the QR code inside the frame"; white-space: pre; min-height: 280px; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--color-echo-text-secondary); font-size: .875rem; line-height: 1.5; }
+
+        .echo-qr-tabs { display: flex; border-bottom: 1px solid var(--color-echo-border); }
+        .echo-qr-tab { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-width: 0; padding: .8rem .65rem; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--color-echo-text-secondary); font-size: .875rem; font-weight: 600; cursor: pointer; }
+        .echo-qr-tab-active { color: var(--color-echo-primary); border-bottom-color: var(--color-echo-primary); }
+        .echo-qr-tab-inactive:hover { color: var(--color-echo-text-primary); background: color-mix(in srgb, var(--color-echo-background) 70%, white); }
+        .echo-qr-tab svg, .echo-camera-title svg, .echo-qr-empty-state svg, .echo-qr-recovery-trigger > svg, .echo-manual-header > svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+        .echo-camera-title, .echo-manual-header { display: flex; align-items: flex-start; gap: .6rem; color: var(--color-echo-text-primary); font-weight: 700; }
+        .echo-qr-empty-state { min-height: 280px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .65rem; text-align: center; color: var(--color-echo-text-secondary); }
+        .echo-qr-empty-state svg { width: 2.5rem; height: 2.5rem; color: var(--color-echo-primary); }
+        .echo-qr-empty-state strong { color: var(--color-echo-text-primary); }
+        .echo-qr-recovery-trigger { width: 100%; display: flex; align-items: center; gap: .75rem; padding: .9rem 1rem; border: 1px solid #eadfbd; border-radius: .9rem; background: #fff9e9; color: var(--color-echo-text-secondary); text-align: left; cursor: pointer; }
+        .echo-qr-recovery-trigger > span, .echo-manual-header > span { display: flex; flex-direction: column; gap: .2rem; }
+        .echo-qr-recovery-trigger strong { color: #5f5130; }
+        .echo-qr-recovery-trigger small, .echo-manual-header small { font-size: .875rem; }
+        .echo-qr-chevron { margin-left: auto; transition: transform 180ms ease; }
+        .echo-qr-recovery-trigger[aria-expanded=\"true\"] .echo-qr-chevron { transform: rotate(180deg); }
+        .echo-manual-header { margin-bottom: 1rem; }
+        .echo-manual-header > svg { color: var(--color-echo-primary); }
+        .echo-qr-security-note { margin: .65rem 0 0; color: var(--color-echo-text-secondary); font-size: .75rem; }
 
         .echo-summary-header {
             display: flex;
@@ -272,9 +292,9 @@
             <div class="echo-import-hero-grid">
                 <div>
                     <p class="echo-import-kicker echo-label">Echo Flight Operations</p>
-                    <h2 class="echo-display" style="margin: 0.5rem 0 0;">Open Flight Plan</h2>
+                    <h2 class="echo-display" style="margin: 0.5rem 0 0;">Scan or Upload</h2>
                     <p class="echo-import-subtitle echo-body">
-                        Scan the flight plan QR with your camera or upload an image to review, authorize, or process the flight.
+                        Use any option below to open the flight plan.
                     </p>
                 </div>
             </div>
@@ -282,21 +302,18 @@
 
         <div class="echo-import-layout">
             <section class="echo-import-panel">
-                <div class="echo-panel-header">
-                    <div>
-                        <h3 class="echo-heading" style="margin: 0;">Scan or Upload</h3>
-                        <p class="echo-help" style="margin: 0.35rem 0 0;">Use either method below to open the flight plan.</p>
-                    </div>
-                </div>
-
                 <form id="scan-qr-lookup-form" wire:submit="submit" class="echo-import-stack" style="margin-top: 1.25rem;">
+                    <div class="echo-qr-tabs" role="tablist" aria-label="QR input method">
+                        <button id="qr-tab-webcam" type="button" role="tab" aria-selected="true" aria-controls="qr-panel-webcam" class="echo-qr-tab echo-qr-tab-active"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 7h2l1.2-2h3.6L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Zm5 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/></svg>Scan with Camera</button>
+                        <button id="qr-tab-upload" type="button" role="tab" aria-selected="false" aria-controls="qr-panel-upload" class="echo-qr-tab echo-qr-tab-inactive"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 13v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>Upload QR Image</button>
+                    </div>
                     
-                    <div class="echo-camera-card">
+                    <div id="qr-panel-webcam" data-qr-tab-panel="webcam" role="tabpanel" aria-labelledby="qr-tab-webcam" class="echo-camera-card">
                         <div class="echo-camera-header">
                             <div>
-                                <div class="echo-title">Scan with Webcam</div>
+                                <div class="echo-camera-title"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 7h2l1.2-2h3.6L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Zm5 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/></svg>Scan with Camera</div>
                                 <div class="echo-help" style="margin-top: 0.35rem;">
-                                    Allow camera access, then place the QR code inside the frame until it is detected.
+                                    Allow camera access, then position the QR code within the frame.
                                 </div>
                             </div>
 
@@ -320,10 +337,10 @@
                             </div>
                         </div>
 
-                        <div id="qr-reader"></div>
+                        <div id="qr-reader"><div class="echo-qr-empty-state"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4M8 8h3v3H8V8Zm5 5h3v3h-3v-3Z"/></svg><strong>Camera preview will appear here</strong><span>Place the QR code inside the frame</span></div></div>
                     </div>
 
-                    <div class="echo-input-card">
+                    <div id="qr-panel-upload" data-qr-tab-panel="upload" role="tabpanel" aria-labelledby="qr-tab-upload" hidden class="echo-input-card">
                         <label for="qr-image-upload" class="echo-field-label echo-title">Upload QR Image</label>
                         <input
                             id="qr-image-upload"
@@ -336,6 +353,27 @@
                         </p>
                         <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
                     </div>                    
+
+                    <div style="margin-top: 0.25rem;">
+                        <button id="manual-qr-toggle" type="button" aria-expanded="false" aria-controls="manual-qr-recovery" class="echo-qr-recovery-trigger"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M8.5 14.5A6 6 0 1 1 16 14c-.8.5-1.2 1.2-1.4 2H9.4c-.2-.8-.6-1.1-.9-1.5Z"/></svg><span><strong>Can't scan the QR?</strong><small>Paste the QR data instead.</small></span><svg class="echo-qr-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+                        <div id="manual-qr-recovery" hidden class="echo-input-card" style="margin-top: 0.75rem;">
+                            <textarea
+                                id="manual-qr-payload"
+                                rows="4"
+                                placeholder="Paste the decoded QR text here..."
+                                class="echo-payload-textarea echo-mono"
+                            ></textarea>
+                            <button
+                                id="manual-qr-load"
+                                type="button"
+                                class="echo-button echo-button-primary"
+                                style="margin-top: 0.75rem;"
+                            >
+                                Load Flight Plan
+                            </button>
+                            <p class="echo-qr-security-note">Your data is read-only and secure.</p>
+                        </div>
+                    </div>
 
                     <div>
                         @if($this->shouldShowRawPayload())

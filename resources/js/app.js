@@ -135,10 +135,39 @@ const initImportScanQrPage = () => {
     const payloadInput = document.getElementById('payload');
     const startButton = document.getElementById('start-qr-camera');
     const stopButton = document.getElementById('stop-qr-camera');
+    const manualPayloadInput = document.getElementById('manual-qr-payload');
+    const manualLoadButton = document.getElementById('manual-qr-load');
+    const manualToggle = document.getElementById('manual-qr-toggle');
+    const manualRecovery = document.getElementById('manual-qr-recovery');
+    const tabWebcam = document.getElementById('qr-tab-webcam');
+    const tabUpload = document.getElementById('qr-tab-upload');
+    const tabPanels = document.querySelectorAll('[data-qr-tab-panel]');
     const scannerRegionId = 'qr-reader';
 
     lookupForm?.addEventListener('submit', () => {
         importScanQrIsSubmitting = true;
+    });
+
+    manualLoadButton?.addEventListener('click', () => {
+        fillQrPayload(manualPayloadInput?.value || '');
+    });
+
+    const selectQrTab = (tab) => {
+        const webcamActive = tab === 'webcam';
+        tabPanels.forEach((panel) => { panel.hidden = panel.dataset.qrTabPanel !== tab; });
+        tabWebcam?.setAttribute('aria-selected', String(webcamActive));
+        tabUpload?.setAttribute('aria-selected', String(!webcamActive));
+        tabWebcam?.classList.toggle('echo-qr-tab-active', webcamActive);
+        tabWebcam?.classList.toggle('echo-qr-tab-inactive', !webcamActive);
+        tabUpload?.classList.toggle('echo-qr-tab-active', !webcamActive);
+        tabUpload?.classList.toggle('echo-qr-tab-inactive', webcamActive);
+    };
+    tabWebcam?.addEventListener('click', () => selectQrTab('webcam'));
+    tabUpload?.addEventListener('click', () => selectQrTab('upload'));
+    manualToggle?.addEventListener('click', () => {
+        const expanded = manualToggle.getAttribute('aria-expanded') === 'true';
+        manualToggle.setAttribute('aria-expanded', String(!expanded));
+        if (manualRecovery) manualRecovery.hidden = expanded;
     });
 
     payloadInput?.addEventListener('input', () => {
@@ -177,7 +206,7 @@ const initImportScanQrPage = () => {
             setQrStatus('Flight plan QR loaded from image. Verifying now...', 'success');
         } catch (error) {
             console.error('[Echo QR] upload decoding failed before payload production', error);
-            setQrStatus('Unable to decode that image. Try a clearer QR image or use the webcam scanner.', 'danger');
+            setQrStatus('Unable to decode that image. Try a clearer QR image or use the camera scanner.', 'danger');
         }
     });
 

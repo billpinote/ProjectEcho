@@ -812,6 +812,149 @@ body {
     padding: 0.75rem;
 }
 
+#qr-reader:empty::before {
+    content: "Camera preview will appear here\\A\\APlace the QR code inside the frame";
+    white-space: pre;
+    min-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #68726b;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.echo-qr-tabs {
+    display: flex;
+    border-bottom: 1px solid #d9e2da;
+}
+
+.echo-qr-tab {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-width: 0;
+    padding: 0.8rem 0.65rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: #68726b;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.echo-qr-tab svg,
+.echo-camera-title svg,
+.echo-qr-empty-state svg,
+.echo-qr-recovery-trigger > svg,
+.echo-manual-header > svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: 0 0 auto;
+}
+
+.echo-qr-tab-active {
+    color: #0f5f4a;
+    border-bottom-color: #2fae7b;
+}
+
+.echo-qr-tab-inactive:hover {
+    color: #162018;
+    background: rgba(238, 243, 238, 0.55);
+}
+
+.echo-camera-title,
+.echo-manual-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    color: #162018;
+    font-weight: 700;
+}
+
+.echo-qr-empty-state {
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    text-align: center;
+    color: #68726b;
+}
+
+.echo-qr-empty-state svg {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #0f5f4a;
+}
+
+.echo-qr-empty-state strong {
+    color: #162018;
+}
+
+.echo-qr-recovery-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid #eadfbd;
+    border-radius: 0.9rem;
+    background: #fff9e9;
+    color: #68726b;
+    text-align: left;
+    cursor: pointer;
+}
+
+.echo-qr-recovery-trigger > span,
+.echo-manual-header > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.echo-qr-recovery-trigger strong {
+    color: #5f5130;
+}
+
+.echo-qr-recovery-trigger small,
+.echo-manual-header small {
+    font-size: 0.875rem;
+}
+
+.echo-qr-chevron {
+    margin-left: auto;
+    transition: transform 180ms ease;
+}
+
+.echo-qr-recovery-trigger[aria-expanded="true"] .echo-qr-chevron {
+    transform: rotate(180deg);
+}
+
+.echo-manual-header {
+    margin-bottom: 1rem;
+}
+
+.echo-manual-header > svg {
+    color: #0f5f4a;
+}
+
+.echo-qr-security-note {
+    margin: 0.65rem 0 0;
+    color: #68726b;
+    font-size: 0.75rem;
+}
+
 .echo-summary-header {
     display: flex;
     align-items: center;

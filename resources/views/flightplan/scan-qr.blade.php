@@ -36,9 +36,9 @@
             <div class="echo-import-hero-grid">
                 <div>
                     <p class="echo-import-kicker echo-label">Flight Plan Tool</p>
-                    <h1 class="echo-display" style="margin: 0.5rem 0 0;">Scan / Upload QR</h1>
+                    <h1 class="echo-display" style="margin: 0.5rem 0 0;">Scan or Upload</h1>
                     <p class="echo-import-subtitle echo-body">
-                        Scan a live QR code from your camera or upload a QR image, then verify the signed Echo payload and open the flight plan record.
+                        Use any option below to open the flight plan.
                     </p>
                 </div>
             </div>
@@ -46,17 +46,15 @@
 
         <div class="echo-import-layout">
             <section class="echo-import-panel">
-                <div class="echo-panel-header">
-                    <div>
-                        <h2 class="echo-heading" style="margin: 0;">Scan or Upload</h2>
-                        <p class="echo-help" style="margin: 0.35rem 0 0;">Use either method below to capture the QR payload.</p>
-                    </div>
-                </div>
-
                 <form id="scan-qr-lookup-form" action="{{ route('flightplan.scan-qr.lookup') }}" method="POST" class="echo-import-stack" style="margin-top: 1.25rem;">
                     @csrf
 
-                    <div class="echo-input-card">
+                    <div class="echo-qr-tabs" role="tablist" aria-label="QR input method">
+                        <button id="qr-tab-webcam" type="button" role="tab" aria-selected="true" aria-controls="qr-panel-webcam" class="echo-qr-tab echo-qr-tab-active"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 7h2l1.2-2h3.6L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Zm5 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/></svg>Scan with Camera</button>
+                        <button id="qr-tab-upload" type="button" role="tab" aria-selected="false" aria-controls="qr-panel-upload" class="echo-qr-tab echo-qr-tab-inactive"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 13v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg>Upload QR Image</button>
+                    </div>
+
+                    <div id="qr-panel-upload" data-qr-tab-panel="upload" role="tabpanel" aria-labelledby="qr-tab-upload" hidden class="echo-input-card">
                         <label for="qr-image-upload" class="echo-field-label echo-title" style="text-transform: none;">Upload QR</label>
                         <input
                             id="qr-image-upload"
@@ -70,12 +68,12 @@
                         <p id="qr-image-upload-status" class="echo-help" style="margin: 0.75rem 0 0; display: none;"></p>
                     </div>
 
-                    <div class="echo-camera-card">
+                    <div id="qr-panel-webcam" data-qr-tab-panel="webcam" role="tabpanel" aria-labelledby="qr-tab-webcam" class="echo-camera-card">
                         <div class="echo-camera-header">
                             <div>
-                                <div class="echo-title">Scan QR</div>
+                                <div class="echo-camera-title"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 7h2l1.2-2h3.6L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3Zm5 9a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/></svg>Scan with Camera</div>
                                 <div class="echo-help" style="margin-top: 0.35rem;">
-                                    Allow camera access, then place the QR code inside the frame until it is detected.
+                                    Allow camera access, then position the QR code within the frame.
                                 </div>
                             </div>
 
@@ -99,8 +97,29 @@
                             </div>
                         </div>
 
-                        <div id="qr-reader"></div>
+                        <div id="qr-reader"><div class="echo-qr-empty-state"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4M8 8h3v3H8V8Zm5 5h3v3h-3v-3Z"/></svg><strong>Camera preview will appear here</strong><span>Place the QR code inside the frame</span></div></div>
                     </div>                    
+
+                    <div style="margin-top: 0.25rem;">
+                        <button id="manual-qr-toggle" type="button" aria-expanded="false" aria-controls="manual-qr-recovery" class="echo-qr-recovery-trigger"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M8.5 14.5A6 6 0 1 1 16 14c-.8.5-1.2 1.2-1.4 2H9.4c-.2-.8-.6-1.1-.9-1.5Z"/></svg><span><strong>Can't scan the QR?</strong><small>Paste the QR data instead.</small></span><svg class="echo-qr-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg></button>
+                        <div id="manual-qr-recovery" hidden class="echo-input-card" style="margin-top: 0.75rem;">
+                            <textarea
+                                id="manual-qr-payload"
+                                rows="4"
+                                placeholder="Paste the decoded QR text here..."
+                                class="echo-payload-textarea echo-mono"
+                            ></textarea>
+                            <button
+                                id="manual-qr-load"
+                                type="button"
+                                class="echo-button echo-button-primary"
+                                style="margin-top: 0.75rem;"
+                            >
+                                Load Flight Plan
+                            </button>
+                            <p class="echo-qr-security-note">Your data is read-only and secure.</p>
+                        </div>
+                    </div>
 
                     <div style="display: none;">
                         <label for="payload" class="echo-field-label echo-title">QR Payload</label>
@@ -223,7 +242,7 @@
                     <div class="echo-workflow">
                         <div class="echo-workflow-step">
                             <div class="echo-label">1. Capture the QR</div>
-                            <div class="echo-help" style="margin-top: 0.3rem;">Use the webcam or upload a saved QR image from a device.</div>
+                            <div class="echo-help" style="margin-top: 0.3rem;">Use the camera or upload a saved QR image from a device.</div>
                         </div>
 
                         <div class="echo-workflow-step">
@@ -341,10 +360,39 @@
                 const uploadInput = document.getElementById('qr-image-upload');
                 const startButton = document.getElementById('start-qr-camera');
                 const stopButton = document.getElementById('stop-qr-camera');
+                const manualPayloadInput = document.getElementById('manual-qr-payload');
+                const manualLoadButton = document.getElementById('manual-qr-load');
+                const manualToggle = document.getElementById('manual-qr-toggle');
+                const manualRecovery = document.getElementById('manual-qr-recovery');
+                const tabWebcam = document.getElementById('qr-tab-webcam');
+                const tabUpload = document.getElementById('qr-tab-upload');
+                const tabPanels = document.querySelectorAll('[data-qr-tab-panel]');
                 const scannerRegionId = 'qr-reader';
 
                 lookupForm?.addEventListener('submit', () => {
                     importScanQrIsSubmitting = true;
+                });
+
+                manualLoadButton?.addEventListener('click', () => {
+                    fillQrPayload(manualPayloadInput?.value || '');
+                });
+
+                const selectQrTab = (tab) => {
+                    const webcamActive = tab === 'webcam';
+                    tabPanels.forEach((panel) => { panel.hidden = panel.dataset.qrTabPanel !== tab; });
+                    tabWebcam?.setAttribute('aria-selected', String(webcamActive));
+                    tabUpload?.setAttribute('aria-selected', String(!webcamActive));
+                    tabWebcam?.classList.toggle('echo-qr-tab-active', webcamActive);
+                    tabWebcam?.classList.toggle('echo-qr-tab-inactive', !webcamActive);
+                    tabUpload?.classList.toggle('echo-qr-tab-active', !webcamActive);
+                    tabUpload?.classList.toggle('echo-qr-tab-inactive', webcamActive);
+                };
+                tabWebcam?.addEventListener('click', () => selectQrTab('webcam'));
+                tabUpload?.addEventListener('click', () => selectQrTab('upload'));
+                manualToggle?.addEventListener('click', () => {
+                    const expanded = manualToggle.getAttribute('aria-expanded') === 'true';
+                    manualToggle.setAttribute('aria-expanded', String(!expanded));
+                    if (manualRecovery) manualRecovery.hidden = expanded;
                 });
 
                 payloadInput?.addEventListener('input', () => {
@@ -384,7 +432,7 @@
                         setQrStatus('QR payload loaded from image. Verifying now...', 'success');
                     } catch (error) {
                         console.error('[Echo QR] upload decoding failed before payload production', error);
-                        setQrStatus('Unable to decode that image. Try a clearer QR image or use the webcam scanner.', 'danger');
+                    setQrStatus('Unable to decode that image. Try a clearer QR image or use the camera scanner.', 'danger');
                     }
                 });
 
