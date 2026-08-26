@@ -1126,8 +1126,28 @@ class FlightsTable
         ];
 
         if (in_array($resourceClass, [MyFlightPlansResource::class, MyCurrentFlightResource::class], true)) {
-            $actions[] = self::delayAction();
-            $actions[] = self::cancelAction();
+            $delayAction = self::delayAction();
+            $cancelAction = self::cancelAction();
+
+            if ($resourceClass === MyCurrentFlightResource::class) {
+                $actions[] = $delayAction->visible(fn (Flight $record): bool => Auth::user()?->can('delay', $record) ?? false);
+                $actions[] = $cancelAction->visible(fn (Flight $record): bool => Auth::user()?->can('cancel', $record) ?? false);
+
+                return [
+                    ActionGroup::make($actions)
+                        ->label('Flight actions')
+                        ->icon('heroicon-o-squares-2x2')
+                        ->iconButton()
+                        ->tooltip('Flight actions')
+                        ->extraAttributes([
+                            'aria-label' => 'Flight actions',
+                            'class' => 'echo-flight-row-actions-trigger',
+                        ]),
+                ];
+            }
+
+            $actions[] = $delayAction;
+            $actions[] = $cancelAction;
 
             return $actions;
         }
