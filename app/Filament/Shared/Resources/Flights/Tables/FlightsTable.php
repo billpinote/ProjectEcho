@@ -1100,7 +1100,7 @@ class FlightsTable
     {
         $actions = [
             Action::make('qr')
-                ->label('QR')
+                ->label('QR Code')
                 ->icon('heroicon-o-qr-code')
                 ->iconButton()
                 ->tooltip('View QR code')
@@ -1108,7 +1108,7 @@ class FlightsTable
                 ->url(fn (Flight $record): string => route('flights.qr', $record))
                 ->openUrlInNewTab(),
             Action::make('view')
-                ->label('View')
+                ->label('View Flight Plan')
                 ->icon('heroicon-o-eye')
                 ->iconButton()
                 ->tooltip('View flight plan')
@@ -1116,7 +1116,7 @@ class FlightsTable
                 ->url(fn (Flight $record): string => route('flights.view', $record))
                 ->openUrlInNewTab(),
             Action::make('pdf')
-                ->label('PDF')
+                ->label('Download PDF')
                 ->icon('heroicon-o-document-text')
                 ->iconButton()
                 ->tooltip('Download PDF')
@@ -1133,65 +1133,78 @@ class FlightsTable
                 $actions[] = $delayAction->visible(fn (Flight $record): bool => Auth::user()?->can('delay', $record) ?? false);
                 $actions[] = $cancelAction->visible(fn (Flight $record): bool => Auth::user()?->can('cancel', $record) ?? false);
 
-                return [
-                    ActionGroup::make($actions)
-                        ->label('Flight actions')
-                        ->icon('heroicon-o-squares-2x2')
-                        ->iconButton()
-                        ->tooltip('Flight actions')
-                        ->extraAttributes([
-                            'aria-label' => 'Flight actions',
-                            'class' => 'echo-flight-row-actions-trigger',
-                        ]),
-                ];
+                return self::flightActionsGroup($actions);
             }
 
             $actions[] = $delayAction;
             $actions[] = $cancelAction;
 
-            return $actions;
+            return self::flightActionsGroup($actions);
         }
 
         if ($resourceClass === AwaitingAuthorizationFlightResource::class) {
-            $actions[] = ActionGroup::make([
-                Action::make('correctResubmit')
-                    ->label('Correct & Resubmit')
-                    ->icon('heroicon-o-pencil-square')
-                    ->url(fn (Flight $record): string => \App\Filament\Panels\Pilot\Resources\Flights\FlightResource::getUrl('create', ['correct_from' => $record->getKey()], panel: 'pilot'))
-                    ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
-                        && (int) $record->prepared_by_user_id === (int) Auth::id()),
-                Action::make('archive')
-                    ->label('Archive')
-                    ->icon('heroicon-o-archive-box')
-                    ->color('gray')
-                    ->requiresConfirmation()
-                    ->action(function (Flight $record): void {
-                        abort_unless($record->pic_authorization_status === 'declined'
-                            && (int) $record->prepared_by_user_id === (int) Auth::id(), 403);
-                        $record->archivePicDecline();
-                    })
-                    ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
-                        && (int) $record->prepared_by_user_id === (int) Auth::id()),
-            ])->label('More')->icon('heroicon-m-ellipsis-vertical')->iconButton()->tooltip('Workflow actions')
-                ->extraAttributes(['class' => 'echo-flight-row-action echo-flight-row-action-more']);
+            $actions[] = Action::make('correctResubmit')
+                ->label('Correct & Resubmit')
+                ->icon('heroicon-o-pencil-square')
+                ->url(fn (Flight $record): string => \App\Filament\Panels\Pilot\Resources\Flights\FlightResource::getUrl('create', ['correct_from' => $record->getKey()], panel: 'pilot'))
+                ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
+                    && (int) $record->prepared_by_user_id === (int) Auth::id());
+            $actions[] = Action::make('archive')
+                ->label('Archive')
+                ->icon('heroicon-o-archive-box')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->action(function (Flight $record): void {
+                    abort_unless($record->pic_authorization_status === 'declined'
+                        && (int) $record->prepared_by_user_id === (int) Auth::id(), 403);
+                    $record->archivePicDecline();
+                })
+                ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
+                    && (int) $record->prepared_by_user_id === (int) Auth::id());
 
-            return $actions;
+            return self::flightActionsGroup($actions);
         }
 
         if (in_array($resourceClass, [MyCompletedFlightResource::class, MyArchivedFlightResource::class, DispatchAwaitingAuthorizationFlightResource::class], true)) {
 
-            return $actions;
+            return self::flightActionsGroup($actions);
         }
 
         $actions[] = EditAction::make()->label('Edit');
 
-        return $actions;
+        return self::flightActionsGroup($actions);
+    }
+
+    /**
+     * Present a flight row's record actions as one labeled dropdown.
+     *
+     * @param  array<int, Action|ActionGroup|EditAction>  $actions
+     * @return array<int, ActionGroup>
+     */
+    private static function flightActionsGroup(array $actions): array
+    {
+        return [
+            ActionGroup::make(array_map(
+                fn (Action|ActionGroup|EditAction $action): Action|ActionGroup|EditAction => $action instanceof Action
+                    ? $action->grouped()
+                    : $action,
+                $actions,
+            ))
+                ->label('Actions')
+                ->icon('heroicon-o-squares-2x2')
+                ->iconButton()
+                ->tooltip('Actions')
+                ->extraAttributes([
+                    'aria-label' => 'Flight actions',
+                    'class' => 'echo-flight-row-actions-trigger',
+                ]),
+        ];
     }
 
     private static function delayAction(): Action
     {
         return Action::make('delay')
-            ->label('Delay')
+            ->label('Delay Flight')
             ->icon('heroicon-o-clock')
             ->fillForm(fn (Flight $record): array => [
                 'new_proposed_time' => UtcFourDigitTime::formatForDisplay($record->proposed_time) ?? '',
@@ -1235,7 +1248,7 @@ class FlightsTable
     private static function cancelAction(): Action
     {
         return Action::make('cancel')
-            ->label('Cancel')
+            ->label('Cancel Flight')
             ->icon('heroicon-o-no-symbol')
             ->color('danger')
             ->form([
