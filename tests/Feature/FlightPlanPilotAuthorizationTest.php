@@ -266,8 +266,13 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             ->test(ListMyCurrentFlights::class)
             ->assertTableActionDoesNotExist('edit', null, $ownedFlight->getKey())
             ->assertTableActionVisible('view', $ownedFlight->getKey())
-            ->assertTableActionVisible('delay', $ownedFlight->getKey())
-            ->assertTableActionVisible('cancel', $ownedFlight->getKey())
+            ->assertTableActionHidden('delay', $ownedFlight->getKey())
+            ->assertTableActionHidden('cancel', $ownedFlight->getKey())
+            ->assertSee('aria-label="Flight actions"', false)
+            ->assertSeeText('Actions')
+            ->assertSeeText('QR Code')
+            ->assertSeeText('View Flight Plan')
+            ->assertSeeText('Download PDF')
             ->assertDontSee('OTH456');
     }
 
@@ -518,7 +523,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
 
             Livewire::actingAs($pilot)
                 ->test(ListMyCurrentFlights::class)
-                ->assertTableActionDisabled('delay', $flight->getKey());
+                ->assertTableActionHidden('delay', $flight->getKey());
         }
     }
 
@@ -575,7 +580,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
 
             Livewire::actingAs($pilot)
                 ->test(ListMyCurrentFlights::class)
-                ->assertTableActionDisabled('cancel', $flight->getKey());
+                ->assertTableActionHidden('cancel', $flight->getKey());
         }
     }
 
