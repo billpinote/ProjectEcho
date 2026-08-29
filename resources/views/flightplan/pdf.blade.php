@@ -378,6 +378,7 @@
         .echo-review-modal-title { margin: 0 0 8px; font-size: 20px; }
         .echo-review-modal-copy { margin: 0 0 14px; color: #475569; font-size: 14px; line-height: 1.45; }
         .echo-review-wiresign { margin: 0 0 16px; color: #334155; font-size: 13px; font-weight: 600; }
+        .echo-review-wiresign-chip { display: inline-block; margin-left: 4px; padding: 3px 8px; border: 1px solid #bfdbfe; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; letter-spacing: .04em; line-height: 1.2; }
         .echo-review-acceptance-identity { margin: 18px 0 4px; text-align: center; }
         .echo-review-acceptance-wiresign { display: inline-block; min-width: 96px; padding: 10px 18px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1d4ed8; font-size: 30px; font-weight: 800; letter-spacing: .08em; line-height: 1.1; }
         .echo-review-acceptance-role { margin: 9px 0 18px; color: #334155; font-size: 14px; font-weight: 700; text-align: center; }
@@ -1256,8 +1257,8 @@
                 @csrf
                 <div class="echo-review-modal-body">
                     <h2 class="echo-review-modal-title" id="reject-flight-plan-title">Reject Flight Plan</h2>
-                    <p class="echo-review-modal-copy">Rejecting this flight plan will return it to the filer with your reason for rejection.</p>
-                    <p class="echo-review-wiresign">Reviewer: {{ $acceptedByWiresign ?: 'ATMO reviewer' }}</p>
+                    <p class="echo-review-modal-copy">Return this flight plan to the filer with a reason.</p>
+                    <p class="echo-review-wiresign">Reviewer: <span class="echo-review-wiresign-chip">{{ $acceptedByWiresign ?: 'ATMO' }}</span></p>
                     <label for="rejection-reason">Reason for rejection</label>
                     <textarea id="rejection-reason" name="rejection_reason" maxlength="255" required autofocus></textarea>
                 </div>
