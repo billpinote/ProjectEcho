@@ -279,6 +279,11 @@
         .echo-preview-status-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
         .echo-preview-status-rejected { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
         .echo-preview-status-default { border-color: #cbd5e1; background: #f8fafc; color: #475569; }
+        .echo-preview-delay-banner { width: min(794px, calc(100% - 32px)); margin: 0 auto 12px; padding: 10px 12px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; color: #92400e; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 650; box-sizing: border-box; }
+        .echo-preview-delay-history { width: min(794px, calc(100% - 32px)); margin: 0 auto 14px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; box-sizing: border-box; }
+        .echo-preview-delay-history-title { margin: 0 0 6px; color: #334155; font-weight: 700; }
+        .echo-preview-delay-history-list { margin: 0; padding-left: 18px; }
+        .echo-preview-delay-history-list li { margin: 3px 0; }
 
         .echo-review-toolbar {
             position: fixed;
@@ -487,6 +492,32 @@
             </div>
             <span class="echo-preview-status-badge echo-preview-status-{{ $previewStatusClass }}">{{ $previewStatus }}</span>
         </div>
+
+        @if($flight->revised_eobt !== null)
+            <div class="echo-preview-delay-banner" role="status">
+                Flight plan delayed to {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->revised_eobt) }}. Original filed EOBT: {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) }}.
+            </div>
+        @endif
+
+        @php
+            $delayEvents = $flight->relationLoaded('events')
+                ? $flight->events->where('event_type', \App\Models\FlightPlanEvent::TYPE_DELAYED)
+                : $flight->events()->where('event_type', \App\Models\FlightPlanEvent::TYPE_DELAYED)->latest('id')->get()->reverse();
+        @endphp
+        @if($delayEvents->isNotEmpty())
+            <div class="echo-preview-delay-history">
+                <p class="echo-preview-delay-history-title">Delay history</p>
+                <ol class="echo-preview-delay-history-list">
+                    @foreach($delayEvents as $delayEvent)
+                        <li>
+                            Delayed — {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($delayEvent->old_values['eobt'] ?? null) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($delayEvent->new_values['eobt'] ?? null) ?? 'N/A' }}
+                            @if($delayEvent->created_at) · {{ $delayEvent->created_at->format('d M Y H:i') }}@endif
+                            @if($delayEvent->actor) · {{ $delayEvent->actor->name }}@endif
+                        </li>
+                    @endforeach
+                </ol>
+            </div>
+        @endif
 
         @if($reviewCompleted)
             <div class="echo-review-completion" role="status" data-review-completion>

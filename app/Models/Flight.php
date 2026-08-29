@@ -22,6 +22,7 @@ class Flight extends Model
 
     private const MINUTE_PRECISION_TIME_FIELDS = [
         'proposed_time',
+        'revised_eobt',
         'total_eet',
         'endurance',
         'time_start_up',
@@ -89,6 +90,7 @@ class Flight extends Model
         'equipment_10b',
         'departure_aerodrome',
         'proposed_time',
+        'revised_eobt',
         'cruising_speed',
         'level',
         'route',
@@ -207,6 +209,11 @@ class Flight extends Model
     public function events(): HasMany
     {
         return $this->hasMany(FlightPlanEvent::class);
+    }
+
+    public function currentEobt(): ?string
+    {
+        return $this->revised_eobt ?? $this->proposed_time;
     }
 
     public function revisionOf(): BelongsTo

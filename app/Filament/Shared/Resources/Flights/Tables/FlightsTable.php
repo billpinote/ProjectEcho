@@ -1204,11 +1204,11 @@ class FlightsTable
             ->label('Delay Flight')
             ->icon('heroicon-o-clock')
             ->fillForm(fn (Flight $record): array => [
-                'new_proposed_time' => UtcFourDigitTime::formatForDisplay($record->proposed_time) ?? '',
+                'new_proposed_time' => UtcFourDigitTime::formatForDisplay($record->currentEobt()) ?? '',
             ])
             ->form([
                 TextInput::make('new_proposed_time')
-                    ->label('New Proposed Time (UTC)')
+                    ->label('New Operational EOBT (UTC)')
                     ->required()
                     ->rule(new UtcFourDigitTime)
                     ->maxLength(5)
@@ -1217,10 +1217,10 @@ class FlightsTable
             ])
             ->modalHeading('Delay Flight Plan')
             ->modalDescription(function (Flight $record, array $data): string {
-                $current = UtcFourDigitTime::formatForDisplay($record->proposed_time) ?? 'N/A';
+                $current = UtcFourDigitTime::formatForDisplay($record->currentEobt()) ?? 'N/A';
                 $next = UtcFourDigitTime::formatForDisplay($data['new_proposed_time'] ?? null) ?? ($data['new_proposed_time'] ?? 'N/A');
 
-                return "Current proposed time: {$current}. New proposed time: {$next}.";
+                return "Current operational EOBT: {$current}. New operational EOBT: {$next}.";
             })
             ->requiresConfirmation()
             ->visible(fn (Flight $record): bool => Auth::user()?->can('view', $record) ?? false)
@@ -1237,7 +1237,7 @@ class FlightsTable
 
                 Notification::make()
                     ->success()
-                    ->title('Proposed time updated')
+                    ->title('Operational EOBT updated')
                     ->send();
             });
     }

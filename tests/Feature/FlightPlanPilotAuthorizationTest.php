@@ -18,6 +18,7 @@ use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Shared\Resources\Flights\Pages\EditFlight;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -472,7 +473,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         }
     }
 
-    public function test_pilot_can_delay_only_their_own_eligible_flight_and_only_proposed_time_changes(): void
+    public function test_pilot_can_delay_only_their_own_eligible_flight_without_changing_original_eobt(): void
     {
         $pilot = $this->user(UserRole::Pilot);
         $flight = $this->flight([
@@ -489,7 +490,9 @@ class FlightPlanPilotAuthorizationTest extends TestCase
 
         $flight->refresh();
 
-        $this->assertSame('15:30', $flight->proposed_time);
+        $this->assertSame('14:30', $flight->proposed_time);
+        $this->assertSame('15:30', $flight->revised_eobt);
+        $this->assertSame('15:30', $flight->currentEobt());
         $this->assertSame('DCT TEST', $flight->route);
         $this->assertSame(FlightPlanStatus::Accepted, $flight->status);
 
@@ -501,8 +504,49 @@ class FlightPlanPilotAuthorizationTest extends TestCase
 
         $event = $flight->events()->where('event_type', 'delayed')->latest('id')->firstOrFail();
 
-        $this->assertSame('14:30', $event->old_values['proposed_time']);
-        $this->assertSame('15:30', $event->new_values['proposed_time']);
+        $this->assertSame('14:30', $event->old_values['eobt']);
+        $this->assertSame('15:30', $event->new_values['eobt']);
+        $this->assertSame('14:30', $event->new_values['original_eobt']);
+    }
+
+    public function test_pilot_can_record_multiple_delays_from_current_operational_eobt(): void
+    {
+        $pilot = $this->user(UserRole::Pilot);
+        $flight = $this->flight([
+            'filed_by_user_id' => $pilot->id,
+            'pilot_in_command_user_id' => $pilot->id,
+            'status' => FlightPlanStatus::Accepted,
+            'proposed_time' => '09:00',
+        ]);
+
+        foreach (['1000', '1030', '1100'] as $time) {
+            app(FlightPlanMutationService::class)->delay($flight, $pilot, $time);
+        }
+
+        $flight->refresh();
+        $events = $flight->events()->where('event_type', FlightPlanEvent::TYPE_DELAYED)->orderBy('id')->get();
+
+        $this->assertSame('09:00', $flight->proposed_time);
+        $this->assertSame('11:00', $flight->revised_eobt);
+        $this->assertSame('11:00', $flight->currentEobt());
+        $this->assertCount(3, $events);
+        $this->assertSame(['09:00', '10:00', '10:30'], $events->map(fn (FlightPlanEvent $event): string => $event->old_values['eobt'])->all());
+        $this->assertSame(['10:00', '10:30', '11:00'], $events->map(fn (FlightPlanEvent $event): string => $event->new_values['eobt'])->all());
+    }
+
+    public function test_delay_to_current_operational_eobt_is_rejected(): void
+    {
+        $pilot = $this->user(UserRole::Pilot);
+        $flight = $this->flight([
+            'filed_by_user_id' => $pilot->id,
+            'pilot_in_command_user_id' => $pilot->id,
+            'status' => FlightPlanStatus::Accepted,
+            'proposed_time' => '09:00',
+            'revised_eobt' => '10:30',
+        ]);
+
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        app(FlightPlanMutationService::class)->delay($flight, $pilot, '1030');
     }
 
     public function test_delay_is_blocked_after_startup_off_block_or_airborne_activity(): void

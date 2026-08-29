@@ -45,12 +45,6 @@ class FlightPlanMutationService
 
         $normalizedTime = UtcFourDigitTime::normalizeForStorage($newProposedTime);
 
-        if ($normalizedTime === $flight->proposed_time) {
-            throw ValidationException::withMessages([
-                'new_proposed_time' => 'The new proposed time must be different from the current proposed time.',
-            ]);
-        }
-
         return DB::transaction(function () use ($actor, $flight, $normalizedTime): Flight {
             $flight->refresh();
 
@@ -60,18 +54,27 @@ class FlightPlanMutationService
                 ]);
             }
 
-            $oldTime = $flight->proposed_time;
+            $oldTime = $flight->currentEobt();
+
+            if ($normalizedTime === $oldTime) {
+                throw ValidationException::withMessages([
+                    'new_proposed_time' => 'The new proposed time must be different from the current operational EOBT.',
+                ]);
+            }
 
             $flight->forceFill([
-                'proposed_time' => $normalizedTime,
+                'revised_eobt' => $normalizedTime,
             ])->save();
 
             FlightPlanEvent::create([
                 'flight_id' => $flight->getKey(),
                 'actor_user_id' => $actor->getKey(),
                 'event_type' => FlightPlanEvent::TYPE_DELAYED,
-                'old_values' => ['proposed_time' => $oldTime],
-                'new_values' => ['proposed_time' => $flight->proposed_time],
+                'old_values' => ['eobt' => $oldTime],
+                'new_values' => [
+                    'eobt' => $flight->revised_eobt,
+                    'original_eobt' => $flight->proposed_time,
+                ],
                 'created_at' => now(),
             ]);
 
