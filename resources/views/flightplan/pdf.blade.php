@@ -334,6 +334,24 @@
 
         .echo-review-document-spacer { height: 78px; }
 
+        .echo-review-completion {
+            width: min(794px, calc(100% - 32px));
+            margin: 18px auto;
+            padding: 14px 16px;
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+            background: #f0fdf4;
+            color: #166534;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px;
+            font-weight: 650;
+            box-sizing: border-box;
+        }
+
+        .echo-review-completion-close {
+            margin-top: 10px;
+        }
+
         .echo-review-modal[hidden] { display: none; }
 
         .echo-review-modal {
@@ -422,6 +440,21 @@
     @endif
 
     @if(isset($isPreview))
+        @php
+            $reviewCompleted = session('review_status')
+                && in_array($flight->status, [
+                    \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted,
+                    \App\Domain\FlightPlans\Enums\FlightPlanStatus::Rejected,
+                ], true);
+        @endphp
+
+        @if($reviewCompleted)
+            <div class="echo-review-completion" role="status" data-review-completion>
+                <div>{{ $flight->status === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted ? 'Flight plan accepted successfully.' : 'Flight plan rejected successfully.' }}</div>
+                <button class="echo-review-button echo-review-button-neutral echo-review-completion-close" type="button" data-close-review-tab>Close This Tab</button>
+            </div>
+        @endif
+
         @if(($picDeclineDetails ?? false))
             <div style="width: 794px; margin: 0 auto 12px; padding: 12px 14px; border: 2px solid #b45309; background: #fffbeb; color: #78350f; font-size: 12px;">
                 <strong style="display:block; font-size: 14px; margin-bottom: 6px;">PIC Authorization Declined</strong>
@@ -1207,10 +1240,11 @@
     </div>
     @endif
 
-    @if(isset($isPreview) && ($showReviewActions ?? false))
+    @if(isset($isPreview) && (($showReviewActions ?? false) || ($reviewCompleted ?? false)))
+        @if($showReviewActions ?? false)
         <div class="echo-review-document-spacer" aria-hidden="true"></div>
         <div class="echo-review-toolbar" aria-label="Flight plan review actions">
-            <a class="echo-review-button echo-review-button-neutral" href="{{ $backActionUrl }}">&larr; Back to Pending</a>
+            <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; Close Review</button>
             <div class="echo-review-toolbar-actions">
                 <button class="echo-review-button echo-review-button-danger" type="button" data-open-review-modal="reject-flight-plan">Reject</button>
                 <button class="echo-review-button echo-review-button-primary" type="button" data-open-review-modal="accept-flight-plan">&#10003; Accept Flight Plan</button>
@@ -1252,9 +1286,19 @@
                 </div>
             </form>
         </div>
+        @endif
 
         <script>
             (() => {
+                const refreshOpenerAndClose = () => {
+                    try {
+                        if (window.opener && !window.opener.closed) window.opener.location.reload();
+                    } catch (error) {
+                        // A cross-origin opener may be unavailable; closing remains best effort.
+                    }
+
+                    window.close();
+                };
                 const modals = document.querySelectorAll('.echo-review-modal');
                 const openModal = (modal) => {
                     modal.hidden = false;
@@ -1272,9 +1316,16 @@
                 modals.forEach((modal) => modal.addEventListener('click', (event) => {
                     if (event.target === modal) closeModal(modal);
                 }));
+                document.querySelectorAll('[data-close-review-tab]').forEach((button) => {
+                    button.addEventListener('click', refreshOpenerAndClose);
+                });
                 document.addEventListener('keydown', (event) => {
                     if (event.key === 'Escape') modals.forEach((modal) => { if (!modal.hidden) closeModal(modal); });
                 });
+
+                if (document.querySelector('[data-review-completion]')) {
+                    refreshOpenerAndClose();
+                }
             })();
         </script>
     @endif
