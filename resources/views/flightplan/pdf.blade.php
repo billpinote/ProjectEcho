@@ -262,6 +262,24 @@
             font-weight: 700;
         }
 
+        .echo-preview-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 2px 12px;
+        }
+
+        .echo-preview-header .echo-review-eyebrow { margin-bottom: 5px; }
+        .echo-preview-title { margin: 0; color: #172033; font-size: 22px; line-height: 1.2; font-weight: 700; }
+        .echo-preview-aircraft { margin: 6px 0 0; color: #334155; font-size: 15px; font-weight: 700; letter-spacing: .03em; }
+        .echo-preview-status-badge { display: inline-block; padding: 6px 10px; border: 1px solid transparent; border-radius: 999px; font-size: 12px; font-weight: 750; line-height: 1.2; white-space: nowrap; }
+        .echo-preview-status-pending { border-color: #fcd34d; background: #fffbeb; color: #a16207; }
+        .echo-preview-status-accepted, .echo-preview-status-completed { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+        .echo-preview-status-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+        .echo-preview-status-rejected { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+        .echo-preview-status-default { border-color: #cbd5e1; background: #f8fafc; color: #475569; }
+
         .echo-review-toolbar {
             position: fixed;
             z-index: 20;
@@ -442,12 +460,33 @@
 
     @if(isset($isPreview))
         @php
+            $previewStatus = $flight->status?->label() ?? 'Unknown';
+            $previewStatusClass = match ($flight->status) {
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Pending => 'pending',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted => 'accepted',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Active => 'active',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Rejected => 'rejected',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Completed => 'completed',
+                default => 'default',
+            };
+            if ($flight->status === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Pending && ($showReviewActions ?? false)) {
+                $previewStatus = 'Pending ATMO Review';
+            }
             $reviewCompleted = session('review_status')
                 && in_array($flight->status, [
                     \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted,
                     \App\Domain\FlightPlans\Enums\FlightPlanStatus::Rejected,
                 ], true);
         @endphp
+
+        <div class="echo-review-page echo-preview-header">
+            <div>
+                <p class="echo-review-eyebrow">ATMO · Echo</p>
+                <h1 class="echo-preview-title">Flight Plan Preview</h1>
+                <p class="echo-preview-aircraft">{{ $flight->aircraft_identification }}</p>
+            </div>
+            <span class="echo-preview-status-badge echo-preview-status-{{ $previewStatusClass }}">{{ $previewStatus }}</span>
+        </div>
 
         @if($reviewCompleted)
             <div class="echo-review-completion" role="status" data-review-completion>
@@ -505,17 +544,6 @@
                 </table>
             </div>
         @endif
-
-    @if(($showReviewActions ?? false))
-        <div class="echo-review-page echo-review-heading">
-            <p class="echo-review-eyebrow">ATMO · Echo</p>
-            <h1 class="echo-review-title">Flight Plan Review</h1>
-            <div class="echo-review-meta">
-                <span>{{ $flight->aircraft_identification }}</span>
-                <span class="echo-review-status">Pending ATMO Review</span>
-            </div>
-        </div>
-    @endif
 
     <div class="preview-wrapper">
     @endif
