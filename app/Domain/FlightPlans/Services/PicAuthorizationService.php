@@ -7,6 +7,7 @@ use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -110,6 +111,11 @@ class PicAuthorizationService
         });
 
         app(FlightPlanPdfService::class)->regenerate($authorizedFlight);
+        FlightPlanEvent::record($authorizedFlight, FlightPlanEvent::TYPE_PIC_AUTHORIZED, $authorizer, null, [
+            'revision_number' => $authorizedFlight->revision_number,
+            'authorization_method' => 'QR',
+        ]);
+        FlightPlanEvent::record($authorizedFlight, FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $authorizer);
 
         return $authorizedFlight;
     }
@@ -135,7 +141,7 @@ class PicAuthorizationService
 
         $this->guardPicAccess($flight, $user);
 
-        return DB::transaction(function () use ($flight, $user, $reason, $token): Flight {
+        $declinedFlight = DB::transaction(function () use ($flight, $user, $reason, $token): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $this->guardCurrentAuthorizationState($flight, $user);
             $this->guardHandoffToken($flight, $token);
@@ -151,6 +157,10 @@ class PicAuthorizationService
 
             return $flight->refresh();
         });
+
+        FlightPlanEvent::record($declinedFlight, FlightPlanEvent::TYPE_PIC_DECLINED, $user, null, null, $reason);
+
+        return $declinedFlight;
     }
 
     /** @return array{pilot_name: ?string, license: ?string, ratings: ?string, license_expiry_date: ?string} */

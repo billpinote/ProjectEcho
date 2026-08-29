@@ -280,10 +280,14 @@
         .echo-preview-status-rejected { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
         .echo-preview-status-default { border-color: #cbd5e1; background: #f8fafc; color: #475569; }
         .echo-preview-delay-banner { width: min(794px, calc(100% - 32px)); margin: 0 auto 12px; padding: 10px 12px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; color: #92400e; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 650; box-sizing: border-box; }
-        .echo-preview-delay-history { width: min(794px, calc(100% - 32px)); margin: 0 auto 14px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12px; box-sizing: border-box; }
-        .echo-preview-delay-history-title { margin: 0 0 6px; color: #334155; font-weight: 700; }
-        .echo-preview-delay-history-list { margin: 0; padding-left: 18px; }
-        .echo-preview-delay-history-list li { margin: 3px 0; }
+        .echo-preview-activity { width: min(794px, calc(100% - 32px)); margin: 0 auto 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; color: #475569; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; box-sizing: border-box; }
+        .echo-preview-activity summary { min-height: 44px; padding: 12px 14px; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer; list-style-position: inside; }
+        .echo-preview-activity summary::marker { color: #64748b; }
+        .echo-preview-activity-timeline { margin: 0; padding: 0 14px 12px 34px; border-top: 1px solid #f1f5f9; list-style: none; }
+        .echo-preview-activity-timeline li { position: relative; margin: 0; padding: 10px 0 0 14px; border-left: 2px solid #dbeafe; font-size: 12px; line-height: 1.45; }
+        .echo-preview-activity-timeline li::before { position: absolute; top: 14px; left: -5px; width: 7px; height: 7px; border-radius: 50%; background: #60a5fa; content: ""; }
+        .echo-preview-activity-time { color: #64748b; font-variant-numeric: tabular-nums; }
+        .echo-preview-activity-event { color: #1e293b; font-weight: 700; }
 
         .echo-review-toolbar {
             position: fixed;
@@ -496,26 +500,6 @@
         @if($flight->revised_eobt !== null)
             <div class="echo-preview-delay-banner" role="status">
                 Flight plan delayed to {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->revised_eobt) }}. Original filed EOBT: {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) }}.
-            </div>
-        @endif
-
-        @php
-            $delayEvents = $flight->relationLoaded('events')
-                ? $flight->events->where('event_type', \App\Models\FlightPlanEvent::TYPE_DELAYED)
-                : $flight->events()->where('event_type', \App\Models\FlightPlanEvent::TYPE_DELAYED)->latest('id')->get()->reverse();
-        @endphp
-        @if($delayEvents->isNotEmpty())
-            <div class="echo-preview-delay-history">
-                <p class="echo-preview-delay-history-title">Delay history</p>
-                <ol class="echo-preview-delay-history-list">
-                    @foreach($delayEvents as $delayEvent)
-                        <li>
-                            Delayed — {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($delayEvent->old_values['eobt'] ?? null) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($delayEvent->new_values['eobt'] ?? null) ?? 'N/A' }}
-                            @if($delayEvent->created_at) · {{ $delayEvent->created_at->format('d M Y H:i') }}@endif
-                            @if($delayEvent->actor) · {{ $delayEvent->actor->name }}@endif
-                        </li>
-                    @endforeach
-                </ol>
             </div>
         @endif
 
@@ -1388,6 +1372,59 @@
                 }
             })();
         </script>
+    @endif
+
+    @if(isset($isPreview))
+        @php
+            $activityEvents = $flight->events()->with('actor')->orderBy('created_at')->orderBy('id')->get();
+        @endphp
+        <details class="echo-preview-activity">
+            <summary>Flight Plan Activity · {{ $activityEvents->count() }} {{ $activityEvents->count() === 1 ? 'event' : 'events' }}</summary>
+            @if($activityEvents->isNotEmpty())
+                <ol class="echo-preview-activity-timeline">
+                    @foreach($activityEvents as $activityEvent)
+                        @php
+                            $activityLabel = match ($activityEvent->event_type) {
+                                \App\Models\FlightPlanEvent::TYPE_CREATED => 'Flight plan created',
+                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION => 'Submitted for PIC authorization',
+                                \App\Models\FlightPlanEvent::TYPE_PIC_AUTHORIZED => 'PIC authorized',
+                                \App\Models\FlightPlanEvent::TYPE_PIC_DECLINED => 'PIC declined',
+                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_TO_ATC => 'Submitted to ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_ATC_ACCEPTED => 'Accepted by ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_ATC_REJECTED => 'Rejected by ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_DELAYED => 'Flight delayed',
+                                \App\Models\FlightPlanEvent::TYPE_CANCELLED => 'Flight plan cancelled',
+                                \App\Models\FlightPlanEvent::TYPE_ARCHIVED => 'Flight plan archived',
+                                \App\Models\FlightPlanEvent::TYPE_STARTUP_RECORDED => 'Start-up recorded',
+                                \App\Models\FlightPlanEvent::TYPE_BLOCK_OFF_RECORDED => 'Block off recorded',
+                                \App\Models\FlightPlanEvent::TYPE_AIRBORNE => 'Airborne recorded',
+                                \App\Models\FlightPlanEvent::TYPE_TOUCHDOWN => 'Touchdown recorded',
+                                \App\Models\FlightPlanEvent::TYPE_SHUTDOWN_RECORDED => 'Shutdown recorded',
+                                \App\Models\FlightPlanEvent::TYPE_FLIGHT_COMPLETED => 'Flight completed',
+                                default => \Illuminate\Support\Str::headline((string) $activityEvent->event_type),
+                            };
+                            $oldEobt = $activityEvent->old_values['eobt'] ?? $activityEvent->old_values['proposed_time'] ?? null;
+                            $newEobt = $activityEvent->new_values['eobt'] ?? $activityEvent->new_values['proposed_time'] ?? null;
+                            $activityActor = $activityEvent->new_values['actor_name'] ?? $activityEvent->actor?->name;
+                            $activityRole = $activityEvent->new_values['actor_role'] ?? $activityEvent->actor?->role?->value ?? null;
+                        @endphp
+                        <li>
+                            <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('H:i\Z') ?? '—' }}</span>
+                            <span class="echo-preview-activity-event"> · {{ $activityLabel }}</span>
+                            @if($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_DELAYED)
+                                <span> · {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($oldEobt) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($newEobt) ?? 'N/A' }}</span>
+                            @endif
+                            @if($activityActor)
+                                <span> · {{ $activityActor }}@if($activityRole) · {{ \Illuminate\Support\Str::headline($activityRole) }}@endif</span>
+                            @endif
+                            @if($activityEvent->reason)
+                                <span> · {{ $activityEvent->reason }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ol>
+            @endif
+        </details>
     @endif
 
     @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
