@@ -8,6 +8,10 @@
             background: #ccc;
         }
 
+        body.preview.preview-has-review-toolbar {
+            padding-bottom: calc(var(--echo-review-toolbar-space, 0px) + 24px + env(safe-area-inset-bottom));
+        }
+
         .preview-wrapper {
             width: 794px;
             margin: auto;
@@ -416,6 +420,7 @@
         .echo-review-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 22px 20px; }
 
         @media (max-width: 640px) {
+            body.preview.preview-has-review-toolbar { padding-bottom: env(safe-area-inset-bottom); }
             .echo-review-toolbar { position: static; margin-top: 12px; flex-direction: column; align-items: stretch; }
             .echo-review-toolbar-actions { justify-content: stretch; }
             .echo-review-toolbar-actions .echo-review-button { flex: 1 1 auto; }
@@ -437,7 +442,7 @@
         }
     </style>
 </head>
-<body class="{{ isset($isPreview) ? 'preview' : '' }}">
+<body class="{{ isset($isPreview) ? 'preview' : '' }}{{ isset($isPreview) && ($showReviewActions ?? false) ? ' preview-has-review-toolbar' : '' }}">
     @php
         $isPdfOnly = (bool) ($isPdfOnly ?? false);
         $charBoxes = function (mixed $value): \Illuminate\Support\HtmlString {
@@ -1284,6 +1289,59 @@
     </div>
     @endif
 
+    @if(isset($isPreview))
+        @php
+            $activityEvents = $flight->events()->with('actor')->orderBy('created_at')->orderBy('id')->get();
+        @endphp
+        <details class="echo-preview-activity">
+            <summary>Flight Plan Activity · {{ $activityEvents->count() }} {{ $activityEvents->count() === 1 ? 'event' : 'events' }}</summary>
+            @if($activityEvents->isNotEmpty())
+                <ol class="echo-preview-activity-timeline">
+                    @foreach($activityEvents as $activityEvent)
+                        @php
+                            $activityLabel = match ($activityEvent->event_type) {
+                                \App\Models\FlightPlanEvent::TYPE_CREATED => 'Flight plan created',
+                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION => 'Submitted for PIC authorization',
+                                \App\Models\FlightPlanEvent::TYPE_PIC_AUTHORIZED => 'PIC authorized',
+                                \App\Models\FlightPlanEvent::TYPE_PIC_DECLINED => 'PIC declined',
+                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_TO_ATC => 'Submitted to ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_ATC_ACCEPTED => 'Accepted by ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_ATC_REJECTED => 'Rejected by ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_DELAYED => 'Flight delayed',
+                                \App\Models\FlightPlanEvent::TYPE_CANCELLED => 'Flight plan cancelled',
+                                \App\Models\FlightPlanEvent::TYPE_ARCHIVED => 'Flight plan archived',
+                                \App\Models\FlightPlanEvent::TYPE_STARTUP_RECORDED => 'Start-up recorded',
+                                \App\Models\FlightPlanEvent::TYPE_BLOCK_OFF_RECORDED => 'Block off recorded',
+                                \App\Models\FlightPlanEvent::TYPE_AIRBORNE => 'Airborne recorded',
+                                \App\Models\FlightPlanEvent::TYPE_TOUCHDOWN => 'Touchdown recorded',
+                                \App\Models\FlightPlanEvent::TYPE_SHUTDOWN_RECORDED => 'Shutdown recorded',
+                                \App\Models\FlightPlanEvent::TYPE_FLIGHT_COMPLETED => 'Flight completed',
+                                default => \Illuminate\Support\Str::headline((string) $activityEvent->event_type),
+                            };
+                            $oldEobt = $activityEvent->old_values['eobt'] ?? $activityEvent->old_values['proposed_time'] ?? null;
+                            $newEobt = $activityEvent->new_values['eobt'] ?? $activityEvent->new_values['proposed_time'] ?? null;
+                            $activityActor = $activityEvent->new_values['actor_name'] ?? $activityEvent->actor?->name;
+                            $activityRole = $activityEvent->new_values['actor_role'] ?? $activityEvent->actor?->role?->value ?? null;
+                        @endphp
+                        <li>
+                            <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('H:i\Z') ?? '—' }}</span>
+                            <span class="echo-preview-activity-event"> · {{ $activityLabel }}</span>
+                            @if($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_DELAYED)
+                                <span> · {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($oldEobt) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($newEobt) ?? 'N/A' }}</span>
+                            @endif
+                            @if($activityActor)
+                                <span> · {{ $activityActor }}@if($activityRole) · {{ \Illuminate\Support\Str::headline($activityRole) }}@endif</span>
+                            @endif
+                            @if($activityEvent->reason)
+                                <span> · {{ $activityEvent->reason }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ol>
+            @endif
+        </details>
+    @endif
+
     @if(isset($isPreview) && (($showReviewActions ?? false) || ($reviewCompleted ?? false)))
         @if($showReviewActions ?? false)
         <div class="echo-review-document-spacer" aria-hidden="true"></div>
@@ -1343,6 +1401,18 @@
 
                     window.close();
                 };
+                const reviewToolbar = document.querySelector('.echo-review-toolbar');
+                const reserveReviewToolbarSpace = () => {
+                    if (!reviewToolbar || window.matchMedia('(max-width: 640px)').matches) {
+                        document.body.style.removeProperty('--echo-review-toolbar-space');
+                        return;
+                    }
+
+                    document.body.style.setProperty(
+                        '--echo-review-toolbar-space',
+                        (reviewToolbar.getBoundingClientRect().height + 16) + 'px',
+                    );
+                };
                 const modals = document.querySelectorAll('.echo-review-modal');
                 const openModal = (modal) => {
                     modal.hidden = false;
@@ -1370,61 +1440,14 @@
                 if (document.querySelector('[data-review-completion]')) {
                     refreshOpenerAndClose();
                 }
+
+                reserveReviewToolbarSpace();
+                window.addEventListener('resize', reserveReviewToolbarSpace);
+                if (reviewToolbar && 'ResizeObserver' in window) {
+                    new ResizeObserver(reserveReviewToolbarSpace).observe(reviewToolbar);
+                }
             })();
         </script>
-    @endif
-
-    @if(isset($isPreview))
-        @php
-            $activityEvents = $flight->events()->with('actor')->orderBy('created_at')->orderBy('id')->get();
-        @endphp
-        <details class="echo-preview-activity">
-            <summary>Flight Plan Activity · {{ $activityEvents->count() }} {{ $activityEvents->count() === 1 ? 'event' : 'events' }}</summary>
-            @if($activityEvents->isNotEmpty())
-                <ol class="echo-preview-activity-timeline">
-                    @foreach($activityEvents as $activityEvent)
-                        @php
-                            $activityLabel = match ($activityEvent->event_type) {
-                                \App\Models\FlightPlanEvent::TYPE_CREATED => 'Flight plan created',
-                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION => 'Submitted for PIC authorization',
-                                \App\Models\FlightPlanEvent::TYPE_PIC_AUTHORIZED => 'PIC authorized',
-                                \App\Models\FlightPlanEvent::TYPE_PIC_DECLINED => 'PIC declined',
-                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_TO_ATC => 'Submitted to ATMO',
-                                \App\Models\FlightPlanEvent::TYPE_ATC_ACCEPTED => 'Accepted by ATMO',
-                                \App\Models\FlightPlanEvent::TYPE_ATC_REJECTED => 'Rejected by ATMO',
-                                \App\Models\FlightPlanEvent::TYPE_DELAYED => 'Flight delayed',
-                                \App\Models\FlightPlanEvent::TYPE_CANCELLED => 'Flight plan cancelled',
-                                \App\Models\FlightPlanEvent::TYPE_ARCHIVED => 'Flight plan archived',
-                                \App\Models\FlightPlanEvent::TYPE_STARTUP_RECORDED => 'Start-up recorded',
-                                \App\Models\FlightPlanEvent::TYPE_BLOCK_OFF_RECORDED => 'Block off recorded',
-                                \App\Models\FlightPlanEvent::TYPE_AIRBORNE => 'Airborne recorded',
-                                \App\Models\FlightPlanEvent::TYPE_TOUCHDOWN => 'Touchdown recorded',
-                                \App\Models\FlightPlanEvent::TYPE_SHUTDOWN_RECORDED => 'Shutdown recorded',
-                                \App\Models\FlightPlanEvent::TYPE_FLIGHT_COMPLETED => 'Flight completed',
-                                default => \Illuminate\Support\Str::headline((string) $activityEvent->event_type),
-                            };
-                            $oldEobt = $activityEvent->old_values['eobt'] ?? $activityEvent->old_values['proposed_time'] ?? null;
-                            $newEobt = $activityEvent->new_values['eobt'] ?? $activityEvent->new_values['proposed_time'] ?? null;
-                            $activityActor = $activityEvent->new_values['actor_name'] ?? $activityEvent->actor?->name;
-                            $activityRole = $activityEvent->new_values['actor_role'] ?? $activityEvent->actor?->role?->value ?? null;
-                        @endphp
-                        <li>
-                            <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('H:i\Z') ?? '—' }}</span>
-                            <span class="echo-preview-activity-event"> · {{ $activityLabel }}</span>
-                            @if($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_DELAYED)
-                                <span> · {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($oldEobt) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($newEobt) ?? 'N/A' }}</span>
-                            @endif
-                            @if($activityActor)
-                                <span> · {{ $activityActor }}@if($activityRole) · {{ \Illuminate\Support\Str::headline($activityRole) }}@endif</span>
-                            @endif
-                            @if($activityEvent->reason)
-                                <span> · {{ $activityEvent->reason }}</span>
-                            @endif
-                        </li>
-                    @endforeach
-                </ol>
-            @endif
-        </details>
     @endif
 
     @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
