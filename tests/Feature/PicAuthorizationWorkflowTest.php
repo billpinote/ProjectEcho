@@ -85,8 +85,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->get($previewUrl)
             ->assertOk()
             ->assertSee('FLIGHT PLAN', false)
-            ->assertSee('BACK TO PIC AUTHORIZATION SCANNER', false)
-            ->assertDontSee('<button', false)
+            ->assertSee('Close Preview')
+            ->assertSee('data-close-review-tab', false)
             ->assertDontSee('<form method="POST"', false);
 
         $this->get(route('flights.view', $flight))->assertForbidden();
@@ -145,7 +145,8 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->get(route('flightplan.pic-authorization.preview', ['token' => $previewToken]))
             ->assertOk()
-            ->assertSee('BACK TO PIC AUTHORIZATION SCANNER', false);
+            ->assertSee('Close Preview')
+            ->assertSee('data-close-review-tab', false);
     }
 
     public function test_pic_authorization_preview_rejects_missing_token(): void
