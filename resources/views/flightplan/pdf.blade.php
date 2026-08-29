@@ -1359,21 +1359,30 @@
         </script>
     @endif
 
-    @if(isset($isPreview) && isset($backActionUrl) && $backActionUrl && !($showReviewActions ?? false))
+    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
     <div style="display:flex; justify-content:center; margin-top:10px;">
-        @if($backActionIsDashboard ?? false)
-            <x-filament::button
-                tag="a"
-                :href="$backActionUrl"
-                color="gray"
-                class="echo-preview-dashboard-button"
-            >
-                {{ $backActionLabel ?? 'Back' }}
-            </x-filament::button>
-        @else
-            <a href="{{ $backActionUrl }}">{{ $backActionLabel ?? 'Back' }}</a>
-        @endif
+        <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; Close Preview</button>
     </div>
+    @endif
+
+    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
+        <script>
+            (() => {
+                const closePreview = () => {
+                    try {
+                        if (window.opener && !window.opener.closed) window.opener.location.reload();
+                    } catch (error) {
+                        // A cross-origin opener may be unavailable; closing remains best effort.
+                    }
+
+                    window.close();
+                };
+
+                document.querySelectorAll('[data-close-review-tab]').forEach((button) => {
+                    button.addEventListener('click', closePreview);
+                });
+            })();
+        </script>
     @endif
 
 </body>
