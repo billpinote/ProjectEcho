@@ -360,6 +360,10 @@
         .echo-review-modal-title { margin: 0 0 8px; font-size: 20px; }
         .echo-review-modal-copy { margin: 0 0 14px; color: #475569; font-size: 14px; line-height: 1.45; }
         .echo-review-wiresign { margin: 0 0 16px; color: #334155; font-size: 13px; font-weight: 600; }
+        .echo-review-acceptance-identity { margin: 18px 0 4px; text-align: center; }
+        .echo-review-acceptance-wiresign { display: inline-block; min-width: 96px; padding: 10px 18px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1d4ed8; font-size: 30px; font-weight: 800; letter-spacing: .08em; line-height: 1.1; }
+        .echo-review-acceptance-role { margin: 9px 0 18px; color: #334155; font-size: 14px; font-weight: 700; text-align: center; }
+        .echo-review-acceptance-note { margin: 0 0 4px; color: #475569; font-size: 14px; line-height: 1.45; text-align: center; }
         .echo-review-modal label { display: block; margin-bottom: 6px; color: #334155; font-size: 13px; font-weight: 650; }
         .echo-review-modal textarea { width: 100%; min-height: 104px; padding: 10px 11px; border: 1px solid #cbd5e1; border-radius: 7px; color: #172033; font: inherit; font-size: 14px; resize: vertical; box-sizing: border-box; }
         .echo-review-modal textarea:focus { border-color: #60a5fa; outline: 2px solid rgba(96, 165, 250, .25); }
@@ -474,7 +478,7 @@
             <h1 class="echo-review-title">Flight Plan Review</h1>
             <div class="echo-review-meta">
                 <span>{{ $flight->aircraft_identification }}</span>
-                <span class="echo-review-status">Pending ATC Review</span>
+                <span class="echo-review-status">Pending ATMO Review</span>
             </div>
         </div>
     @endif
@@ -1219,7 +1223,7 @@
                 <div class="echo-review-modal-body">
                     <h2 class="echo-review-modal-title" id="reject-flight-plan-title">Reject Flight Plan</h2>
                     <p class="echo-review-modal-copy">Rejecting this flight plan will return it to the filer with your reason for rejection.</p>
-                    <p class="echo-review-wiresign">Reviewer: {{ $acceptedByWiresign ?: 'ATC reviewer' }}</p>
+                    <p class="echo-review-wiresign">Reviewer: {{ $acceptedByWiresign ?: 'ATMO reviewer' }}</p>
                     <label for="rejection-reason">Reason for rejection</label>
                     <textarea id="rejection-reason" name="rejection_reason" maxlength="255" required autofocus></textarea>
                 </div>
@@ -1235,8 +1239,12 @@
                 @csrf
                 <div class="echo-review-modal-body">
                     <h2 class="echo-review-modal-title" id="accept-flight-plan-title">Accept Flight Plan?</h2>
-                    <p class="echo-review-modal-copy">Confirm that this flight plan has been reviewed and is ready for ATC acceptance.</p>
-                    <p class="echo-review-wiresign">Accepted by: {{ $acceptedByWiresign ?: 'ATC reviewer' }}</p>
+                    <p class="echo-review-modal-copy">You are about to accept this flight plan as:</p>
+                    <div class="echo-review-acceptance-identity">
+                        <div class="echo-review-acceptance-wiresign">{{ $acceptedByWiresign ?: 'ATMO' }}</div>
+                        <p class="echo-review-acceptance-role">Air Traffic Management Officer</p>
+                    </div>
+                    <p class="echo-review-acceptance-note">By continuing, <strong>{{ $acceptedByWiresign ?: 'this ATMO' }}</strong> will be recorded as the accepting ATMO for this flight plan.</p>
                 </div>
                 <div class="echo-review-modal-footer">
                     <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-modal>Cancel</button>
