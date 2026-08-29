@@ -396,9 +396,9 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
             ->assertOk()
-            ->assertSee('Back to Dashboard')
+            ->assertSee('Back to Pending')
             ->assertSee('href="'.url('/atmo').'"', false)
-            ->assertSee('echo-preview-dashboard-button', false)
+            ->assertSee('echo-review-toolbar', false)
             ->assertDontSee('<a href="'.url('/atmo').'">', false)
             ->assertDontSee('BACK TO PIC AUTHORIZATION SCANNER', false)
             ->assertDontSee('/admin', false);
