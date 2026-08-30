@@ -284,7 +284,7 @@
         .echo-preview-status-rejected { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
         .echo-preview-status-default { border-color: #cbd5e1; background: #f8fafc; color: #475569; }
         .echo-preview-delay-banner { width: min(794px, calc(100% - 32px)); margin: 0 auto 12px; padding: 10px 12px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; color: #92400e; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 650; box-sizing: border-box; }
-        .echo-preview-activity { width: min(794px, calc(100% - 32px)); margin: 0 auto 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; color: #475569; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; box-sizing: border-box; }
+        .echo-preview-activity { width: min(794px, calc(100% - 32px)); margin: 24px auto 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; color: #475569; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; box-sizing: border-box; }
         .echo-preview-activity summary { min-height: 44px; padding: 12px 14px; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer; list-style-position: inside; }
         .echo-preview-activity summary::marker { color: #64748b; }
         .echo-preview-activity-timeline { margin: 0; padding: 0 14px 12px 34px; border-top: 1px solid #f1f5f9; list-style: none; }
