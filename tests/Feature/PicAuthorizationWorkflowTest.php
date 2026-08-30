@@ -433,10 +433,65 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertDontSee('/admin', false);
     }
 
+    public function test_atmo_cannot_view_flight_before_pic_authorization(): void
+    {
+        $atmo = $this->user(UserRole::Atmo);
+        $atmo->forceFill(['station' => 'RPUS'])->save();
+        $flight = $this->awaitingFlight($atmo);
+
+        $this->actingAs($atmo)
+            ->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSeeText('PIC Authorization Pending')
+            ->assertSeeText('This flight plan is not yet available for operational review. PIC authorization must be completed first.')
+            ->assertSeeText('Close')
+            ->assertDontSee('FLIGHT PLAN', false)
+            ->assertDontSeeText('PIC-001');
+    }
+
+    public function test_avsec_cannot_view_flight_before_pic_authorization(): void
+    {
+        $avsec = $this->user(UserRole::Avsec);
+        $flight = $this->awaitingFlight($avsec);
+
+        $this->actingAs($avsec)
+            ->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSeeText('PIC Authorization Pending')
+            ->assertSeeText('This flight plan is not yet available for operational review. PIC authorization must be completed first.')
+            ->assertSeeText('Close')
+            ->assertDontSee('FLIGHT PLAN', false)
+            ->assertDontSeeText('PIC-001');
+    }
+
+    public function test_atmo_can_view_flight_after_pic_authorization_and_revision_invalidation_reprotects_it(): void
+    {
+        $atmo = $this->user(UserRole::Atmo);
+        $atmo->forceFill(['station' => 'RPUS'])->save();
+        $pic = $this->user(UserRole::Pilot, PilotLicenseType::AirlineTransportPilot->value);
+        $flight = $this->awaitingFlight($pic);
+
+        app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $pic);
+
+        $this->actingAs($atmo)
+            ->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSee('FLIGHT PLAN', false)
+            ->assertDontSeeText('PIC Authorization Pending');
+
+        $flight->incrementRevisionNumber();
+
+        $this->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSeeText('PIC Authorization Pending')
+            ->assertDontSee('FLIGHT PLAN', false);
+    }
+
     public function test_pilot_saved_flight_preview_can_close_without_dashboard_navigation(): void
     {
         $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
         $flight = $this->awaitingFlight($pilot, [
+            'prepared_by_user_id' => $pilot->id,
             'pilot_in_command_user_id' => $pilot->id,
         ]);
 
@@ -454,6 +509,7 @@ class PicAuthorizationWorkflowTest extends TestCase
         $flight = $this->awaitingFlight($dispatch, [
             'status' => FlightPlanStatus::Pending,
             'prepared_by_user_id' => $dispatch->id,
+            'pilot_in_command_user_id' => $dispatch->id,
         ]);
 
         $this->actingAs($dispatch)
@@ -555,7 +611,8 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertOk()
             ->assertSeeText('PIC Authorization Required')
             ->assertSeeText('This flight plan can only be reviewed and acted on by a verified PPL, CPL, or ATPL holder authorized to act as PIC.')
-            ->assertSeeText('BACK TO PIC AUTHORIZATION SCANNER')
+            ->assertSeeText('Close')
+            ->assertDontSeeText('BACK TO PIC AUTHORIZATION SCANNER')
             ->assertDontSee('FLIGHT PLAN', false)
             ->assertDontSeeText('Authorize as PIC')
             ->assertDontSeeText('Decline Flight Plan');
@@ -716,7 +773,13 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertSeeText('PIC-DECLINED')
             ->assertSeeText('PIC-ARCHIVED');
 
-        $this->get(route('flights.view', $flight))->assertOk();
+        $this->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSeeText('PIC Authorization Pending')
+            ->assertSeeText('This flight plan is not yet available for operational review. PIC authorization must be completed first.')
+            ->assertSeeText('Close')
+            ->assertDontSee('FLIGHT PLAN', false)
+            ->assertDontSeeText('PIC-DECLINED');
         $flight->refresh();
         $this->assertTrue(FlightAccess::canView($pic, $flight));
         $this->assertTrue(Flight::query()->visibleTo($pic)->whereKey($flight)->exists());

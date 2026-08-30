@@ -267,6 +267,7 @@ class FlightPlanPreviewActionsTest extends TestCase
         ]);
         $flight = Flight::create($this->previewFlightPlanData([
             'filed_by_user_id' => $pilot->getKey(),
+            'prepared_by_user_id' => $pilot->getKey(),
             'pilot_id' => $pilot->getKey(),
             'pilot_in_command_user_id' => $pilot->getKey(),
         ]));
@@ -289,6 +290,7 @@ class FlightPlanPreviewActionsTest extends TestCase
         ]);
         $flight = Flight::create($this->previewFlightPlanData([
             'filed_by_user_id' => $pilot->getKey(),
+            'prepared_by_user_id' => $pilot->getKey(),
             'pilot_id' => $pilot->getKey(),
             'pilot_in_command_user_id' => $pilot->getKey(),
         ]));

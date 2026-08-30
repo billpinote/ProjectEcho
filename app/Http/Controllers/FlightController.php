@@ -194,6 +194,13 @@ class FlightController extends Controller
         $this->ensureFlightUserAccess();
         abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
 
+        if ($flight->requiresPicAuthorization() && ! $flight->isPicAuthorizationCurrent()) {
+            return view('flightplan.pic-authorization-required', [
+                'noticeHeading' => 'PIC Authorization Pending',
+                'noticeMessage' => 'This flight plan is not yet available for operational review. PIC authorization must be completed first.',
+            ]);
+        }
+
         if (Auth::user()?->canReviewFlightPlans() && $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
             $flight->markAsReviewed();
         }
