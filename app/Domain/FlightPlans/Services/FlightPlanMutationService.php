@@ -15,20 +15,20 @@ class FlightPlanMutationService
 {
     public function recordSubmission(Flight $flight, ?User $actor = null): void
     {
-        FlightPlanEvent::create([
-            'flight_id' => $flight->getKey(),
-            'actor_user_id' => $actor?->getKey(),
-            'event_type' => FlightPlanEvent::TYPE_SUBMITTED,
-            'old_values' => null,
-            'new_values' => [
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, $actor, null, [
+            'status' => $flight->status?->value ?? $flight->status,
+            'aircraft_identification' => $flight->aircraft_identification,
+        ]);
+
+        FlightPlanEvent::record($flight, $flight->requiresPicAuthorization()
+            ? FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION
+            : FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $actor, null, [
                 'status' => $flight->status?->value ?? $flight->status,
                 'proposed_time' => $flight->proposed_time,
                 'date_of_flight' => $flight->date_of_flight,
                 'aircraft_identification' => $flight->aircraft_identification,
                 'filed_by_user_id' => $flight->filed_by_user_id,
-            ],
-            'created_at' => now(),
-        ]);
+            ]);
     }
 
     public function delay(Flight $flight, User $actor, string $newProposedTime): Flight
@@ -45,12 +45,6 @@ class FlightPlanMutationService
 
         $normalizedTime = UtcFourDigitTime::normalizeForStorage($newProposedTime);
 
-        if ($normalizedTime === $flight->proposed_time) {
-            throw ValidationException::withMessages([
-                'new_proposed_time' => 'The new proposed time must be different from the current proposed time.',
-            ]);
-        }
-
         return DB::transaction(function () use ($actor, $flight, $normalizedTime): Flight {
             $flight->refresh();
 
@@ -60,20 +54,22 @@ class FlightPlanMutationService
                 ]);
             }
 
-            $oldTime = $flight->proposed_time;
+            $oldTime = $flight->currentEobt();
+
+            if ($normalizedTime === $oldTime) {
+                throw ValidationException::withMessages([
+                    'new_proposed_time' => 'The new proposed time must be different from the current operational EOBT.',
+                ]);
+            }
 
             $flight->forceFill([
-                'proposed_time' => $normalizedTime,
+                'revised_eobt' => $normalizedTime,
             ])->save();
 
-            FlightPlanEvent::create([
-                'flight_id' => $flight->getKey(),
-                'actor_user_id' => $actor->getKey(),
-                'event_type' => FlightPlanEvent::TYPE_DELAYED,
-                'old_values' => ['proposed_time' => $oldTime],
-                'new_values' => ['proposed_time' => $flight->proposed_time],
-                'created_at' => now(),
-            ]);
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_DELAYED, $actor, ['eobt' => $oldTime], [
+                    'eobt' => $flight->revised_eobt,
+                    'original_eobt' => $flight->proposed_time,
+                ]);
 
             return $flight;
         });
@@ -110,15 +106,7 @@ class FlightPlanMutationService
                 'cancelled_by_user_id' => $actor->getKey(),
             ])->save();
 
-            FlightPlanEvent::create([
-                'flight_id' => $flight->getKey(),
-                'actor_user_id' => $actor->getKey(),
-                'event_type' => FlightPlanEvent::TYPE_CANCELLED,
-                'old_values' => ['status' => $oldStatus],
-                'new_values' => ['status' => FlightPlanStatus::Cancelled->value],
-                'reason' => $reason,
-                'created_at' => now(),
-            ]);
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CANCELLED, $actor, ['status' => $oldStatus], ['status' => FlightPlanStatus::Cancelled->value], $reason);
 
             return $flight;
         });

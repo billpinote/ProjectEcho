@@ -8,6 +8,10 @@
             background: #ccc;
         }
 
+        body.preview.preview-has-review-toolbar {
+            padding-bottom: calc(var(--echo-review-toolbar-space, 0px) + 24px + env(safe-area-inset-bottom));
+        }
+
         .preview-wrapper {
             width: 794px;
             margin: auto;
@@ -221,6 +225,208 @@
             box-shadow: 0 0 0 3px rgba(96, 165, 250, .25);
         }
 
+        .echo-review-page {
+            width: min(794px, calc(100% - 32px));
+            margin: 0 auto 18px;
+            color: #172033;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .echo-review-heading {
+            padding: 18px 2px 12px;
+        }
+
+        .echo-review-eyebrow {
+            margin: 0 0 4px;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .echo-review-title {
+            margin: 0;
+            font-size: 23px;
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        .echo-review-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+            margin-top: 7px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .echo-review-status {
+            color: #1d4ed8;
+            font-weight: 700;
+        }
+
+        .echo-preview-header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 2px 12px;
+        }
+
+        .echo-preview-header .echo-review-eyebrow { margin-bottom: 5px; }
+        .echo-preview-title { margin: 0; color: #172033; font-size: 22px; line-height: 1.2; font-weight: 700; }
+        .echo-preview-aircraft { margin: 6px 0 0; color: #334155; font-size: 15px; font-weight: 700; letter-spacing: .03em; }
+        .echo-preview-status-badge { display: inline-block; padding: 6px 10px; border: 1px solid transparent; border-radius: 999px; font-size: 12px; font-weight: 750; line-height: 1.2; white-space: nowrap; }
+        .echo-preview-status-pending { border-color: #fcd34d; background: #fffbeb; color: #a16207; }
+        .echo-preview-status-accepted, .echo-preview-status-completed { border-color: #86efac; background: #f0fdf4; color: #15803d; }
+        .echo-preview-status-active { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+        .echo-preview-status-rejected { border-color: #fca5a5; background: #fef2f2; color: #b91c1c; }
+        .echo-preview-status-default { border-color: #cbd5e1; background: #f8fafc; color: #475569; }
+        .echo-preview-delay-banner { width: min(794px, calc(100% - 32px)); margin: 0 auto 12px; padding: 10px 12px; border: 1px solid #fcd34d; border-radius: 8px; background: #fffbeb; color: #92400e; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; font-weight: 650; box-sizing: border-box; }
+        .echo-preview-activity { width: min(794px, calc(100% - 32px)); margin: 24px auto 10px; border: 1px solid #e2e8f0; border-radius: 9px; background: #fff; color: #475569; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; box-sizing: border-box; }
+        .echo-preview-activity summary { min-height: 44px; padding: 12px 14px; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer; list-style-position: inside; }
+        .echo-preview-activity summary::marker { color: #64748b; }
+        .echo-preview-activity-timeline { margin: 0; padding: 0 14px 12px 34px; border-top: 1px solid #f1f5f9; list-style: none; }
+        .echo-preview-activity-timeline li { position: relative; margin: 0; padding: 10px 0 0 14px; border-left: 2px solid #dbeafe; font-size: 12px; line-height: 1.45; }
+        .echo-preview-activity-timeline li::before { position: absolute; top: 14px; left: -5px; width: 7px; height: 7px; border-radius: 50%; background: #60a5fa; content: ""; }
+        .echo-preview-activity-time { color: #64748b; font-variant-numeric: tabular-nums; }
+        .echo-preview-activity-event { color: #1e293b; font-weight: 700; }
+
+        .echo-review-toolbar {
+            position: fixed;
+            z-index: 20;
+            right: 0;
+            bottom: 16px;
+            left: 0;
+            width: min(794px, calc(100% - 32px));
+            margin: auto;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .97);
+            box-shadow: 0 8px 28px rgba(15, 23, 42, .16);
+            box-sizing: border-box;
+        }
+
+        .echo-review-toolbar-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .echo-review-button {
+            min-height: 44px;
+            padding: 10px 16px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            font: inherit;
+            font-size: 14px;
+            font-weight: 650;
+            line-height: 1.2;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+        }
+
+        .echo-review-button:focus-visible, .echo-review-modal-close:focus-visible {
+            outline: 2px solid #60a5fa;
+            outline-offset: 2px;
+        }
+
+        .echo-review-button-neutral {
+            border-color: #cbd5e1;
+            background: #fff;
+            color: #475569;
+        }
+
+        .echo-review-button-neutral:hover { background: #f8fafc; border-color: #94a3b8; }
+
+        .echo-review-button-danger {
+            border-color: #fca5a5;
+            background: #fff;
+            color: #b91c1c;
+        }
+
+        .echo-review-button-danger:hover { background: #fef2f2; border-color: #f87171; }
+
+        .echo-review-button-primary {
+            border-color: #2563eb;
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .echo-review-button-primary:hover { background: #1d4ed8; }
+
+        .echo-review-document-spacer { height: 78px; }
+
+        .echo-review-completion {
+            width: min(794px, calc(100% - 32px));
+            margin: 18px auto;
+            padding: 14px 16px;
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+            background: #f0fdf4;
+            color: #166534;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px;
+            font-weight: 650;
+            box-sizing: border-box;
+        }
+
+        .echo-review-completion-close {
+            margin-top: 10px;
+        }
+
+        .echo-review-modal[hidden] { display: none; }
+
+        .echo-review-modal {
+            position: fixed;
+            z-index: 40;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            padding: 16px;
+            background: rgba(15, 23, 42, .48);
+            box-sizing: border-box;
+        }
+
+        .echo-review-modal-card {
+            width: min(440px, 100%);
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #fff;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, .25);
+            color: #172033;
+        }
+
+        .echo-review-modal-body { padding: 22px 22px 8px; }
+        .echo-review-modal-title { margin: 0 0 8px; font-size: 20px; }
+        .echo-review-modal-copy { margin: 0 0 14px; color: #475569; font-size: 14px; line-height: 1.45; }
+        .echo-review-wiresign { margin: 0 0 16px; color: #334155; font-size: 13px; font-weight: 600; }
+        .echo-review-wiresign-chip { display: inline-block; margin-left: 4px; padding: 3px 8px; border: 1px solid #bfdbfe; border-radius: 999px; background: #eff6ff; color: #1d4ed8; font-size: 12px; font-weight: 700; letter-spacing: .04em; line-height: 1.2; }
+        .echo-review-acceptance-identity { margin: 18px 0 4px; text-align: center; }
+        .echo-review-acceptance-wiresign { display: inline-block; min-width: 96px; padding: 10px 18px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #1d4ed8; font-size: 30px; font-weight: 800; letter-spacing: .08em; line-height: 1.1; }
+        .echo-review-acceptance-role { margin: 9px 0 18px; color: #334155; font-size: 14px; font-weight: 700; text-align: center; }
+        .echo-review-acceptance-note { margin: 0 0 4px; color: #475569; font-size: 14px; line-height: 1.45; text-align: center; }
+        .echo-review-modal label { display: block; margin-bottom: 6px; color: #334155; font-size: 13px; font-weight: 650; }
+        .echo-review-modal textarea { width: 100%; min-height: 104px; padding: 10px 11px; border: 1px solid #cbd5e1; border-radius: 7px; color: #172033; font: inherit; font-size: 14px; resize: vertical; box-sizing: border-box; }
+        .echo-review-modal textarea:focus { border-color: #60a5fa; outline: 2px solid rgba(96, 165, 250, .25); }
+        .echo-review-modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 22px 20px; }
+
+        @media (max-width: 640px) {
+            body.preview.preview-has-review-toolbar { padding-bottom: env(safe-area-inset-bottom); }
+            .echo-review-toolbar { position: static; margin-top: 12px; flex-direction: column; align-items: stretch; }
+            .echo-review-toolbar-actions { justify-content: stretch; }
+            .echo-review-toolbar-actions .echo-review-button { flex: 1 1 auto; }
+            .echo-review-document-spacer { display: none; }
+        }
+
         @media (prefers-color-scheme: dark) {
             .echo-preview-dashboard-button {
                 border-color: #4b5563;
@@ -236,7 +442,7 @@
         }
     </style>
 </head>
-<body class="{{ isset($isPreview) ? 'preview' : '' }}">
+<body class="{{ isset($isPreview) ? 'preview' : '' }}{{ isset($isPreview) && ($showReviewActions ?? false) ? ' preview-has-review-toolbar' : '' }}">
     @php
         $isPdfOnly = (bool) ($isPdfOnly ?? false);
         $charBoxes = function (mixed $value): \Illuminate\Support\HtmlString {
@@ -267,6 +473,48 @@
     @endif
 
     @if(isset($isPreview))
+        @php
+            $previewStatus = $flight->status?->label() ?? 'Unknown';
+            $previewStatusClass = match ($flight->status) {
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Pending => 'pending',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted => 'accepted',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Active => 'active',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Rejected => 'rejected',
+                \App\Domain\FlightPlans\Enums\FlightPlanStatus::Completed => 'completed',
+                default => 'default',
+            };
+            if ($flight->status === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Pending && ($showReviewActions ?? false)) {
+                $previewStatus = 'Pending ATMO Review';
+            }
+            $reviewCompleted = session('review_status')
+                && in_array($flight->status, [
+                    \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted,
+                    \App\Domain\FlightPlans\Enums\FlightPlanStatus::Rejected,
+                ], true);
+        @endphp
+
+        <div class="echo-review-page echo-preview-header">
+            <div>
+                <p class="echo-review-eyebrow">ATMO · Echo</p>
+                <h1 class="echo-preview-title">Flight Plan Preview</h1>
+                <p class="echo-preview-aircraft">{{ $flight->aircraft_identification }}</p>
+            </div>
+            <span class="echo-preview-status-badge echo-preview-status-{{ $previewStatusClass }}">{{ $previewStatus }}</span>
+        </div>
+
+        @if($flight->revised_eobt !== null)
+            <div class="echo-preview-delay-banner" role="status">
+                Flight plan delayed to {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->revised_eobt) }}. Original filed EOBT: {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time) }}.
+            </div>
+        @endif
+
+        @if($reviewCompleted)
+            <div class="echo-review-completion" role="status" data-review-completion>
+                <div>{{ $flight->status === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted ? 'Flight plan accepted successfully.' : 'Flight plan rejected successfully.' }}</div>
+                <button class="echo-review-button echo-review-button-neutral echo-review-completion-close" type="button" data-close-review-tab>Close This Tab</button>
+            </div>
+        @endif
+
         @if(($picDeclineDetails ?? false))
             <div style="width: 794px; margin: 0 auto 12px; padding: 12px 14px; border: 2px solid #b45309; background: #fffbeb; color: #78350f; font-size: 12px;">
                 <strong style="display:block; font-size: 14px; margin-bottom: 6px;">PIC Authorization Declined</strong>
@@ -1041,64 +1289,191 @@
     </div>
     @endif
 
-    @if(isset($isPreview) && ($showReviewActions ?? false))
-    <div style="display:flex; justify-content:center; gap:12px; margin-top:10px;">
-        <form method="POST" action="{{ $acceptActionUrl }}">
-            @csrf
-            <button
-                type="submit"
-                onclick="return confirm('Accepted by {{ $acceptedByWiresign !== '' ? addslashes($acceptedByWiresign) : 'this ATC user' }}?');"
-            >
-                ACCEPT
-            </button>
-        </form>
+    @if(isset($isPreview))
+        @php
+            $activityEvents = $flight->events()->with('actor')->orderBy('created_at')->orderBy('id')->get();
+        @endphp
+        <details class="echo-preview-activity">
+            <summary>Flight Plan Activity · {{ $activityEvents->count() }} {{ $activityEvents->count() === 1 ? 'event' : 'events' }}</summary>
+            @if($activityEvents->isNotEmpty())
+                <ol class="echo-preview-activity-timeline">
+                    @foreach($activityEvents as $activityEvent)
+                        @php
+                            $activityLabel = match ($activityEvent->event_type) {
+                                \App\Models\FlightPlanEvent::TYPE_CREATED => 'Flight plan created',
+                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION => 'Submitted for PIC authorization',
+                                \App\Models\FlightPlanEvent::TYPE_PIC_AUTHORIZED => 'PIC authorized',
+                                \App\Models\FlightPlanEvent::TYPE_PIC_DECLINED => 'PIC declined',
+                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_TO_ATC => 'Submitted to ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_ATC_ACCEPTED => 'Accepted by ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_ATC_REJECTED => 'Rejected by ATMO',
+                                \App\Models\FlightPlanEvent::TYPE_DELAYED => 'Flight delayed',
+                                \App\Models\FlightPlanEvent::TYPE_CANCELLED => 'Flight plan cancelled',
+                                \App\Models\FlightPlanEvent::TYPE_ARCHIVED => 'Flight plan archived',
+                                \App\Models\FlightPlanEvent::TYPE_STARTUP_RECORDED => 'Start-up recorded',
+                                \App\Models\FlightPlanEvent::TYPE_BLOCK_OFF_RECORDED => 'Block off recorded',
+                                \App\Models\FlightPlanEvent::TYPE_AIRBORNE => 'Airborne recorded',
+                                \App\Models\FlightPlanEvent::TYPE_TOUCHDOWN => 'Touchdown recorded',
+                                \App\Models\FlightPlanEvent::TYPE_SHUTDOWN_RECORDED => 'Shutdown recorded',
+                                \App\Models\FlightPlanEvent::TYPE_FLIGHT_COMPLETED => 'Flight completed',
+                                default => \Illuminate\Support\Str::headline((string) $activityEvent->event_type),
+                            };
+                            $oldEobt = $activityEvent->old_values['eobt'] ?? $activityEvent->old_values['proposed_time'] ?? null;
+                            $newEobt = $activityEvent->new_values['eobt'] ?? $activityEvent->new_values['proposed_time'] ?? null;
+                            $activityActor = $activityEvent->new_values['actor_name'] ?? $activityEvent->actor?->name;
+                            $activityRole = $activityEvent->new_values['actor_role'] ?? $activityEvent->actor?->role?->value ?? null;
+                        @endphp
+                        <li>
+                            <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('H:i\Z') ?? '—' }}</span>
+                            <span class="echo-preview-activity-event"> · {{ $activityLabel }}</span>
+                            @if($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_DELAYED)
+                                <span> · {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($oldEobt) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($newEobt) ?? 'N/A' }}</span>
+                            @endif
+                            @if($activityActor)
+                                <span> · {{ $activityActor }}@if($activityRole) · {{ \Illuminate\Support\Str::headline($activityRole) }}@endif</span>
+                            @endif
+                            @if($activityEvent->reason)
+                                <span> · {{ $activityEvent->reason }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ol>
+            @endif
+        </details>
+    @endif
 
-        <form method="POST" action="{{ $rejectActionUrl }}">
-            @csrf
-            <input type="hidden" name="rejection_reason" id="rejection-reason-input">
-            <button
-                type="submit"
-                onclick="
-                    const wiresign = '{{ $acceptedByWiresign !== '' ? addslashes($acceptedByWiresign) : 'this ATC user' }}';
-                    const reason = window.prompt('Reject by ' + wiresign + '. State a short reason:');
+    @if(isset($isPreview) && (($showReviewActions ?? false) || ($reviewCompleted ?? false)))
+        @if($showReviewActions ?? false)
+        <div class="echo-review-document-spacer" aria-hidden="true"></div>
+        <div class="echo-review-toolbar" aria-label="Flight plan review actions">
+            <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; Close Review</button>
+            <div class="echo-review-toolbar-actions">
+                <button class="echo-review-button echo-review-button-danger" type="button" data-open-review-modal="reject-flight-plan">Reject</button>
+                <button class="echo-review-button echo-review-button-primary" type="button" data-open-review-modal="accept-flight-plan">&#10003; Accept Flight Plan</button>
+            </div>
+        </div>
 
-                    if (reason === null) {
-                        return false;
+        <div class="echo-review-modal" id="reject-flight-plan" role="dialog" aria-modal="true" aria-labelledby="reject-flight-plan-title" hidden>
+            <form class="echo-review-modal-card" method="POST" action="{{ $rejectActionUrl }}">
+                @csrf
+                <div class="echo-review-modal-body">
+                    <h2 class="echo-review-modal-title" id="reject-flight-plan-title">Reject Flight Plan</h2>
+                    <p class="echo-review-modal-copy">Return this flight plan to the filer with a reason.</p>
+                    <p class="echo-review-wiresign">Reviewer: <span class="echo-review-wiresign-chip">{{ $acceptedByWiresign ?: 'ATMO' }}</span></p>
+                    <label for="rejection-reason">Reason for rejection</label>
+                    <textarea id="rejection-reason" name="rejection_reason" maxlength="255" required autofocus></textarea>
+                </div>
+                <div class="echo-review-modal-footer">
+                    <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-modal>Cancel</button>
+                    <button class="echo-review-button echo-review-button-danger" type="submit">Reject Flight Plan</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="echo-review-modal" id="accept-flight-plan" role="dialog" aria-modal="true" aria-labelledby="accept-flight-plan-title" hidden>
+            <form class="echo-review-modal-card" method="POST" action="{{ $acceptActionUrl }}">
+                @csrf
+                <div class="echo-review-modal-body">
+                    <h2 class="echo-review-modal-title" id="accept-flight-plan-title">Accept Flight Plan?</h2>
+                    <p class="echo-review-modal-copy">You are about to accept this flight plan as:</p>
+                    <div class="echo-review-acceptance-identity">
+                        <div class="echo-review-acceptance-wiresign">{{ $acceptedByWiresign ?: 'ATMO' }}</div>
+                        <p class="echo-review-acceptance-role">Air Traffic Management Officer</p>
+                    </div>
+                    <p class="echo-review-acceptance-note">By continuing, <strong>{{ $acceptedByWiresign ?: 'this ATMO' }}</strong> will be recorded as the accepting ATMO for this flight plan.</p>
+                </div>
+                <div class="echo-review-modal-footer">
+                    <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-modal>Cancel</button>
+                    <button class="echo-review-button echo-review-button-primary" type="submit">Accept Flight Plan</button>
+                </div>
+            </form>
+        </div>
+        @endif
+
+        <script>
+            (() => {
+                const refreshOpenerAndClose = () => {
+                    try {
+                        if (window.opener && !window.opener.closed) window.opener.location.reload();
+                    } catch (error) {
+                        // A cross-origin opener may be unavailable; closing remains best effort.
                     }
 
-                    const trimmedReason = reason.trim();
-
-                    if (trimmedReason === '') {
-                        window.alert('A short rejection reason is required.');
-                        return false;
+                    window.close();
+                };
+                const reviewToolbar = document.querySelector('.echo-review-toolbar');
+                const reserveReviewToolbarSpace = () => {
+                    if (!reviewToolbar || window.matchMedia('(max-width: 640px)').matches) {
+                        document.body.style.removeProperty('--echo-review-toolbar-space');
+                        return;
                     }
 
-                    document.getElementById('rejection-reason-input').value = trimmedReason;
+                    document.body.style.setProperty(
+                        '--echo-review-toolbar-space',
+                        (reviewToolbar.getBoundingClientRect().height + 16) + 'px',
+                    );
+                };
+                const modals = document.querySelectorAll('.echo-review-modal');
+                const openModal = (modal) => {
+                    modal.hidden = false;
+                    const focusTarget = modal.querySelector('textarea, button[type="submit"]');
+                    if (focusTarget) focusTarget.focus();
+                };
+                const closeModal = (modal) => { modal.hidden = true; };
 
-                    return true;
-                "
-            >
-                REJECT
-            </button>
-        </form>
+                document.querySelectorAll('[data-open-review-modal]').forEach((button) => {
+                    button.addEventListener('click', () => openModal(document.getElementById(button.dataset.openReviewModal)));
+                });
+                document.querySelectorAll('[data-close-review-modal]').forEach((button) => {
+                    button.addEventListener('click', () => closeModal(button.closest('.echo-review-modal')));
+                });
+                modals.forEach((modal) => modal.addEventListener('click', (event) => {
+                    if (event.target === modal) closeModal(modal);
+                }));
+                document.querySelectorAll('[data-close-review-tab]').forEach((button) => {
+                    button.addEventListener('click', refreshOpenerAndClose);
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') modals.forEach((modal) => { if (!modal.hidden) closeModal(modal); });
+                });
+
+                if (document.querySelector('[data-review-completion]')) {
+                    refreshOpenerAndClose();
+                }
+
+                reserveReviewToolbarSpace();
+                window.addEventListener('resize', reserveReviewToolbarSpace);
+                if (reviewToolbar && 'ResizeObserver' in window) {
+                    new ResizeObserver(reserveReviewToolbarSpace).observe(reviewToolbar);
+                }
+            })();
+        </script>
+    @endif
+
+    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
+    <div style="display:flex; justify-content:center; margin-top:10px;">
+        <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; Close Preview</button>
     </div>
     @endif
 
-    @if(isset($isPreview) && isset($backActionUrl) && $backActionUrl)
-    <div style="display:flex; justify-content:center; margin-top:10px;">
-        @if($backActionIsDashboard ?? false)
-            <x-filament::button
-                tag="a"
-                :href="$backActionUrl"
-                color="gray"
-                class="echo-preview-dashboard-button"
-            >
-                {{ $backActionLabel ?? 'Back' }}
-            </x-filament::button>
-        @else
-            <a href="{{ $backActionUrl }}">{{ $backActionLabel ?? 'Back' }}</a>
-        @endif
-    </div>
+    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
+        <script>
+            (() => {
+                const closePreview = () => {
+                    try {
+                        if (window.opener && !window.opener.closed) window.opener.location.reload();
+                    } catch (error) {
+                        // A cross-origin opener may be unavailable; closing remains best effort.
+                    }
+
+                    window.close();
+                };
+
+                document.querySelectorAll('[data-close-review-tab]').forEach((button) => {
+                    button.addEventListener('click', closePreview);
+                });
+            })();
+        </script>
     @endif
 
 </body>

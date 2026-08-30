@@ -24,6 +24,7 @@ use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\ActiveFlightDataResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
@@ -307,10 +308,14 @@ class FlightsTable
                         }
 
                         $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+                        $previousState = $record->time_start_up;
 
                         $record->forceFill([
                             'time_start_up' => $normalizedState,
                         ])->save();
+
+                        FlightPlanEvent::record($record, FlightPlanEvent::TYPE_STARTUP_RECORDED, Auth::user(),
+                            ['time_start_up' => $previousState], ['time_start_up' => $normalizedState]);
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
@@ -367,10 +372,14 @@ class FlightsTable
                         }
 
                         $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+                        $previousState = $record->time_block_off;
 
                         $record->forceFill([
                             'time_block_off' => $normalizedState,
                         ])->save();
+
+                        FlightPlanEvent::record($record, FlightPlanEvent::TYPE_BLOCK_OFF_RECORDED, Auth::user(),
+                            ['time_block_off' => $previousState], ['time_block_off' => $normalizedState]);
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
@@ -675,10 +684,14 @@ class FlightsTable
                         }
 
                         $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+                        $previousState = $record->time_airborne;
 
                         $record->forceFill([
                             'time_airborne' => $normalizedState,
                         ])->save();
+
+                        FlightPlanEvent::record($record, FlightPlanEvent::TYPE_AIRBORNE, Auth::user(),
+                            ['time_airborne' => $previousState], ['time_airborne' => $normalizedState]);
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
@@ -766,10 +779,14 @@ class FlightsTable
                         }
 
                         $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+                        $previousState = $record->time_touchdown;
 
                         $record->forceFill([
                             'time_touchdown' => $normalizedState,
                         ])->save();
+
+                        FlightPlanEvent::record($record, FlightPlanEvent::TYPE_TOUCHDOWN, Auth::user(),
+                            ['time_touchdown' => $previousState], ['time_touchdown' => $normalizedState]);
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
@@ -845,10 +862,14 @@ class FlightsTable
                         }
 
                         $normalizedState = UtcFourDigitTime::normalizeForStorage($state);
+                        $previousState = $record->time_shutdown;
 
                         $record->forceFill([
                             'time_shutdown' => $normalizedState,
                         ])->save();
+
+                        FlightPlanEvent::record($record, FlightPlanEvent::TYPE_SHUTDOWN_RECORDED, Auth::user(),
+                            ['time_shutdown' => $previousState], ['time_shutdown' => $normalizedState]);
 
                         return FlightForm::formatTimeForForm($normalizedState);
                     })
@@ -1155,6 +1176,7 @@ class FlightsTable
                     abort_unless($record->pic_authorization_status === 'declined'
                         && (int) $record->prepared_by_user_id === (int) Auth::id(), 403);
                     $record->archivePicDecline();
+                    FlightPlanEvent::record($record, FlightPlanEvent::TYPE_ARCHIVED, Auth::user());
                 })
                 ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
                     && (int) $record->prepared_by_user_id === (int) Auth::id());
@@ -1204,11 +1226,11 @@ class FlightsTable
             ->label('Delay Flight')
             ->icon('heroicon-o-clock')
             ->fillForm(fn (Flight $record): array => [
-                'new_proposed_time' => UtcFourDigitTime::formatForDisplay($record->proposed_time) ?? '',
+                'new_proposed_time' => UtcFourDigitTime::formatForDisplay($record->currentEobt()) ?? '',
             ])
             ->form([
                 TextInput::make('new_proposed_time')
-                    ->label('New Proposed Time (UTC)')
+                    ->label('New Operational EOBT (UTC)')
                     ->required()
                     ->rule(new UtcFourDigitTime)
                     ->maxLength(5)
@@ -1217,10 +1239,10 @@ class FlightsTable
             ])
             ->modalHeading('Delay Flight Plan')
             ->modalDescription(function (Flight $record, array $data): string {
-                $current = UtcFourDigitTime::formatForDisplay($record->proposed_time) ?? 'N/A';
+                $current = UtcFourDigitTime::formatForDisplay($record->currentEobt()) ?? 'N/A';
                 $next = UtcFourDigitTime::formatForDisplay($data['new_proposed_time'] ?? null) ?? ($data['new_proposed_time'] ?? 'N/A');
 
-                return "Current proposed time: {$current}. New proposed time: {$next}.";
+                return "Current operational EOBT: {$current}. New operational EOBT: {$next}.";
             })
             ->requiresConfirmation()
             ->visible(fn (Flight $record): bool => Auth::user()?->can('view', $record) ?? false)
@@ -1237,7 +1259,7 @@ class FlightsTable
 
                 Notification::make()
                     ->success()
-                    ->title('Proposed time updated')
+                    ->title('Operational EOBT updated')
                     ->send();
             });
     }

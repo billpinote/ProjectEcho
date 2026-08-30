@@ -85,8 +85,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->get($previewUrl)
             ->assertOk()
             ->assertSee('FLIGHT PLAN', false)
-            ->assertSee('BACK TO PIC AUTHORIZATION SCANNER', false)
-            ->assertDontSee('<button', false)
+            ->assertSee('Close Preview')
+            ->assertSee('data-close-review-tab', false)
             ->assertDontSee('<form method="POST"', false);
 
         $this->get(route('flights.view', $flight))->assertForbidden();
@@ -145,7 +145,8 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->get(route('flightplan.pic-authorization.preview', ['token' => $previewToken]))
             ->assertOk()
-            ->assertSee('BACK TO PIC AUTHORIZATION SCANNER', false);
+            ->assertSee('Close Preview')
+            ->assertSee('data-close-review-tab', false);
     }
 
     public function test_pic_authorization_preview_rejects_missing_token(): void
@@ -396,15 +397,15 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
             ->assertOk()
-            ->assertSee('Back to Dashboard')
-            ->assertSee('href="'.url('/atmo').'"', false)
-            ->assertSee('echo-preview-dashboard-button', false)
+            ->assertSee('Close Review')
+            ->assertSee('data-close-review-tab', false)
+            ->assertSee('echo-review-toolbar', false)
             ->assertDontSee('<a href="'.url('/atmo').'">', false)
             ->assertDontSee('BACK TO PIC AUTHORIZATION SCANNER', false)
             ->assertDontSee('/admin', false);
     }
 
-    public function test_pilot_saved_flight_preview_uses_pilot_dashboard_back_destination(): void
+    public function test_pilot_saved_flight_preview_can_close_without_dashboard_navigation(): void
     {
         $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
         $flight = $this->awaitingFlight($pilot, [
@@ -414,11 +415,12 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->actingAs($pilot)
             ->get(route('flights.view', $flight))
             ->assertOk()
-            ->assertSee('Back to Dashboard')
-            ->assertSee('href="'.url('/pilot').'"', false);
+            ->assertSee('Close Preview')
+            ->assertSee('data-close-review-tab', false)
+            ->assertDontSee('/pilot', false);
     }
 
-    public function test_dispatch_saved_flight_preview_uses_dispatch_dashboard_back_destination(): void
+    public function test_dispatch_saved_flight_preview_can_close_without_dashboard_navigation(): void
     {
         $dispatch = $this->user(UserRole::Dispatch);
         $flight = $this->awaitingFlight($dispatch, [
@@ -429,8 +431,9 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->actingAs($dispatch)
             ->get(route('flights.view', $flight))
             ->assertOk()
-            ->assertSee('Back to Dashboard')
-            ->assertSee('href="'.url('/dispatch').'"', false);
+            ->assertSee('Close Preview')
+            ->assertSee('data-close-review-tab', false)
+            ->assertDontSee('/dispatch', false);
     }
 
     public function test_pic_authorization_preview_rejects_stale_handoff_after_revision_change(): void

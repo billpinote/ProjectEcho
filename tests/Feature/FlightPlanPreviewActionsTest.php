@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -278,6 +279,36 @@ class FlightPlanPreviewActionsTest extends TestCase
             ->assertOk()
             ->assertSee('href="'.url('/pilot').'"', false)
             ->assertSee('Back to Dashboard');
+    }
+
+    public function test_saved_preview_renders_collapsed_unified_flight_plan_activity(): void
+    {
+        $pilot = User::factory()->create([
+            'role' => UserRole::Pilot,
+            'is_active' => true,
+        ]);
+        $flight = Flight::create($this->previewFlightPlanData([
+            'filed_by_user_id' => $pilot->getKey(),
+            'pilot_id' => $pilot->getKey(),
+            'pilot_in_command_user_id' => $pilot->getKey(),
+        ]));
+
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, $pilot);
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_DELAYED, $pilot, ['eobt' => '14:30'], [
+            'eobt' => '15:30',
+            'original_eobt' => '14:30',
+        ]);
+
+        $this->actingAs($pilot)
+            ->get(route('flights.view', $flight))
+            ->assertOk()
+            ->assertSee('Flight Plan Activity · 2 events', false)
+            ->assertSee('Flight delayed')
+            ->assertSee('1430')
+            ->assertSee('1530')
+            ->assertSee('<details class="echo-preview-activity">', false)
+            ->assertDontSee('<details class="echo-preview-activity" open>', false)
+            ->assertDontSee('Delay history');
     }
 
     public function test_qr_image_download_returns_server_generated_png(): void

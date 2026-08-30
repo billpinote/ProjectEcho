@@ -18,6 +18,7 @@ use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -313,6 +314,10 @@ class FlightController extends Controller
 
         $this->deleteStoredFlightPlanPdfs($flight);
         $this->storeFlightPlanPdf($flight);
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_ATC_ACCEPTED, Auth::user(), null, [
+            'accepted_by_wiresign' => $flight->accepted_by_wiresign,
+            'received_facility' => $flight->received_facility,
+        ]);
 
         return redirect()
             ->route('flights.view', $flight)
@@ -345,6 +350,8 @@ class FlightController extends Controller
             'received_time' => null,
             'received_facility' => null,
         ])->save();
+
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_ATC_REJECTED, Auth::user(), null, null, $flight->rejection_reason);
 
         return redirect()
             ->route('flights.view', $flight)
