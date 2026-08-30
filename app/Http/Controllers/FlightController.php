@@ -492,9 +492,12 @@ class FlightController extends Controller
         abort_unless(FlightAccess::canAccessPicAuthorization(Auth::user(), $flight), 403);
 
         try {
-            app(PicAuthorizationService::class)->eligibleCredentials(Auth::user(), $flight);
+            app(PicAuthorizationService::class)->guardEligiblePic(Auth::user());
         } catch (ValidationException) {
-            abort(403);
+            return view('flightplan.pic-authorization-required', [
+                'backActionUrl' => $this->picAuthorizationScannerUrl(),
+                'backActionLabel' => 'BACK TO PIC AUTHORIZATION SCANNER',
+            ]);
         }
 
         $payload = app(FlightPlanQrPayloadService::class)->buildPayload($flight);

@@ -549,6 +549,17 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertDontSeeText('Authorize as PIC')
             ->assertDontSeeText('Decline Authorization');
 
+        $previewToken = array_key_last((array) session('scanned_flight_plan_previews'));
+
+        $this->get(route('flightplan.pic-authorization.preview', ['token' => $previewToken]))
+            ->assertOk()
+            ->assertSeeText('PIC Authorization Required')
+            ->assertSeeText('This flight plan can only be reviewed and acted on by a verified PPL, CPL, or ATPL holder authorized to act as PIC.')
+            ->assertSeeText('BACK TO PIC AUTHORIZATION SCANNER')
+            ->assertDontSee('FLIGHT PLAN', false)
+            ->assertDontSeeText('Authorize as PIC')
+            ->assertDontSeeText('Decline Flight Plan');
+
         try {
             app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer);
             $this->fail('An SPL holder was allowed to authorize.');
