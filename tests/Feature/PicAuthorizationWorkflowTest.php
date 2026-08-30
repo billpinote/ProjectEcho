@@ -13,6 +13,7 @@ use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Filament\Shared\Pages\ImportScanQr;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use App\Models\Operator;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -325,6 +326,33 @@ class PicAuthorizationWorkflowTest extends TestCase
         }
     }
 
+    public function test_spl_cannot_decline_and_flight_remains_awaiting_pic_authorization(): void
+    {
+        $operator = Operator::factory()->create();
+        $spl = $this->user(UserRole::Pilot, PilotLicenseType::StudentPilot->value, $operator);
+        $preparer = $this->user(UserRole::Dispatch, null, $operator);
+        $flight = $this->awaitingFlight($spl, [
+            'filed_by_user_id' => $preparer->id,
+            'prepared_by_user_id' => $preparer->id,
+            'operator_id' => $operator->id,
+        ]);
+
+        try {
+            app(PicAuthorizationService::class)->declineFromPayload($this->payload($flight), $spl, 'PIC details need correction.');
+            $this->fail('An SPL holder was allowed to decline PIC authorization.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Only verified PPL, CPL, or ATPL holders may authorize as PIC.', $exception->errors()['payload'][0]);
+        }
+
+        $flight->refresh();
+        $this->assertNull($flight->pic_authorization_status);
+        $this->assertNull($flight->pic_authorization_declined_by_user_id);
+        $this->assertNull($flight->pic_authorization_declined_at);
+        $this->assertNull($flight->pic_authorization_decline_reason);
+        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
+        $this->assertFalse($flight->events()->where('event_type', FlightPlanEvent::TYPE_PIC_DECLINED)->exists());
+    }
+
     public function test_consumed_pic_authorization_handoff_cannot_be_reused(): void
     {
         $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
@@ -353,7 +381,7 @@ class PicAuthorizationWorkflowTest extends TestCase
     public function test_decline_consumes_the_pic_authorization_handoff(): void
     {
         $operator = Operator::factory()->create();
-        $reviewer = $this->user(UserRole::Dispatch, null, $operator);
+        $reviewer = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value, $operator);
         $preparer = $this->user(UserRole::Dispatch, null, $operator);
         $flight = $this->awaitingFlight($reviewer, [
             'operator_id' => $operator->id,
@@ -514,6 +542,13 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->assertTrue(FlightAccess::canAccessPicAuthorization($authorizer, $flight));
 
+        Livewire::actingAs($authorizer)
+            ->test(ScanAuthorizationQr::class)
+            ->set('payload', $this->payload($flight))
+            ->assertSeeText('PIC Authorization Required')
+            ->assertDontSeeText('Authorize as PIC')
+            ->assertDontSeeText('Decline Authorization');
+
         try {
             app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer);
             $this->fail('An SPL holder was allowed to authorize.');
@@ -615,10 +650,10 @@ class PicAuthorizationWorkflowTest extends TestCase
         app(PicAuthorizationService::class)->authorizeFromPayload($payload, $authorizer);
     }
 
-    public function test_decline_records_audit_state_without_deleting_the_flight(): void
+    public function test_eligible_pilot_can_decline_and_records_audit_state_without_deleting_the_flight(): void
     {
         $operator = Operator::factory()->create();
-        $reviewer = $this->user(UserRole::Dispatch, null, $operator);
+        $reviewer = $this->user(UserRole::Pilot, PilotLicenseType::PrivatePilot->value, $operator);
         $preparer = $this->user(UserRole::Dispatch, null, $operator);
         $flight = $this->awaitingFlight($reviewer, [
             'prepared_by_user_id' => $preparer->id,

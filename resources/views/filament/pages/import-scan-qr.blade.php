@@ -497,12 +497,12 @@
                                 </button>
                             @else
                                 <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #718096; border-radius: 0.75rem; background: #edf2f7;">
-                                    <strong>Awaiting PIC Authorization</strong>
-                                    <p style="margin: 0.4rem 0 0;">This flight plan requires authorization from a verified PPL, CPL, or ATPL holder. You may review the flight plan, but you cannot authorize it.</p>
+                                    <strong>PIC Authorization Required</strong>
+                                    <p style="margin: 0.4rem 0 0;">You may review this flight plan, but only a verified PPL, CPL, or ATPL holder may approve or decline it as PIC.</p>
                                 </div>
                             @endif
 
-                            @if(! $this->isPicAuthorizationPreparer() && ! $this->isPicAuthorizationDeclined())
+                            @if($this->canAuthorizeMatchedFlight() && ! $this->isPicAuthorizationDeclined())
                                 <button
                                     type="button"
                                     class="echo-button echo-button-secondary echo-decline-flight-trigger"

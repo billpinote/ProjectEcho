@@ -140,6 +140,7 @@ class PicAuthorizationService
         }
 
         $this->guardPicAccess($flight, $user);
+        $this->eligibleCredentials($user, $flight);
 
         $declinedFlight = DB::transaction(function () use ($flight, $user, $reason, $token): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
@@ -166,11 +167,7 @@ class PicAuthorizationService
     /** @return array{pilot_name: ?string, license: ?string, ratings: ?string, license_expiry_date: ?string} */
     public function eligibleCredentials(User $user, Flight $flight): array
     {
-        $profile = $user->pilotProfile;
-
-        if ($profile === null || ! in_array($profile->license_type, self::ELIGIBLE_LICENSES, true)) {
-            throw ValidationException::withMessages(['payload' => 'Only verified PPL, CPL, or ATPL holders may authorize as PIC.']);
-        }
+        $this->guardEligiblePic($user);
 
         $credentials = PilotFlightPlanCredentials::forUser($user, $flight->date_of_flight);
 
@@ -179,6 +176,15 @@ class PicAuthorizationService
         }
 
         return $credentials;
+    }
+
+    public function guardEligiblePic(User $user): void
+    {
+        $profile = $user->pilotProfile;
+
+        if ($profile === null || ! in_array($profile->license_type, self::ELIGIBLE_LICENSES, true)) {
+            throw ValidationException::withMessages(['payload' => 'Only verified PPL, CPL, or ATPL holders may authorize as PIC.']);
+        }
     }
 
     public function resolveAccessibleFlightFromPayload(string $payload, User $user): Flight
