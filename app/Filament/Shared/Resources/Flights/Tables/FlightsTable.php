@@ -24,6 +24,7 @@ use App\Filament\Shared\Resources\Reports\AbbreviatedFlightReportResource;
 use App\Filament\Shared\Resources\Reports\ActiveFlightDataResource;
 use App\Filament\Shared\Resources\Reports\PostOpsLogResource;
 use App\Models\Flight;
+use App\Models\FlightManifest;
 use App\Models\FlightPlanEvent;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -981,7 +982,7 @@ class FlightsTable
                     ->recordUrl(fn (Flight $record): string => route('flights.view', $record))
                     ->openRecordUrlInNewTab()
             )
-            ->modifyQueryUsing(fn (Builder $query): Builder => self::applyDefaultOrdering($query, $resourceClass, $isOperationalFlightTable))
+            ->modifyQueryUsing(fn (Builder $query): Builder => self::applyDefaultOrdering($query->with('manifest'), $resourceClass, $isOperationalFlightTable))
             ->recordClasses(fn (Flight $record): array => self::matchesResource($resourceClass, FlightResource::class) && $record->reviewed_at === null
                 ? ['echo-new-flight-row']
                 : [])
@@ -1120,6 +1121,14 @@ class FlightsTable
     private static function recordActions(?string $resourceClass): array
     {
         $actions = [
+            Action::make('manifest')
+                ->label('Flight Manifest')
+                ->icon('heroicon-o-clipboard-document-list')
+                ->iconButton()
+                ->tooltip('Prepare or view flight manifest')
+                ->url(fn (Flight $record): string => route('flights.manifest.edit', $record))
+                ->visible(fn (Flight $record): bool => (Auth::user()?->can('create', [FlightManifest::class, $record]) ?? false)
+                    || ($record->manifest !== null && (Auth::user()?->can('view', $record->manifest) ?? false))),
             Action::make('qr')
                 ->label('QR Code')
                 ->icon('heroicon-o-qr-code')

@@ -17,6 +17,7 @@ use App\Models\UserKycDocument;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -58,6 +59,8 @@ class PilotProfilePageTest extends TestCase
 
     public function test_pilot_sees_their_own_profile_information(): void
     {
+        $this->travelTo(Carbon::parse('2026-08-09 08:00:00', 'Asia/Manila'));
+
         $pilot = $this->pilot([
             'first_name' => 'Bill',
             'middle_name' => 'Q',

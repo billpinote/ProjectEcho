@@ -305,26 +305,10 @@ class FlightController extends Controller
                 ->with('review_status', $flight->expiration_reason ?? 'Flight plan expired because the date of flight has passed.');
         }
 
-        $nowUtc = now('UTC');
-
-        $flight->forceFill([
-            'status' => FlightPlanStatus::Accepted,
-            'accepted_by_user_id' => Auth::id(),
-            'accepted_by_wiresign' => $this->resolveAtcWiresign(),
-            'rejected_by_wiresign' => null,
-            'rejection_reason' => null,
-            'received_by' => $this->resolveAtcWiresign(),
-            'received_date' => $nowUtc->toDateString(),
-            'received_time' => $nowUtc->format('H:i'),
-            'received_facility' => (string) (Auth::user()?->station ?? ''),
-        ])->save();
+        $flight = app(FlightPlanMutationService::class)->accept($flight, Auth::user(), $this->resolveAtcWiresign());
 
         $this->deleteStoredFlightPlanPdfs($flight);
         $this->storeFlightPlanPdf($flight);
-        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_ATC_ACCEPTED, Auth::user(), null, [
-            'accepted_by_wiresign' => $flight->accepted_by_wiresign,
-            'received_facility' => $flight->received_facility,
-        ]);
 
         return redirect()
             ->route('flights.view', $flight)

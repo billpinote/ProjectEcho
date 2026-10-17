@@ -225,6 +225,9 @@
         </section>
 
         <div class="qr-actions" aria-label="QR actions">
+            @if(auth()->user()?->can('create', [\App\Models\FlightManifest::class, $flight]) || ($flight->manifest && auth()->user()?->can('view', $flight->manifest)))
+                <a class="qr-download qr-download-secondary" href="{{ route('flights.manifest.edit', $flight) }}">Flight manifest</a>
+            @endif
             <a class="qr-download" href="{{ $qrImageDownloadUrl }}">Save QR to Device</a>
             <button
                 id="qr-share-button"

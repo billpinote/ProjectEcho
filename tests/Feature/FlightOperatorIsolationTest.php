@@ -127,7 +127,7 @@ class FlightOperatorIsolationTest extends TestCase
         $this->actingAs($dispatch);
 
         try {
-            (new ListAcceptedFlights())->confirmStartUpNow($alphaFlight->id);
+            (new ListAcceptedFlights)->confirmStartUpNow($alphaFlight->id);
             $this->fail('Expected cross-operator start-up update to be denied.');
         } catch (HttpException $exception) {
             $this->assertSame(403, $exception->getStatusCode());
@@ -153,7 +153,7 @@ class FlightOperatorIsolationTest extends TestCase
         $this->assertSame(FlightPlanStatus::Pending, $pendingFlight->refresh()->status);
     }
 
-    public function test_authorized_atmo_admin_and_artisan_access_still_works(): void
+    public function test_authorized_atmo_admin_and_artisan_can_view_and_operate_but_not_edit_accepted_filings(): void
     {
         [, $alpha] = $this->operators();
         $flight = $this->flight($alpha, ['status' => FlightPlanStatus::Accepted]);
@@ -166,7 +166,9 @@ class FlightOperatorIsolationTest extends TestCase
             $user = $this->user($role, $attributes);
 
             $this->assertTrue($user->can('view', $flight));
-            $this->assertTrue($user->can('update', $flight));
+            $this->assertFalse($user->can('update', $flight));
+            $this->assertFalse($user->can('delete', $flight));
+            $this->assertTrue($user->can('updateStartUpTime', $flight));
         }
     }
 

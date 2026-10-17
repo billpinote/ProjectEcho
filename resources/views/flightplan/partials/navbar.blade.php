@@ -14,9 +14,9 @@
         [
             'key' => 'manifest',
             'label' => 'Manifest',
-            'href' => null,
+            'href' => route('manifests.index'),
             'icon' => 'clipboard',
-            'disabled' => true,
+            'disabled' => false,
         ],
         [
             'key' => 'scan-upload-qr',

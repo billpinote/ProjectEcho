@@ -13,8 +13,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 class Flight extends Model
 {
@@ -178,7 +180,39 @@ class Flight extends Model
     {
         static::saving(function (self $flight): void {
             $flight->normalizeMinutePrecisionTimes();
+            if ($flight->exists && $flight->hasBeenAccepted()) {
+                $operationalFields = [
+                    'status', 'updated_at', 'reviewed_at', 'revised_eobt',
+                    'cancelled_at', 'cancelled_by_user_id',
+                    'time_start_up', 'time_shutdown', 'time_block_off',
+                    'time_block_on', 'time_airborne', 'time_touchdown',
+                ];
+                if (array_diff(array_keys($flight->getDirty()), $operationalFields) !== []) {
+                    throw ValidationException::withMessages(['flight' => 'Accepted flight-plan contents are read-only. Create a new flight plan for changes.']);
+                }
+            }
         });
+        static::deleting(function (self $flight): void {
+            if ($flight->hasBeenAccepted()) {
+                throw ValidationException::withMessages(['flight' => 'Accepted filings must be preserved.']);
+            }
+        });
+    }
+
+    public function manifest(): HasOne
+    {
+        return $this->hasOne(FlightManifest::class);
+    }
+
+    public function hasBeenAccepted(): bool
+    {
+        $persisted = $this->exists ? static::query()->find($this->getKey()) : $this;
+
+        return $persisted !== null && (
+            $persisted->accepted_by_user_id !== null
+            || in_array($persisted->status, [FlightPlanStatus::Accepted, FlightPlanStatus::Active, FlightPlanStatus::Completed], true)
+            || ($persisted->exists && $persisted->events()->where('event_type', FlightPlanEvent::TYPE_ATC_ACCEPTED)->exists())
+        );
     }
 
     public function acceptedBy(): BelongsTo

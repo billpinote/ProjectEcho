@@ -74,7 +74,7 @@ class FlightResource extends Resource
 
     public static function canDelete($record): bool
     {
-        return Auth::user()?->canDeleteFlightPlans() ?? false;
+        return Auth::user()?->can('delete', $record) ?? false;
     }
 
     protected static function getFlightPlanBaseQuery(): Builder

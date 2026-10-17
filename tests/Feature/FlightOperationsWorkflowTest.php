@@ -4,16 +4,17 @@ namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Atmo\Pages\ImportScanQr as AtmoImportScanQr;
+use App\Filament\Panels\Dispatch\Pages\ScanAuthorizationQr as DispatchScanAuthorizationQr;
+use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Filament\Shared\Resources\AcceptedFlights\Pages\ListAcceptedFlights;
 use App\Filament\Shared\Resources\ActiveFlights\Pages\ListActiveFlights;
 use App\Filament\Shared\Resources\AirborneFlights\Pages\ListAirborneFlights;
 use App\Filament\Shared\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Shared\Resources\LandedFlights\Pages\ListLandedFlights;
 use App\Filament\Shared\Widgets\AlphaFlightsTable;
-use App\Filament\Panels\Atmo\Pages\ImportScanQr as AtmoImportScanQr;
-use App\Filament\Panels\Dispatch\Pages\ScanAuthorizationQr as DispatchScanAuthorizationQr;
-use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Models\Flight;
+use App\Models\FlightManifest;
 use App\Models\Operator;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -279,6 +280,7 @@ class FlightOperationsWorkflowTest extends TestCase
         $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS', 'wiresign' => 'AT']);
 
         $acceptedFlight = $this->flight(['status' => FlightPlanStatus::Pending]);
+        $this->completeManifestFor($acceptedFlight);
 
         $this->actingAs($atmo)
             ->post(route('flights.accept', $acceptedFlight))
@@ -336,6 +338,7 @@ class FlightOperationsWorkflowTest extends TestCase
             'operator_id' => $operator->id,
         ]);
 
+        $this->completeManifestFor($flight);
         $this->actingAs($atmo)
             ->post(route('flights.accept', $flight))
             ->assertRedirect(route('flights.view', $flight));
@@ -392,6 +395,22 @@ class FlightOperationsWorkflowTest extends TestCase
             'role' => $role,
             'is_active' => true,
             ...$attributes,
+        ]);
+    }
+
+    private function completeManifestFor(Flight $flight): void
+    {
+        $flight->update([
+            'type_of_aircraft' => 'C172',
+            'pilot_in_command' => 'Test Pilot',
+            'pilot_license_no' => 'PPL-12345',
+            'license_expiry_date' => now()->addYear()->toDateString(),
+            'persons_on_board' => 1,
+        ]);
+        $manifest = FlightManifest::factory()->for($flight)->create();
+        $manifest->persons()->create([
+            'sequence_number' => 1, 'full_name' => 'Test Pilot',
+            'nationality' => 'Filipino', 'classification' => 'pic',
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Models\Flight;
 use App\Models\User;
@@ -39,6 +40,7 @@ class FlightPolicy
     {
         return $user->is_active
             && $user->hasFullFlightAccess()
+            && ! $flight->hasBeenAccepted()
             && $flight->pic_authorization_status !== 'declined';
     }
 
@@ -47,7 +49,7 @@ class FlightPolicy
      */
     public function delete(User $user, Flight $flight): bool
     {
-        return $user->hasFullFlightAccess();
+        return $user->hasFullFlightAccess() && ! $flight->hasBeenAccepted();
     }
 
     /**
@@ -63,7 +65,7 @@ class FlightPolicy
      */
     public function forceDelete(User $user, Flight $flight): bool
     {
-        return $user->hasFullFlightAccess();
+        return $this->delete($user, $flight);
     }
 
     /**
@@ -72,6 +74,8 @@ class FlightPolicy
     public function accept(User $user, Flight $flight): bool
     {
         return $user->canReviewFlightPlans()
+            && $flight->status === FlightPlanStatus::Pending
+            && ! $flight->hasBeenAccepted()
             && $flight->canSubmitToAtc()
             && FlightAccess::canView($user, $flight);
     }
@@ -82,6 +86,7 @@ class FlightPolicy
     public function reject(User $user, Flight $flight): bool
     {
         return $user->canReviewFlightPlans()
+            && ! $flight->hasBeenAccepted()
             && $flight->canSubmitToAtc()
             && FlightAccess::canView($user, $flight);
     }

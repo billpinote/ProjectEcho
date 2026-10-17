@@ -526,6 +526,9 @@
         @endif
         @if(!(($showPreviewActions ?? true)))
             <div style="width: 794px; margin: 0 auto 10px;">
+                @error('manifest')
+                    <p role="alert">{{ $message }}</p>
+                @enderror
                 @if(session('review_status'))
                     <div
                         id="review-status-banner"

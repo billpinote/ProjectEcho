@@ -1,4 +1,5 @@
 import './bootstrap';
+import './manifest';
 import { Html5Qrcode } from 'html5-qrcode';
 import './qr-image-decoder';
 

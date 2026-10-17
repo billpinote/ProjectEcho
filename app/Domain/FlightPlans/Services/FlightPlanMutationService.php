@@ -3,16 +3,48 @@
 namespace App\Domain\FlightPlans\Services;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Models\Flight;
 use App\Models\FlightPlanEvent;
 use App\Models\User;
-use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class FlightPlanMutationService
 {
+    public function accept(Flight $flight, User $actor, string $wiresign): Flight
+    {
+        return DB::transaction(function () use ($flight, $actor, $wiresign): Flight {
+            $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
+            if (! $actor->can('accept', $flight)) {
+                throw new AuthorizationException;
+            }
+            if ($flight->isPendingExpired()) {
+                throw ValidationException::withMessages(['flight' => 'This flight plan has expired.']);
+            }
+            app(FlightManifestService::class)->assertComplete($flight);
+            $nowUtc = now('UTC');
+            $flight->forceFill([
+                'status' => FlightPlanStatus::Accepted,
+                'accepted_by_user_id' => $actor->getKey(),
+                'accepted_by_wiresign' => $wiresign,
+                'rejected_by_wiresign' => null,
+                'rejection_reason' => null,
+                'received_by' => $wiresign,
+                'received_date' => $nowUtc->toDateString(),
+                'received_time' => $nowUtc->format('H:i'),
+                'received_facility' => (string) $actor->station,
+            ])->save();
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_ATC_ACCEPTED, $actor, null, [
+                'accepted_by_wiresign' => $wiresign,
+                'received_facility' => $flight->received_facility,
+            ]);
+
+            return $flight;
+        });
+    }
+
     public function recordSubmission(Flight $flight, ?User $actor = null): void
     {
         FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, $actor, null, [
@@ -67,9 +99,9 @@ class FlightPlanMutationService
             ])->save();
 
             FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_DELAYED, $actor, ['eobt' => $oldTime], [
-                    'eobt' => $flight->revised_eobt,
-                    'original_eobt' => $flight->proposed_time,
-                ]);
+                'eobt' => $flight->revised_eobt,
+                'original_eobt' => $flight->proposed_time,
+            ]);
 
             return $flight;
         });

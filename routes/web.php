@@ -1,11 +1,18 @@
 <?php
 
 use App\Http\Controllers\FlightController;
+use App\Http\Controllers\FlightManifestController;
 use App\Http\Controllers\ProfileUpdateRequests\ProfileDocumentController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'access-gateway')->name('gateway');
 Route::view('/signed-out', 'signed-out')->name('signed-out');
+
+Route::get('/manifest', [FlightManifestController::class, 'index'])->name('manifests.index');
+Route::get('/flights/{flight}/manifest', [FlightManifestController::class, 'edit'])
+    ->middleware('auth')->name('flights.manifest.edit');
+Route::put('/flights/{flight}/manifest', [FlightManifestController::class, 'update'])
+    ->middleware(['auth', 'throttle:60,1'])->name('flights.manifest.update');
 
 Route::get('/flightplan', [FlightController::class, 'flightplan'])->name('flightplan');
 Route::post('/flightplan', [FlightController::class, 'store'])->name('flightplan.store');
