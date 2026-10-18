@@ -39,6 +39,8 @@
                 <x-filament::button
                     tag="a"
                     :href="$flight['action_url']"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     color="gray"
                     size="sm"
                 >

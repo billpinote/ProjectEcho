@@ -3,15 +3,17 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Panels\Pilot\Pages\Dashboard;
+use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
 use App\Filament\Panels\Pilot\Pages\EditMyProfilePage;
 use App\Filament\Panels\Pilot\Pages\HelpPage;
+use App\Filament\Panels\Pilot\Pages\ListFlightManifests;
 use App\Filament\Panels\Pilot\Pages\MyProfilePage;
 use App\Filament\Panels\Pilot\Pages\PreferencesPage;
-use App\Filament\Panels\Pilot\Pages\SecurityPage;
 use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
+use App\Filament\Panels\Pilot\Pages\SecurityPage;
+use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\Pages\CreateFlight;
-use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
@@ -35,6 +37,8 @@ class PilotPanelProvider extends PanelProvider
     {
         return $this->configureEchoPanel($panel, 'pilot', 'pilot')
             ->pages([
+                EditFlightManifest::class,
+                ListFlightManifests::class,
                 Dashboard::class,
                 MyProfilePage::class,
                 EditMyProfilePage::class,
@@ -88,6 +92,11 @@ class PilotPanelProvider extends PanelProvider
                             ->sort(10)
                             ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.pilot.resources.flights.create'))
                             ->url(fn (): string => CreateFlight::getUrl()),
+                        NavigationItem::make('Flight Manifests')
+                            ->icon(Heroicon::OutlinedClipboardDocumentList)
+                            ->sort(11)
+                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.pilot.pages.manifests', 'filament.pilot.pages.flights.*'))
+                            ->url(fn (): string => ListFlightManifests::getUrl(panel: 'pilot')),
                     ])
                     ->group('My Flight Plans', [
                         NavigationItem::make('Current')

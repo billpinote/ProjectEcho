@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\FlightPlans\Support\FlightManifestData;
+use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
+use App\Filament\Panels\Pilot\Pages\ListFlightManifests;
 use App\Http\Requests\SaveFlightManifestRequest;
 use App\Models\Flight;
 use App\Models\FlightManifest;
@@ -17,11 +19,19 @@ class FlightManifestController extends Controller
 {
     public function __construct(private FlightManifestService $manifests, private FlightManifestData $data) {}
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
         $user = $request->user();
         if ($user !== null) {
             abort_unless($user->canViewFlightPlans(), 403);
+        }
+
+        if ($user?->isPilot()) {
+            return redirect(ListFlightManifests::getUrl(panel: 'pilot'));
+        }
+
+        if ($user?->isDispatch() || $user?->isOperatorStaff()) {
+            return redirect(\App\Filament\Panels\Dispatch\Pages\ListFlightManifests::getUrl(panel: 'dispatch'));
         }
 
         return view('flightplan.manifest-index', [
@@ -30,7 +40,22 @@ class FlightManifestController extends Controller
         ]);
     }
 
-    public function edit(Request $request, Flight $flight): View
+    public function edit(Request $request, Flight $flight): View|RedirectResponse
+    {
+        $data = $this->formData($request, $flight);
+        if ($request->user()->isPilot()) {
+            return redirect(EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot'));
+        }
+
+        if ($request->user()->isDispatch() || $request->user()->isOperatorStaff()) {
+            return redirect(\App\Filament\Panels\Dispatch\Pages\EditFlightManifest::getUrl(['flight' => $flight], panel: 'dispatch'));
+        }
+
+        return view('flightplan.manifest', $data);
+    }
+
+    /** @return array<string, mixed> */
+    public function formData(Request $request, Flight $flight): array
     {
         $manifest = $flight->manifest()->with('persons')->first();
         Gate::authorize($manifest === null ? 'create' : 'view', $manifest ?? [FlightManifest::class, $flight]);
@@ -51,17 +76,25 @@ class FlightManifestController extends Controller
             }
         }
 
-        return view('flightplan.manifest', [
+        return [
             'flight' => $flight, 'manifest' => $manifest, 'editable' => $editable,
             'values' => $values, 'flightData' => $this->data->fromFlight($flight),
             'complete' => $complete, 'completionMessage' => $completionMessage,
-        ]);
+        ];
     }
 
     public function update(SaveFlightManifestRequest $request, Flight $flight): RedirectResponse
     {
         $this->manifests->save($flight, $request->user(), $request->validated());
 
-        return to_route('flights.manifest.edit', $flight)->with('status', 'Manifest saved.');
+        $url = $request->user()->isPilot()
+            ? EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot')
+            : route('flights.manifest.edit', $flight);
+
+        if ($request->user()->isDispatch() || $request->user()->isOperatorStaff()) {
+            $url = \App\Filament\Panels\Dispatch\Pages\EditFlightManifest::getUrl(['flight' => $flight], panel: 'dispatch');
+        }
+
+        return redirect($url)->with('status', 'Manifest saved.');
     }
 }

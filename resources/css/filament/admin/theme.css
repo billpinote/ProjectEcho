@@ -4,6 +4,8 @@
 
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
+@source '../../../../resources/views/flightplan/partials/manifest-form.blade.php';
+@source '../../../../resources/views/components/manifest-person.blade.php';
 
 @layer base {
     :root {

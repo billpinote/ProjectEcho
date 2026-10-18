@@ -19,6 +19,20 @@ class OperatorStaffSupportTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_dispatch_and_operator_staff_have_creation_and_manifest_sidebar_links(): void
+    {
+        foreach ([UserRole::Dispatch, UserRole::OperatorStaff] as $role) {
+            $user = $this->user($role);
+            $this->actingAs($user)->get('/dispatch')->assertOk()
+                ->assertSeeInOrder(['Dashboard', 'Create Flight Plan', 'Flight Manifests'])
+                ->assertSee(route('filament.dispatch.resources.flights.create'), false)
+                ->assertSee(route('filament.dispatch.pages.manifests'), false);
+            $this->get(route('filament.dispatch.resources.flights.create'))->assertOk();
+            $this->get(route('filament.dispatch.pages.manifests'))->assertOk()
+                ->assertSee('fi-sidebar', false)->assertSeeText('Flight Manifests');
+        }
+    }
+
     public function test_operator_staff_role_normalizes_and_labels_correctly(): void
     {
         $this->assertSame(UserRole::OperatorStaff, UserRole::normalize('operator_staff'));

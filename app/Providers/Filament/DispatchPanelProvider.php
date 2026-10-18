@@ -2,13 +2,15 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Panels\Dispatch\Pages\EditFlightManifest;
+use App\Filament\Panels\Dispatch\Pages\ListFlightManifests;
+use App\Filament\Panels\Dispatch\Pages\ScanAuthorizationQr;
 use App\Filament\Panels\Dispatch\Resources\AcceptedFlights\AcceptedFlightResource;
-use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Dispatch\Resources\ActiveFlights\ActiveFlightResource;
+use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Dispatch\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Panels\Dispatch\Resources\Flights\FlightResource;
 use App\Filament\Panels\Dispatch\Resources\LandedFlights\LandedFlightResource;
-use App\Filament\Panels\Dispatch\Pages\ScanAuthorizationQr;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
 use Filament\Navigation\NavigationBuilder;
 use Filament\Navigation\NavigationItem;
@@ -30,6 +32,8 @@ class DispatchPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
                 ScanAuthorizationQr::class,
+                ListFlightManifests::class,
+                EditFlightManifest::class,
             ])
             ->resources([
                 FlightResource::class,
@@ -47,14 +51,19 @@ class DispatchPanelProvider extends PanelProvider
                             ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.dispatch.pages.dashboard'))
                             ->sort(-2)
                             ->url(fn (): string => Dashboard::getUrl(panel: 'dispatch')),
-                    ])
-                    ->group('Flight Operations', [
                         NavigationItem::make('Create Flight Plan')
                             ->icon(Heroicon::OutlinedPlusCircle)
                             ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.dispatch.resources.flights.create'))
                             ->sort(0)
                             ->url(fn (): string => FlightResource::getUrl('create', panel: 'dispatch'))
-                            ->visible(fn (): bool => auth()->user()?->isOperatorStaff() ?? false),
+                            ->visible(fn (): bool => auth()->user()?->canCreateFlightPlans() ?? false),
+                        NavigationItem::make('Flight Manifests')
+                            ->icon(Heroicon::OutlinedClipboardDocumentList)
+                            ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.dispatch.pages.manifests', 'filament.dispatch.pages.flights.*'))
+                            ->sort(1)
+                            ->url(fn (): string => ListFlightManifests::getUrl(panel: 'dispatch')),
+                    ])
+                    ->group('Flight Operations', [
                         self::dispatchResourceNavigationItem(AcceptedFlightResource::class, 'filament.dispatch.resources.accepted-flights.*'),
                         self::dispatchResourceNavigationItem(ActiveFlightResource::class, 'filament.dispatch.resources.active-flights.*'),
                         self::dispatchResourceNavigationItem(LandedFlightResource::class, 'filament.dispatch.resources.landed-flights.*'),

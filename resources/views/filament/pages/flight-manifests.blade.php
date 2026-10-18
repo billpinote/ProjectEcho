@@ -1,0 +1,1 @@
+<x-filament-panels::page><div class="flex flex-col gap-6">@include('flightplan.partials.manifest-index')</div></x-filament-panels::page>
