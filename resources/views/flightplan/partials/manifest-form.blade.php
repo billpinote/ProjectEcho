@@ -6,6 +6,16 @@
         </div>
         <a href="{{ route('flights.view', $flight) }}" target="_blank" rel="noopener noreferrer" class="rounded-lg border border-echo-border bg-echo-card px-4 py-3 text-sm font-semibold">View flight plan</a>
     </header>
+    <nav aria-label="Manifest PDF actions" class="flex flex-wrap gap-4 text-sm font-semibold text-echo-primary">
+        @if($manifest)
+            <a href="{{ route('flights.manifest.pdf', ['flight' => $flight, 'download' => 1]) }}">Download PDF</a>
+            <a href="{{ route('flights.manifest.pdf', $flight) }}" target="_blank" rel="noopener">View / Print PDF</a>
+        @endif
+        <a href="{{ route('manifests.blank') }}">Download blank CAAP manifest</a>
+    </nav>
+    @if($editable && $manifest)
+        <p class="text-sm text-echo-text-secondary">PDF actions use saved manifest details. Save any edits before downloading.</p>
+    @endif
     @if(session('status'))
         <p role="status" class="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-900">{{ session('status') }}</p>
     @endif

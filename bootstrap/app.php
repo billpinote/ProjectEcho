@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\LimitGuestManifestRequest;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -11,6 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->prepend(LimitGuestManifestRequest::class);
         $middleware->redirectGuestsTo(fn (): string => route('gateway'));
     })
     ->withExceptions(function (Exceptions $exceptions) {

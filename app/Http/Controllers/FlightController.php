@@ -206,12 +206,17 @@ class FlightController extends Controller
         }
 
         $backActionUrl = $this->roleAwarePanelUrl();
+        $flight->loadMissing('manifest');
 
         return view('flightplan.pdf', [
             'flight' => $flight,
             'qrCodeBase64' => $this->generateFlightPlanQrCodeBase64($flight),
             'isPreview' => true,
             'showPreviewActions' => false,
+            'manifestReviewUrl' => $flight->manifest !== null && Auth::user()->can('view', $flight->manifest)
+                ? route('flights.manifest.pdf', $flight)
+                : null,
+            'manifestReviewUnavailableReason' => $flight->manifest === null ? 'Manifest missing' : 'Manifest unavailable',
             'showReviewActions' => Auth::user()?->canReviewFlightPlans()
                 && $flight->status === FlightPlanStatus::Pending
                 && ! $flight->isPendingExpired(),

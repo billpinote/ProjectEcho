@@ -44,6 +44,81 @@ class FlightManifestTest extends TestCase
         $this->assertSame($flight->pilot_in_command, $manifest->persons->first()->full_name);
     }
 
+    #[DataProvider('atmoMutations')]
+    public function test_atmo_cannot_mutate_manifests_through_the_shared_service(string $operation): void
+    {
+        $flight = Flight::factory()->create();
+        $atmo = $this->atmo();
+        $manifest = $operation === 'create' ? null : $this->completeManifest($flight);
+        if ($operation === 'reorder_persons') {
+            $manifest = app(FlightManifestService::class)->save($flight, $flight->filedBy, ['persons' => [
+                ['full_name' => $flight->pilot_in_command, 'classification' => 'pic'],
+                ['full_name' => 'Existing crew', 'classification' => 'crew'],
+            ]]);
+        }
+        $before = $manifest?->fresh()->getAttributes();
+        $persons = $manifest?->persons->toArray();
+        $service = app(FlightManifestService::class);
+        $this->assertFalse($atmo->can('create', [FlightManifest::class, $flight]));
+        if ($manifest !== null) {
+            $this->assertTrue($atmo->can('view', $manifest));
+            $this->assertFalse($atmo->can('update', $manifest));
+            $this->assertFalse($atmo->can('delete', $manifest));
+        }
+        try {
+            match ($operation) {
+                'delete' => $service->delete($flight, $atmo),
+                'remove_persons' => $service->save($flight, $atmo, ['persons' => []]),
+                'replace_persons' => $service->save($flight, $atmo, ['persons' => [['full_name' => 'Replacement', 'classification' => 'pic']]]),
+                'add_person' => $service->save($flight, $atmo, ['persons' => [
+                    ...$manifest->persons->map->only(['full_name', 'nationality', 'classification'])->all(),
+                    ['full_name' => 'Added crew', 'classification' => 'crew'],
+                ]]),
+                'reorder_persons' => $service->save($flight, $atmo, ['persons' => array_reverse($manifest->persons->map->only(['full_name', 'nationality', 'classification'])->all())]),
+                default => $service->save($flight, $atmo, ['remarks' => 'Not permitted']),
+            };
+            $this->fail('ATMO manifest mutation was permitted.');
+        } catch (AuthorizationException) {
+            $this->assertSame($before, $manifest?->fresh()->getAttributes());
+            $this->assertSame($persons, $manifest?->fresh()->persons->toArray());
+            $this->assertDatabaseCount('flight_manifests', $manifest === null ? 0 : 1);
+        }
+    }
+
+    public static function atmoMutations(): array
+    {
+        return array_map(fn (string $operation): array => [$operation], ['create', 'update', 'delete', 'remove_persons', 'replace_persons', 'add_person', 'reorder_persons']);
+    }
+
+    public function test_existing_administrative_manifest_permissions_remain_subject_to_acceptance_lock(): void
+    {
+        $flight = Flight::factory()->create();
+        $manifest = $this->completeManifest($flight);
+        foreach ([UserRole::Admin, UserRole::Artisan] as $role) {
+            $user = User::factory()->create(['role' => $role]);
+            $this->assertTrue($user->can('create', [FlightManifest::class, $flight]));
+            $this->assertTrue($user->can('update', $manifest));
+            $this->assertTrue($user->can('delete', $manifest));
+        }
+        app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
+        foreach ([UserRole::Admin, UserRole::Artisan] as $role) {
+            $user = User::factory()->create(['role' => $role]);
+            $this->assertFalse($user->can('update', $manifest->fresh()));
+            $this->assertFalse($user->can('delete', $manifest->fresh()));
+        }
+    }
+
+    public function test_operator_staff_can_review_but_cannot_manage_manifests(): void
+    {
+        $staff = User::factory()->create(['role' => UserRole::OperatorStaff]);
+        $flight = Flight::factory()->create(['prepared_by_user_id' => $staff->id]);
+        $manifest = $this->completeManifest($flight);
+        $this->assertTrue($staff->can('view', $manifest));
+        $this->assertFalse($staff->can('create', [FlightManifest::class, $flight]));
+        $this->assertFalse($staff->can('update', $manifest));
+        $this->assertFalse($staff->can('delete', $manifest));
+    }
+
     public function test_one_manifest_per_flight_is_a_database_constraint(): void
     {
         $manifest = FlightManifest::factory()->create();

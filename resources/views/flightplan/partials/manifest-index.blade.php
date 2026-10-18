@@ -14,10 +14,12 @@
     @guest
         <section class="rounded-xl border border-echo-border bg-echo-card p-6">
             <h2 class="text-xl font-semibold">Sign in to prepare a manifest</h2>
-            <p class="mt-2 text-sm text-echo-text-secondary">Saved manifests must be linked to your Echo flight plan. Guest manifest preparation is not available yet.</p>
+            <p class="mt-2 text-sm text-echo-text-secondary">Saved manifests must be linked to your Echo flight plan. You can also prepare a guest PDF without saving a manifest.</p>
+            <a href="{{ route('manifests.guest') }}" class="mt-5 inline-block text-sm font-semibold text-echo-primary">Prepare guest manifest PDF</a>
             <a href="{{ route('gateway') }}" class="mt-5 inline-block rounded-lg bg-echo-primary px-4 py-3 text-sm font-semibold text-white">Sign in</a>
         </section>
     @else
+        <a href="{{ route('manifests.blank') }}" class="text-sm font-semibold text-echo-primary">Download blank CAAP manifest</a>
         <div class="flex flex-col gap-3">
             @forelse($flights as $flight)
                 @php

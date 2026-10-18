@@ -151,13 +151,50 @@ class FlightManifestPageTest extends TestCase
         $this->actingAs($flight->filedBy)->get(EditFlightManifest::getUrl(['flight' => 999999], panel: 'pilot'))->assertNotFound();
     }
 
-    public function test_staff_can_still_view_existing_manifest_outside_pilot_panel(): void
+    public function test_other_staff_can_still_view_existing_manifest_outside_panels(): void
     {
         $flight = Flight::factory()->create();
         app(FlightManifestService::class)->save($flight, $flight->filedBy, $this->completeData($flight));
-        $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
-        $this->actingAs($atmo)->get(route('flights.manifest.edit', $flight))
+        $staff = User::factory()->create(['role' => UserRole::Avsec]);
+        $this->actingAs($staff)->get(route('flights.manifest.edit', $flight))
             ->assertOk()->assertSeeText('Flight manifest')->assertDontSee('fi-sidebar', false);
+    }
+
+    public function test_atmo_has_no_manifest_management_routes_or_navigation(): void
+    {
+        $flight = Flight::factory()->create();
+        $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
+        $this->actingAs($atmo)->get('/atmo')->assertOk()->assertDontSeeText('Flight Manifests');
+        $this->get('/atmo/manifests')->assertNotFound();
+        $this->get('/atmo/flights/'.$flight->id.'/manifest')->assertNotFound();
+        $this->get(route('manifests.index'))->assertForbidden();
+        $this->get(EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot'))->assertForbidden();
+        $this->get(\App\Filament\Panels\Dispatch\Pages\EditFlightManifest::getUrl(['flight' => $flight], panel: 'dispatch'))->assertForbidden();
+        $this->assertDatabaseCount('flight_manifests', 0);
+    }
+
+    public function test_atmo_can_only_review_existing_manifests_as_authorized_pdfs(): void
+    {
+        $flight = Flight::factory()->create();
+        $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
+        $this->actingAs($atmo)->get(route('flights.manifest.edit', $flight))->assertNotFound();
+        $this->put(route('flights.manifest.update', $flight), $this->completeData($flight))->assertForbidden();
+        $manifest = app(FlightManifestService::class)->save($flight, $flight->filedBy, $this->completeData($flight));
+        $before = $manifest->fresh()->getAttributes();
+        $persons = $manifest->persons->toArray();
+        $this->get(route('flights.manifest.edit', $flight))->assertRedirect(route('flights.manifest.pdf', $flight));
+        $this->get(route('flights.manifest.pdf', $flight))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        foreach ([['remarks' => 'Changed'], ['persons' => []], ['persons' => [['full_name' => 'Replacement', 'nationality' => 'Other', 'classification' => 'pic']]], ['persons' => [...$persons, ['full_name' => 'Added', 'classification' => 'crew']]]] as $data) {
+            $this->put(route('flights.manifest.update', $flight), $data)->assertForbidden();
+        }
+        $this->delete(route('flights.manifest.edit', $flight))->assertStatus(405);
+        $this->assertSame($before, $manifest->fresh()->getAttributes());
+        $this->assertSame($persons, $manifest->fresh()->persons->toArray());
+        app(FlightPlanMutationService::class)->accept($flight, $atmo, 'AT');
+        $this->get(route('flights.manifest.pdf', $flight))->assertOk();
+        $this->put(route('flights.manifest.update', $flight), ['remarks' => 'Changed'])->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPLL']))
+            ->get(route('flights.manifest.pdf', $flight))->assertForbidden();
     }
 
     public function test_dispatch_manifest_urls_and_saving_stay_inside_dispatch_panel(): void
@@ -173,6 +210,12 @@ class FlightManifestPageTest extends TestCase
             $editUrl = \App\Filament\Panels\Dispatch\Pages\EditFlightManifest::getUrl(['flight' => $flight], panel: 'dispatch');
             $this->actingAs($user)->get(route('manifests.index'))->assertRedirect($listUrl);
             $this->get($listUrl)->assertOk()->assertSee('fi-sidebar', false)->assertSeeText($flight->aircraft_identification);
+            if ($role === UserRole::OperatorStaff) {
+                $this->get(route('flights.manifest.edit', $flight))->assertForbidden();
+                $this->put(route('flights.manifest.update', $flight), $this->completeData($flight))->assertForbidden();
+
+                continue;
+            }
             $this->get(route('flights.manifest.edit', $flight))->assertRedirect($editUrl);
             $this->get($editUrl)->assertOk()->assertSee('fi-sidebar', false)->assertSeeText('Save manifest');
             $this->put(route('flights.manifest.update', $flight), $this->completeData($flight))

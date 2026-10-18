@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\FlightPlans\Support\FlightManifestData;
+use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
 use App\Filament\Panels\Pilot\Pages\ListFlightManifests;
 use App\Http\Requests\SaveFlightManifestRequest;
@@ -34,6 +35,10 @@ class FlightManifestController extends Controller
             return redirect(\App\Filament\Panels\Dispatch\Pages\ListFlightManifests::getUrl(panel: 'dispatch'));
         }
 
+        if ($user?->role === UserRole::Atmo) {
+            abort(403);
+        }
+
         return view('flightplan.manifest-index', [
             'flights' => $user === null ? null : Flight::query()->visibleTo($user)
                 ->with('manifest')->orderByDesc('id')->paginate(20),
@@ -42,6 +47,12 @@ class FlightManifestController extends Controller
 
     public function edit(Request $request, Flight $flight): View|RedirectResponse
     {
+        if ($request->user()->role === UserRole::Atmo) {
+            $this->manifests->view($flight, $request->user());
+
+            return redirect()->route('flights.manifest.pdf', $flight);
+        }
+
         $data = $this->formData($request, $flight);
         if ($request->user()->isPilot()) {
             return redirect(EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot'));

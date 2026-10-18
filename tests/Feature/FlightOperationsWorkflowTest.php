@@ -139,7 +139,8 @@ class FlightOperationsWorkflowTest extends TestCase
             ->assertSeeText('Active Flights')
             ->assertSeeText('Landed Flights')
             ->assertSeeText('Completed Flights')
-            ->assertDontSeeText('Create Flight Plan')
+            ->assertSeeText('Create Flight Plan')
+            ->assertSeeText('Flight Manifests')
             ->assertDontSeeText('QR Import')
             ->assertDontSeeText('Pending Flight Plans')
             ->assertDontSeeText('Airborne Flights')
@@ -303,6 +304,53 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->assertSame(FlightPlanStatus::Rejected, $rejectedFlight->status);
         $this->assertSame('AT', $rejectedFlight->rejected_by_wiresign);
         $this->assertSame('Incomplete route', $rejectedFlight->rejection_reason);
+    }
+
+    public function test_atmo_preview_reviews_the_linked_manifest_in_a_separate_read_only_pdf_tab(): void
+    {
+        $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
+        $flight = $this->flight();
+        $otherFlight = $this->flight();
+        $this->completeManifestFor($flight);
+        $this->completeManifestFor($otherFlight);
+        $url = route('flights.manifest.pdf', $flight);
+        $response = $this->actingAs($atmo)->get(route('flights.view', $flight))->assertOk();
+        $this->assertTextContainsInOrder($response->getContent(), ['Close Review', 'Review Flight Manifest', 'Reject', 'Accept Flight Plan']);
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $links = (new \DOMXPath($document))->query('//a[contains(@class, "echo-review-manifest-action")]');
+        $this->assertSame(1, $links->length);
+        $link = $links->item(0);
+        $this->assertSame($url, $link->getAttribute('href'));
+        $this->assertSame('_blank', $link->getAttribute('target'));
+        $this->assertSame('noopener noreferrer', $link->getAttribute('rel'));
+        $response->assertDontSee(route('flights.manifest.pdf', $otherFlight), false);
+        $beforeFlight = $flight->fresh()->getAttributes();
+        $beforeManifest = $flight->manifest->getAttributes();
+        $pdf = $this->get($url)->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('inline;', $pdf->headers->get('Content-Disposition'));
+        $this->assertStringStartsWith('%PDF-', $pdf->getContent());
+        $this->assertSame($beforeFlight, $flight->fresh()->getAttributes());
+        $this->assertSame($beforeManifest, $flight->manifest->fresh()->getAttributes());
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Review Flight Manifest')->assertSee('data-open-review-modal="accept-flight-plan"', false);
+        $this->actingAs($this->user(UserRole::Pilot))->get($url)->assertForbidden();
+        $this->actingAs($this->user(UserRole::Atmo, ['station' => 'RPLL']))->get($url)->assertForbidden();
+    }
+
+    public function test_atmo_preview_disables_manifest_review_when_missing_and_acceptance_still_fails(): void
+    {
+        $flight = $this->flight();
+        $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
+        $response = $this->actingAs($atmo)->get(route('flights.view', $flight))->assertOk()
+            ->assertSeeText('Review Flight Manifest — Manifest missing')
+            ->assertDontSee(route('flights.manifest.pdf', $flight), false);
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $this->assertSame(1, (new \DOMXPath($document))->query('//button[contains(@class, "echo-review-manifest-action") and @disabled and @aria-disabled="true"]')->length);
+        $this->get(route('flights.manifest.pdf', $flight))->assertNotFound();
+        $this->from(route('flights.view', $flight))->post(route('flights.accept', $flight))->assertSessionHasErrors('manifest');
+        $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
+        $this->assertDatabaseCount('flight_manifests', 0);
     }
 
     public function test_unauthorized_roles_cannot_review_or_enter_atmo_times(): void

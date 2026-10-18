@@ -2,13 +2,27 @@
 
 use App\Http\Controllers\FlightController;
 use App\Http\Controllers\FlightManifestController;
+use App\Http\Controllers\ManifestPdfController;
 use App\Http\Controllers\ProfileUpdateRequests\ProfileDocumentController;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::view('/', 'access-gateway')->name('gateway');
 Route::view('/signed-out', 'signed-out')->name('signed-out');
 
 Route::get('/manifest', [FlightManifestController::class, 'index'])->name('manifests.index');
+Route::get('/manifest/blank', [ManifestPdfController::class, 'blank'])->middleware('auth')->name('manifests.blank');
+Route::get('/manifest/guest', [ManifestPdfController::class, 'guestForm'])->name('manifests.guest');
+Route::post('/manifest/guest/pdf', [ManifestPdfController::class, 'guest'])
+    ->withoutMiddleware([
+        StartSession::class,
+        ShareErrorsFromSession::class,
+        ValidateCsrfToken::class,
+    ])->middleware('throttle:10,1')->name('manifests.guest.pdf');
+Route::get('/flights/{flight}/manifest/pdf', [ManifestPdfController::class, 'show'])
+    ->middleware(['auth', 'throttle:30,1'])->name('flights.manifest.pdf');
 Route::get('/flights/{flight}/manifest', [FlightManifestController::class, 'edit'])
     ->middleware('auth')->name('flights.manifest.edit');
 Route::put('/flights/{flight}/manifest', [FlightManifestController::class, 'update'])

@@ -24,6 +24,7 @@ class FlightPlanMutationService
                 throw ValidationException::withMessages(['flight' => 'This flight plan has expired.']);
             }
             app(FlightManifestService::class)->assertComplete($flight);
+            app(ManifestPdfService::class)->snapshot($flight);
             $nowUtc = now('UTC');
             $flight->forceFill([
                 'status' => FlightPlanStatus::Accepted,

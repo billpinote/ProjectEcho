@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>CAAP Form ATS 2019-1 Flight Plan</title>
     <style>
         body.preview {
@@ -305,6 +306,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
             gap: 12px;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
@@ -346,6 +348,16 @@
         }
 
         .echo-review-button-neutral:hover { background: #f8fafc; border-color: #94a3b8; }
+
+        .echo-review-manifest-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .echo-review-manifest-action:disabled { cursor: not-allowed; color: #64748b; background: #f1f5f9; }
 
         .echo-review-button-danger {
             border-color: #fca5a5;
@@ -1351,6 +1363,11 @@
         <div class="echo-review-toolbar" aria-label="Flight plan review actions">
             <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; Close Review</button>
             <div class="echo-review-toolbar-actions">
+                @if($manifestReviewUrl ?? null)
+                    <a class="echo-review-button echo-review-button-neutral echo-review-manifest-action" href="{{ $manifestReviewUrl }}" target="_blank" rel="noopener noreferrer">Review Flight Manifest</a>
+                @else
+                    <button class="echo-review-button echo-review-button-neutral echo-review-manifest-action" type="button" disabled aria-disabled="true">Review Flight Manifest — {{ $manifestReviewUnavailableReason ?? 'Manifest unavailable' }}</button>
+                @endif
                 <button class="echo-review-button echo-review-button-danger" type="button" data-open-review-modal="reject-flight-plan">Reject</button>
                 <button class="echo-review-button echo-review-button-primary" type="button" data-open-review-modal="accept-flight-plan">&#10003; Accept Flight Plan</button>
             </div>

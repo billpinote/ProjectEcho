@@ -19,9 +19,11 @@ class FlightManifest extends Model
         'coa_expiry_date', 'cargo_type', 'cargo_quantity', 'total_cargo_weight', 'remarks',
     ];
 
+    protected $hidden = ['accepted_pdf_content'];
+
     protected function casts(): array
     {
-        return ['coa_expiry_date' => 'date', 'total_cargo_weight' => 'decimal:3'];
+        return ['coa_expiry_date' => 'date', 'total_cargo_weight' => 'decimal:3', 'accepted_pdf_created_at' => 'datetime'];
     }
 
     protected static function booted(): void
