@@ -30,6 +30,9 @@ class EditProfileUpdateRequest extends EditRecord
                 ->label('Approve')
                 ->color('success')
                 ->requiresConfirmation()
+                ->modalDescription(fn (): string => $this->getRecord()->signature
+                    ? 'Confirm that you inspected this signature version and compared it with the pilot’s identity / KYC evidence. Approval activates this exact version.'
+                    : 'Approve the requested profile changes?')
                 ->visible(fn (): bool => $this->getRecord()->status === ProfileUpdateRequestStatus::Pending)
                 ->form([
                     Textarea::make('remarks')

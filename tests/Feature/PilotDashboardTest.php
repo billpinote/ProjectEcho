@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
@@ -16,6 +17,25 @@ use Tests\TestCase;
 class PilotDashboardTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_current_flight_attachments_use_existing_pdf_and_disable_future_features(): void
+    {
+        $pilot = $this->pilot();
+        $flight = Flight::factory()->create(['filed_by_user_id' => $pilot->id, 'pilot_in_command_user_id' => $pilot->id]);
+        app(FlightManifestService::class)->save($flight, $pilot, []);
+        $otherFlight = Flight::factory()->create(['filed_by_user_id' => $pilot->id, 'pilot_in_command_user_id' => $pilot->id]);
+        $this->actingAs($pilot)->get('/pilot')->assertOk()
+            ->assertSee('View Flight Plan')->assertSee(route('flights.view', $flight), false)
+            ->assertSee(route('flights.view', $otherFlight), false)
+            ->assertSeeInOrder(['View Flight Plan', 'Attachments', 'View Flight Plan', 'Attachments'])
+            ->assertSee('Attachments')->assertSee(route('flights.manifest.pdf', $flight), false)
+            ->assertSee("AvSec Clearance \u{2014} coming later")->assertSee("License and Certs \u{2014} coming later");
+        $this->get(route('flights.view', $flight))->assertOk();
+        $this->get(route('flights.manifest.pdf', $flight))->assertOk()->assertHeader('Content-Type', 'application/pdf');
+        $flight->manifest->delete();
+        $this->get('/pilot')->assertOk()->assertSee("Manifest \u{2014} not prepared")
+            ->assertDontSee(route('flights.manifest.pdf', $flight), false);
+    }
 
     public function test_dashboard_renders_for_pilot_with_display_name_greeting_and_readiness(): void
     {

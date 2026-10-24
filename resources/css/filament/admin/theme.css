@@ -6,6 +6,7 @@
 @source '../../../../resources/views/filament/**/*';
 @source '../../../../resources/views/flightplan/partials/manifest-form.blade.php';
 @source '../../../../resources/views/components/manifest-person.blade.php';
+@source '../../../../resources/views/components/pilot/**/*.blade.php';
 
 @layer base {
     :root {
@@ -190,6 +191,24 @@
 
     .echo-flight-ticket-card {
         background: linear-gradient(110deg, #ffffff 0%, #fdfbf6 65%, #f7f3e9 100%);
+    }
+
+    .echo-signature-canvas {
+        @apply block h-60 w-full touch-none rounded-lg border border-gray-300 bg-white;
+    }
+
+    .echo-signature-pdf-preview {
+        width: min(100%, 429.33px);
+        aspect-ratio: 322 / 28;
+        @apply flex items-center justify-center rounded border border-gray-300 bg-white;
+
+        & img {
+            @apply block h-full w-full object-contain;
+        }
+    }
+
+    .fi-dropdown-panel.echo-flight-attachments-panel {
+        @apply w-80 max-w-[calc(100vw-2rem)]!;
     }
 
     .echo-flight-ticket-card:where(.dark, .dark *) {

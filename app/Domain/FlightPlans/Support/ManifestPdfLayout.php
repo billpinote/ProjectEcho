@@ -4,6 +4,8 @@ namespace App\Domain\FlightPlans\Support;
 
 class ManifestPdfLayout
 {
+    public const WRAPPED_CREDENTIALS = [382, 697, 194, 29];
+
     /** Native PDF points measured from the top left of the 612 x 792 Letter page. */
     public const FIELDS = [
         'aircraft_identification' => [49, 148, 168, 23],
@@ -15,8 +17,8 @@ class ManifestPdfLayout
         'cargo_type' => [49, 230, 168, 23],
         'cargo_quantity' => [228, 230, 168, 23],
         'total_cargo_weight' => [408, 230, 168, 23],
-        'pilot_in_command' => [49, 717, 322, 13],
-        'credentials' => [382, 685, 194, 43],
+        'pilot_in_command' => [49, 711, 322, 15],
+        'credentials' => [382, 711, 194, 15],
     ];
 
     /** Measured row tops; source row heights vary slightly. */

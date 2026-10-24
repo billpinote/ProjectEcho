@@ -3,6 +3,7 @@
 namespace App\Filament\Panels\Pilot\Pages;
 
 use App\Filament\Panels\Pilot\Pages\Concerns\ResolvesPilotPanelProfileUser;
+use App\Models\PilotSignature;
 use App\Models\User;
 use App\Models\UserKycDocument;
 use BackedEnum;
@@ -137,6 +138,20 @@ class MyProfilePage extends Page
                 'reviewer_remarks' => $request->reviewer_remarks ?: $request->rejection_reason ?: '',
             ])
             ->all();
+        $signatureData = fn (PilotSignature $signature): array => [
+            'url' => route('pilot-signatures.show', $signature),
+            'version' => $signature->version,
+            'status' => $signature->status,
+            'submitted_at' => $this->formatDateTime($signature->submitted_at),
+            'reviewed_at' => $this->formatDateTime($signature->reviewed_at),
+        ];
+        $approved = $user->approvedSignature()->first();
+        $pending = $user->signatureVersions()->where('status', 'pending')->latest('version')->first();
+        $this->profileData['signature'] = [
+            'approved' => $approved === null ? null : $signatureData($approved),
+            'pending' => $pending === null ? null : $signatureData($pending),
+            'action_url' => EditMyProfilePage::getUrl(panel: 'pilot').'#signature',
+        ];
     }
 
     /**

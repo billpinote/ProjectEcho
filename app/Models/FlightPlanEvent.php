@@ -9,6 +9,14 @@ class FlightPlanEvent extends Model
 {
     public const TYPE_CREATED = 'flight_created';
 
+    public const TYPE_UPDATED = 'flight_updated';
+
+    public const TYPE_MANIFEST_CREATED = 'manifest_created';
+
+    public const TYPE_MANIFEST_UPDATED = 'manifest_updated';
+
+    public const TYPE_MANIFEST_DELETED = 'manifest_deleted';
+
     public const TYPE_SUBMITTED = 'submitted';
 
     public const TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION = 'submitted_for_pic_authorization';
@@ -58,6 +66,25 @@ class FlightPlanEvent extends Model
         'new_values' => 'array',
         'created_at' => 'datetime',
     ];
+
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     */
+    public static function recordChanges(Flight $flight, string $type, ?User $actor, array $before, array $after): void
+    {
+        $new = [];
+        $old = [];
+        foreach ($after as $key => $value) {
+            if (($before[$key] ?? null) !== $value) {
+                $old[$key] = $before[$key] ?? null;
+                $new[$key] = $value;
+            }
+        }
+        if ($new !== [] || $type === self::TYPE_MANIFEST_CREATED) {
+            self::record($flight, $type, $actor, $old, $new);
+        }
+    }
 
     public static function record(Flight $flight, string $eventType, ?User $actor = null, ?array $oldValues = null, ?array $newValues = null, ?string $reason = null): self
     {

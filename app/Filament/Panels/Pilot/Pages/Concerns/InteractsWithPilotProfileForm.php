@@ -5,6 +5,7 @@ namespace App\Filament\Panels\Pilot\Pages\Concerns;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Models\PilotProfile;
+use App\Services\ProfileUpdates\ProfileFieldRegistry;
 use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
@@ -14,6 +15,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Components\Section;
@@ -106,6 +108,16 @@ trait InteractsWithPilotProfileForm
                         ->default([])
                         ->columnSpanFull(),
                 ]),
+            Section::make('Signature')
+                ->id('signature')
+                ->description('Draw or upload a signature for KYC review. Your approved signature stays active until a replacement is approved.')
+                ->columnSpanFull()
+                ->schema([
+                    ViewField::make('signature_submission')
+                        ->label('Proposed signature')
+                        ->view('filament.forms.signature-input')
+                        ->rules(['nullable', 'string', 'max:3000000']),
+                ]),
             Section::make('About This Update')
                 ->columns(1)
                 ->columnSpanFull()
@@ -149,6 +161,7 @@ trait InteractsWithPilotProfileForm
             'qualification_additions' => [],
             'reason' => null,
             'supporting_documents' => [],
+            'signature_submission' => null,
         ];
     }
 
@@ -168,7 +181,7 @@ trait InteractsWithPilotProfileForm
             'pilot_profile.license_number' => $data['license_number'] ?? null,
             'pilot_profile.license_expiry_date' => $data['license_expiry_date'] ?? null,
             'pilot_profile.medical_expiry_date' => $data['medical_expiry_date'] ?? null,
-        ], $data['reason'] ?? null, $data['supporting_documents'] ?? [], $this->qualificationOperationsFromFormData($data));
+        ], $data['reason'] ?? null, $data['supporting_documents'] ?? [], $this->qualificationOperationsFromFormData($data), $data['signature_submission'] ?? null);
     }
 
     protected function sendProfileUpdateRequestedNotification(): void
@@ -401,7 +414,7 @@ trait InteractsWithPilotProfileForm
     {
         $user = $this->getProfileUser();
         $data = $this->data ?? [];
-        $ordinaryChanges = \App\Services\ProfileUpdates\ProfileFieldRegistry::changesForRequest($user, [
+        $ordinaryChanges = ProfileFieldRegistry::changesForRequest($user, [
             'user.first_name' => $data['first_name'] ?? null,
             'user.middle_name' => $data['middle_name'] ?? null,
             'user.last_name' => $data['last_name'] ?? null,

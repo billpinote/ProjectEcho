@@ -3,9 +3,9 @@
 namespace App\Filament\Panels\Pilot\Widgets;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Models\Flight;
-use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Models\User;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Builder;
@@ -168,7 +168,7 @@ class PilotDashboardWidget extends Widget
             ->get()
             ->map(fn (Flight $flight): array => $this->flightCard(
                 $flight,
-                'View',
+                'View Flight Plan',
                 route('flights.view', $flight),
             ))
             ->all();
@@ -213,7 +213,7 @@ class PilotDashboardWidget extends Widget
                 'time_touchdown',
                 'time_block_on',
                 'time_shutdown',
-            ]);
+            ])->withExists('manifest');
 
         return FlightAccess::restrictQueryToPilotInvolvement($query, $user);
     }
@@ -249,6 +249,7 @@ class PilotDashboardWidget extends Widget
             'status' => $status,
             'action_label' => $actionLabel,
             'action_url' => $actionUrl,
+            'manifest_url' => $flight->manifest_exists ? route('flights.manifest.pdf', $flight) : null,
             'subdued' => $subdued,
         ];
     }

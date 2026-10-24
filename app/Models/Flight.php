@@ -197,6 +197,21 @@ class Flight extends Model
                 throw ValidationException::withMessages(['flight' => 'Accepted filings must be preserved.']);
             }
         });
+        static::updated(function (self $flight): void {
+            $fields = array_diff($flight->getFillable(), [
+                'status', 'revised_eobt', 'reviewed_at', 'cancelled_at', 'cancelled_by_user_id',
+                'time_start_up', 'time_shutdown', 'time_block_off', 'time_block_on', 'time_airborne', 'time_touchdown',
+                'accepted_by_user_id', 'accepted_by_wiresign', 'rejected_by_wiresign', 'rejection_reason',
+                'received_by', 'received_date', 'received_time', 'received_facility',
+                'pic_authorized_by_user_id', 'pic_authorized_at', 'pic_authorization_method',
+                'pic_authorization_token', 'pic_authorization_token_expires_at', 'pic_authorized_revision',
+                'pic_authorization_status', 'pic_authorization_declined_by_user_id',
+                'pic_authorization_declined_at', 'pic_authorization_decline_reason', 'pic_authorization_archived_at',
+            ]);
+            $changes = array_intersect_key($flight->getChanges(), array_flip($fields));
+            FlightPlanEvent::recordChanges($flight, FlightPlanEvent::TYPE_UPDATED, auth()->user(),
+                array_intersect_key($flight->getRawOriginal(), $changes), $changes);
+        });
     }
 
     public function manifest(): HasOne

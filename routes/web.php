@@ -3,6 +3,7 @@
 use App\Http\Controllers\FlightController;
 use App\Http\Controllers\FlightManifestController;
 use App\Http\Controllers\ManifestPdfController;
+use App\Http\Controllers\ProfileUpdateRequests\PilotSignatureController;
 use App\Http\Controllers\ProfileUpdateRequests\ProfileDocumentController;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Session\Middleware\StartSession;
@@ -10,6 +11,10 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::view('/', 'access-gateway')->name('gateway');
+Route::post('/pilot/signatures/prepare', [PilotSignatureController::class, 'prepare'])
+    ->middleware(['auth', 'throttle:20,1'])->name('pilot-signatures.prepare');
+Route::get('/pilot/signatures/{signature}', [PilotSignatureController::class, 'show'])
+    ->middleware(['auth', 'throttle:60,1'])->name('pilot-signatures.show');
 Route::view('/signed-out', 'signed-out')->name('signed-out');
 
 Route::get('/manifest', [FlightManifestController::class, 'index'])->name('manifests.index');

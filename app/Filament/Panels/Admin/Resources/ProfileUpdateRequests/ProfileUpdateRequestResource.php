@@ -52,6 +52,11 @@ class ProfileUpdateRequestResource extends Resource
                 ->schema([
                     Html::make(fn (?ProfileUpdateRequest $record): string => self::documentsHtml($record)),
                 ]),
+            Section::make('Signature Verification')
+                ->columnSpanFull()
+                ->schema([
+                    Html::make(fn (?ProfileUpdateRequest $record): string => view('filament.partials.signature-review', ['record' => $record])->render()),
+                ]),
         ]);
     }
 
@@ -113,6 +118,9 @@ class ProfileUpdateRequestResource extends Resource
         }
 
         $rows = collect($record->requested_changes)->flatMap(function (array $change, string $field): array {
+            if ($field === 'pilot_signature') {
+                return ['<tr><td>Signature</td><td>'.e($change['old'] ? 'Version record #'.$change['old'] : 'No approved signature').'</td><td>Version record #'.e((string) $change['new']).' — inspect the signature below</td></tr>'];
+            }
             if ($field === ProfileUpdateRequestService::QUALIFICATION_CHANGES_KEY) {
                 return collect($change['operations'] ?? [])
                     ->map(fn (array $operation): string => sprintf(

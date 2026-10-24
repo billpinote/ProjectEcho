@@ -99,6 +99,16 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(UserKycDocument::class);
     }
 
+    public function signatureVersions(): HasMany
+    {
+        return $this->hasMany(PilotSignature::class);
+    }
+
+    public function approvedSignature(): HasOne
+    {
+        return $this->hasOne(PilotSignature::class, 'active_user_id');
+    }
+
     public function operator(): BelongsTo
     {
         return $this->belongsTo(Operator::class);

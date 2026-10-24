@@ -94,7 +94,7 @@ class EditMyProfilePage extends Page
         } catch (\InvalidArgumentException $exception) {
             Notification::make()
                 ->title('No profile changes to submit.')
-                ->body('Update at least one verified profile field before submitting the request.')
+                ->body('Update a verified profile field or prepare a signature preview before submitting the request.')
                 ->warning()
                 ->send();
 

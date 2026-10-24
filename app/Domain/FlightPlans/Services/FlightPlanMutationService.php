@@ -48,10 +48,15 @@ class FlightPlanMutationService
 
     public function recordSubmission(Flight $flight, ?User $actor = null): void
     {
-        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, $actor, null, [
-            'status' => $flight->status?->value ?? $flight->status,
-            'aircraft_identification' => $flight->aircraft_identification,
-        ]);
+        if ($flight->events()->where('event_type', FlightPlanEvent::TYPE_CREATED)->exists()) {
+            return;
+        }
+
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, $actor, null, ['status' => $flight->status?->value ?? $flight->status, ...$flight->only([
+            'aircraft_identification', 'type_of_aircraft', 'date_of_flight', 'departure_aerodrome',
+            'destination_aerodrome', 'proposed_time', 'flight_rules', 'route', 'level', 'cruising_speed',
+            'persons_on_board', 'pilot_in_command', 'pilot_license_no', 'pilot_ratings', 'license_expiry_date',
+        ])]);
 
         FlightPlanEvent::record($flight, $flight->requiresPicAuthorization()
             ? FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION

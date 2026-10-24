@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ProfileUpdateRequest extends Model
 {
@@ -51,5 +52,10 @@ class ProfileUpdateRequest extends Model
     public function isPending(): bool
     {
         return $this->status === ProfileUpdateRequestStatus::Pending;
+    }
+
+    public function signature(): HasOne
+    {
+        return $this->hasOne(PilotSignature::class);
     }
 }

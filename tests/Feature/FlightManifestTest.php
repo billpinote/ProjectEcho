@@ -191,11 +191,12 @@ class FlightManifestTest extends TestCase
             }
         }
         $before = $flight->fresh()->getAttributes();
+        $eventsBefore = $flight->events()->count();
         $this->actingAs($this->atmo())->from(route('flights.view', $flight))
             ->post(route('flights.accept', $flight))
             ->assertRedirect(route('flights.view', $flight))->assertSessionHasErrors('manifest');
         $this->assertSame($before, $flight->fresh()->getAttributes());
-        $this->assertSame(0, $flight->events()->count());
+        $this->assertSame($eventsBefore, $flight->events()->count());
         $this->assertSame([], Storage::disk('public')->allFiles());
         $this->get(route('flights.view', $flight))->assertSee('role="alert"', false);
     }

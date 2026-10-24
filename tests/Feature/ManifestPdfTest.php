@@ -23,16 +23,101 @@ class ManifestPdfTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_pilot_and_credential_values_are_centered_above_the_original_labels(): void
+    {
+        $data = $this->guestData();
+        $data['pilot_license_no'] = 'LICENSE123';
+        $data['pilot_ratings'] = 'C172 C208 IR';
+        $data['license_expiry_date'] = '2027-12-31';
+        $streams = $this->streams(app(ManifestPdfService::class)->render($data));
+        foreach (['Guest PIC' => [210, 322], 'LICENSE123/C172 C208 IR/2027-12-31' => [479, 194]] as $value => [$center, $width]) {
+            preg_match_all('/([\d.]+) ([\d.]+) Td \[\('.preg_quote($this->encoded($value), '/').'\)\] TJ/', $streams, $matches, PREG_SET_ORDER);
+            $this->assertNotEmpty($matches, $value);
+            $position = $matches[0];
+            $font = new \TCPDF('P', 'pt');
+            for ($size = 10; $size >= 7; $size -= 0.5) {
+                $font->SetFont('dejavusans', '', $size);
+                if ($font->GetStringWidth($value) <= $width) {
+                    break;
+                }
+            }
+            $this->assertEqualsWithDelta($center, (float) $position[1] + $font->GetStringWidth($value) / 2, 0.1);
+            $this->assertGreaterThan(68, (float) $position[2]);
+            $this->assertLessThan(78, (float) $position[2]);
+        }
+    }
+
+    public function test_oversized_pilot_details_use_the_supplement_without_overlapping_labels(): void
+    {
+        $data = $this->guestData();
+        $data['pilot_in_command'] = str_repeat('Alexandra ', 30).'NAMEEND';
+        $data['pilot_license_no'] = 'CPL-987654';
+        $data['pilot_ratings'] = str_repeat('C172 C208 IR ', 20).'RATINGEND';
+        $data['license_expiry_date'] = '2028-12-31';
+        $bytes = app(ManifestPdfService::class)->render($data);
+        $streams = $this->streams($bytes);
+        $this->assertSame(2, substr_count($streams, $this->encoded('See full field values supplement')));
+        $this->assertStringContainsString($this->encoded('NAMEEND'), $streams);
+        $this->assertStringContainsString($this->encoded('RATINGEND/2028-12-31'), $streams);
+        $reader = new PdfReader(new PdfParser(StreamReader::createByString($bytes)));
+        $this->assertSame(3, $reader->getPageCount());
+    }
+
+    public function test_long_credentials_wrap_at_a_slash_into_two_centered_lines_above_the_label(): void
+    {
+        $data = $this->guestData();
+        $data['pilot_license_no'] = 'CPL-987654-ADDITIONAL-LICENSE';
+        $data['pilot_ratings'] = 'C172 C208 B350 BE20 IR';
+        $data['license_expiry_date'] = '2028-12-31';
+        $bytes = app(ManifestPdfService::class)->render($data);
+        $streams = $this->streams($bytes);
+        $font = new \TCPDF('P', 'pt');
+        $font->SetFont('dejavusans', '', 7);
+        $positions = [];
+        foreach (['CPL-987654-ADDITIONAL-LICENSE/', 'C172 C208 B350 BE20 IR/2028-12-31'] as $line) {
+            preg_match('/([\d.]+) ([\d.]+) Td \[\('.preg_quote($this->encoded($line), '/').'\)\] TJ/', $streams, $matches);
+            $this->assertNotEmpty($matches, $line);
+            $this->assertEqualsWithDelta(479, (float) $matches[1] + $font->GetStringWidth($line) / 2, 0.1);
+            $this->assertGreaterThan(67, (float) $matches[2]);
+            $this->assertLessThan(95, (float) $matches[2]);
+            $positions[] = (float) $matches[2];
+        }
+        $this->assertGreaterThan($positions[1], $positions[0]);
+        $this->assertStringNotContainsString($this->encoded('See full field values supplement'), $streams);
+        $reader = new PdfReader(new PdfParser(StreamReader::createByString($bytes)));
+        $this->assertSame(2, $reader->getPageCount());
+    }
+
+    public function test_a_long_unbroken_license_wraps_without_losing_any_characters(): void
+    {
+        $data = $this->guestData();
+        $data['pilot_license_no'] = 'CPL-'.str_repeat('1234567890', 6);
+        $data['pilot_ratings'] = 'IR';
+        $data['license_expiry_date'] = '2028-12-31';
+        $bytes = app(ManifestPdfService::class)->render($data);
+        $reader = new PdfReader(new PdfParser(StreamReader::createByString($bytes)));
+        preg_match_all('/([\d.]+) ([\d.]+) Td \[\((.*?)\)\] TJ/s', $reader->getPage(1)->getContentStream(), $matches, PREG_SET_ORDER);
+        $lines = [];
+        foreach ($matches as $match) {
+            if ((float) $match[1] >= 382 && (float) $match[2] > 67 && (float) $match[2] < 95) {
+                $lines[] = mb_convert_encoding($match[3], 'UTF-8', 'UTF-16BE');
+            }
+        }
+        $this->assertCount(2, $lines);
+        $this->assertSame($data['pilot_license_no'].'/IR/2028-12-31', implode('', $lines));
+        $this->assertSame(2, $reader->getPageCount());
+    }
+
     public function test_authenticated_pdf_is_associated_with_flight_and_uses_filed_credentials(): void
     {
-        $flight = Flight::factory()->create(['aircraft_identification' => 'RPCSELECTED', 'pilot_license_no' => 'FILED123']);
+        $flight = Flight::factory()->create(['aircraft_identification' => 'RPCSELECTED', 'pilot_license_no' => 'FILED123', 'pilot_ratings' => 'C172 C208 IR', 'license_expiry_date' => '2028-12-31']);
         Flight::factory()->create(['aircraft_identification' => 'RPCOTHER']);
         $manifest = app(FlightManifestService::class)->save($flight, $flight->filedBy, ['home_base_hangar' => 'Aircraft Hangar']);
         $flight->filedBy->pilotProfile()->create(['license_number' => 'CHANGED123', 'operator' => 'Pilot Operator']);
         $response = $this->actingAs($flight->filedBy)->get(route('flights.manifest.pdf', $flight))->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $text = $this->streams($response->getContent());
         $this->assertStringContainsString($this->encoded('RPCSELECTED'), $text);
-        $this->assertStringContainsString($this->encoded('FILED123'), $text);
+        $this->assertStringContainsString($this->encoded('FILED123/C172 C208 IR/2028-12-31'), $text);
         $this->assertStringContainsString($this->encoded('Aircraft Hangar'), $text);
         $this->assertStringNotContainsString($this->encoded('RPCOTHER'), $text);
         $this->assertStringNotContainsString($this->encoded('CHANGED123'), $text);
@@ -171,7 +256,7 @@ class ManifestPdfTest extends TestCase
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
         $this->assertNull($flight->fresh()->accepted_by_user_id);
         $this->assertNull($flight->manifest->accepted_pdf_content);
-        $this->assertDatabaseCount('flight_plan_events', 0);
+        $this->assertDatabaseCount('flight_plan_events', 1);
     }
 
     public function test_accepted_snapshot_cannot_be_overwritten(): void
@@ -196,7 +281,7 @@ class ManifestPdfTest extends TestCase
         }
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
         $this->assertNull($flight->manifest->accepted_pdf_content);
-        $this->assertDatabaseCount('flight_plan_events', 0);
+        $this->assertDatabaseCount('flight_plan_events', 1);
     }
 
     public function test_legacy_accepted_filing_is_not_silently_regenerated(): void

@@ -5,6 +5,7 @@ namespace App\Domain\FlightPlans\Services;
 use App\Domain\FlightPlans\Support\FlightManifestData;
 use App\Models\Flight;
 use App\Models\FlightManifest;
+use App\Models\FlightPlanEvent;
 use App\Models\ManifestPerson;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -33,6 +34,8 @@ class FlightManifestService
             $manifest = $flight->manifest()->first();
             Gate::forUser($actor)->authorize($manifest === null ? 'create' : 'update', $manifest ?? [FlightManifest::class, $flight]);
             $attributes = $this->data->validate($attributes);
+            $before = $manifest === null ? [] : $this->auditValues($manifest->load('persons'));
+            $creating = $manifest === null;
 
             if ($manifest === null) {
                 $attributes = array_replace($this->data->defaults($flight), $attributes);
@@ -58,7 +61,11 @@ class FlightManifestService
                 }
             }
 
-            return $manifest->load('persons');
+            $manifest->load('persons');
+            FlightPlanEvent::recordChanges($flight, $creating ? FlightPlanEvent::TYPE_MANIFEST_CREATED : FlightPlanEvent::TYPE_MANIFEST_UPDATED,
+                $actor, $before, $this->auditValues($manifest));
+
+            return $manifest;
         });
     }
 
@@ -68,7 +75,9 @@ class FlightManifestService
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $manifest = $flight->manifest()->firstOrFail();
             Gate::forUser($actor)->authorize('delete', $manifest);
+            $before = $this->auditValues($manifest->load('persons'));
             $manifest->delete();
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_MANIFEST_DELETED, $actor, $before);
         });
     }
 
@@ -143,5 +152,15 @@ class FlightManifestService
     private function personName(?string $name): string
     {
         return Str::upper(Str::squish((string) $name));
+    }
+
+    /** @return array<string, mixed> */
+    private function auditValues(FlightManifest $manifest): array
+    {
+        return [
+            ...$manifest->only($manifest->getFillable()),
+            'coa_expiry_date' => $manifest->coa_expiry_date?->format('Y-m-d'),
+            'persons' => $manifest->persons->map->only(['full_name', 'nationality', 'classification'])->all(),
+        ];
     }
 }

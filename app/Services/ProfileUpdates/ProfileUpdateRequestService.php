@@ -2,8 +2,8 @@
 
 namespace App\Services\ProfileUpdates;
 
-use App\Domain\ProfileUpdateRequests\Enums\ProfileUpdateRequestStatus;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
+use App\Domain\ProfileUpdateRequests\Enums\ProfileUpdateRequestStatus;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\PilotQualification;
 use App\Models\ProfileUpdateRequest;
@@ -31,37 +31,60 @@ class ProfileUpdateRequestService
      * @param  array<int, mixed>  $documents
      * @param  array<int, array<string, mixed>>  $qualificationOperations
      */
-    public function submit(User $user, array $requestedValues, ?string $reason, array $documents = [], array $qualificationOperations = []): ProfileUpdateRequest
+    public function submit(User $user, array $requestedValues, ?string $reason, array $documents = [], array $qualificationOperations = [], ?string $signatureSubmission = null): ProfileUpdateRequest
     {
-        return DB::transaction(function () use ($user, $requestedValues, $reason, $documents, $qualificationOperations): ProfileUpdateRequest {
-            $user->refresh()->loadMissing(['pilotProfile.qualifications', 'dispatchProfile', 'atcProfile', 'avsecProfile']);
-            $changes = ProfileFieldRegistry::changesForRequest($user, $requestedValues);
-            $qualificationChanges = $this->qualificationChangesForRequest($user, $qualificationOperations);
+        $storedSignaturePath = null;
+        try {
+            return DB::transaction(function () use ($user, $requestedValues, $reason, $documents, $qualificationOperations, $signatureSubmission, &$storedSignaturePath): ProfileUpdateRequest {
+                $user = User::query()->lockForUpdate()->findOrFail($user->getKey());
+                if (filled($signatureSubmission)) {
+                    abort_unless($user->is_active && $user->isPilot() && (! auth()->check() || auth()->id() === $user->getKey()), 403);
+                }
+                $user->refresh()->loadMissing(['pilotProfile.qualifications', 'dispatchProfile', 'atcProfile', 'avsecProfile']);
+                $changes = ProfileFieldRegistry::changesForRequest($user, $requestedValues);
+                $qualificationChanges = $this->qualificationChangesForRequest($user, $qualificationOperations);
 
-            if ($qualificationChanges !== []) {
-                $changes[self::QUALIFICATION_CHANGES_KEY] = [
-                    'label' => 'Ratings & Qualifications',
-                    'operations' => $qualificationChanges,
-                ];
+                if ($qualificationChanges !== []) {
+                    $changes[self::QUALIFICATION_CHANGES_KEY] = [
+                        'label' => 'Ratings & Qualifications',
+                        'operations' => $qualificationChanges,
+                    ];
+                }
+
+                if ($changes === [] && blank($signatureSubmission)) {
+                    throw new \InvalidArgumentException('At least one changed profile field is required.');
+                }
+
+                $request = $user->profileUpdateRequests()->create([
+                    'status' => ProfileUpdateRequestStatus::Pending,
+                    'requested_changes' => $changes,
+                    'reason' => $this->nullableString($reason),
+                    'submitted_at' => now(),
+                ]);
+
+                if (filled($signatureSubmission)) {
+                    $image = app(SignatureImageService::class)->fromSubmission($signatureSubmission);
+                    $signature = app(PilotSignatureService::class)->stage($request, $image);
+                    $storedSignaturePath = $signature->stored_path;
+                    $request->forceFill(['requested_changes' => [
+                        ...$changes,
+                        'pilot_signature' => ['label' => 'Signature', 'old' => $user->approvedSignature?->getKey(), 'new' => $signature->getKey(), 'sha256' => $signature->sha256],
+                    ]])->save();
+                }
+
+                foreach ($documents as $document) {
+                    $this->attachDocument($request, $document);
+                }
+
+                return $request;
+            });
+        } catch (\Throwable $exception) {
+            if ($storedSignaturePath !== null) {
+                Storage::disk('local')->delete($storedSignaturePath);
             }
 
-            if ($changes === []) {
-                throw new \InvalidArgumentException('At least one changed profile field is required.');
-            }
-
-            $request = $user->profileUpdateRequests()->create([
-                'status' => ProfileUpdateRequestStatus::Pending,
-                'requested_changes' => $changes,
-                'reason' => $this->nullableString($reason),
-                'submitted_at' => now(),
-            ]);
-
-            foreach ($documents as $document) {
-                $this->attachDocument($request, $document);
-            }
-
-            return $request;
-        });
+            throw $exception;
+        }
     }
 
     public function approve(ProfileUpdateRequest $request, User $reviewer, ?string $remarks = null): ProfileUpdateRequest
@@ -80,6 +103,11 @@ class ProfileUpdateRequestService
             $user->loadMissing(['pilotProfile.qualifications', 'dispatchProfile', 'atcProfile', 'avsecProfile']);
 
             foreach ($request->requested_changes ?? [] as $field => $change) {
+                if ($field === 'pilot_signature') {
+                    app(PilotSignatureService::class)->review($request, $reviewer, true, $remarks);
+
+                    continue;
+                }
                 if ($field === self::QUALIFICATION_CHANGES_KEY) {
                     $this->applyQualificationOperations($user, $request, $reviewer, $change['operations'] ?? [], $remarks);
                     $user->refresh()->loadMissing(['pilotProfile.qualifications', 'dispatchProfile', 'atcProfile', 'avsecProfile']);
@@ -130,15 +158,24 @@ class ProfileUpdateRequestService
             throw new \InvalidArgumentException('A rejection reason is required.');
         }
 
-        $request->forceFill([
-            'status' => ProfileUpdateRequestStatus::Rejected,
-            'reviewed_at' => now(),
-            'reviewed_by_user_id' => $reviewer->getKey(),
-            'rejection_reason' => trim($reason),
-            'reviewer_remarks' => trim($reason),
-        ])->save();
+        return DB::transaction(function () use ($request, $reviewer, $reason): ProfileUpdateRequest {
+            $request = ProfileUpdateRequest::query()->lockForUpdate()->findOrFail($request->getKey());
+            if (! $request->isPending()) {
+                throw new \RuntimeException('Only pending profile update requests can be rejected.');
+            }
+            if (isset($request->requested_changes['pilot_signature'])) {
+                app(PilotSignatureService::class)->review($request, $reviewer, false, trim($reason));
+            }
+            $request->forceFill([
+                'status' => ProfileUpdateRequestStatus::Rejected,
+                'reviewed_at' => now(),
+                'reviewed_by_user_id' => $reviewer->getKey(),
+                'rejection_reason' => trim($reason),
+                'reviewer_remarks' => trim($reason),
+            ])->save();
 
-        return $request;
+            return $request;
+        });
     }
 
     private function authorizeReviewer(User $reviewer): void

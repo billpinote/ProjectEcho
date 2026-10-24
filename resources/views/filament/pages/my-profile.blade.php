@@ -166,6 +166,34 @@
                     @endif
                 </x-filament::section>
 
+                <x-filament::section heading="Signature">
+                    <div class="space-y-4">
+                        @if ($profileData['signature']['approved'])
+                            <x-filament::badge color="success">Approved · Version {{ $profileData['signature']['approved']['version'] }}</x-filament::badge>
+                            <div class="echo-signature-pdf-preview">
+                                <img src="{{ $profileData['signature']['approved']['url'] }}" alt="Currently approved signature" />
+                            </div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Approved {{ $profileData['signature']['approved']['reviewed_at'] }}</p>
+                        @else
+                            <p class="text-sm text-gray-600 dark:text-gray-400">No approved signature</p>
+                        @endif
+                        @if ($profileData['signature']['pending'])
+                            <div class="space-y-3 rounded-lg border border-gray-200 p-3 dark:border-white/10">
+                                <x-filament::badge color="warning">Pending review—not available for signing</x-filament::badge>
+                                <div class="echo-signature-pdf-preview">
+                                    <img src="{{ $profileData['signature']['pending']['url'] }}" alt="Pending signature submission" />
+                                </div>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">Version {{ $profileData['signature']['pending']['version'] }} · Submitted {{ $profileData['signature']['pending']['submitted_at'] }}</p>
+                                <p class="text-sm text-gray-600 dark:text-gray-400">{{ $profileData['signature']['approved'] ? 'Your current approved signature remains active during review.' : 'This submission becomes available only after approval.' }}</p>
+                            </div>
+                        @else
+                            <x-filament::button tag="a" :href="$profileData['signature']['action_url']" color="gray" size="sm">
+                                {{ $profileData['signature']['approved'] ? 'Request Signature Change' : 'Submit Signature for Verification' }}
+                            </x-filament::button>
+                        @endif
+                    </div>
+                </x-filament::section>
+
                 <x-filament::section heading="Verification Record">
                     <dl class="space-y-4">
                         @foreach ($profileData['verification_record'] as $field)

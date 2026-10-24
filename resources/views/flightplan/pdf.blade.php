@@ -1316,6 +1316,10 @@
                         @php
                             $activityLabel = match ($activityEvent->event_type) {
                                 \App\Models\FlightPlanEvent::TYPE_CREATED => 'Flight plan created',
+                                \App\Models\FlightPlanEvent::TYPE_UPDATED => 'Flight plan updated',
+                                \App\Models\FlightPlanEvent::TYPE_MANIFEST_CREATED => 'Manifest created',
+                                \App\Models\FlightPlanEvent::TYPE_MANIFEST_UPDATED => 'Manifest updated',
+                                \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED => 'Manifest deleted',
                                 \App\Models\FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION => 'Submitted for PIC authorization',
                                 \App\Models\FlightPlanEvent::TYPE_PIC_AUTHORIZED => 'PIC authorized',
                                 \App\Models\FlightPlanEvent::TYPE_PIC_DECLINED => 'PIC declined',
@@ -1339,7 +1343,7 @@
                             $activityRole = $activityEvent->new_values['actor_role'] ?? $activityEvent->actor?->role?->value ?? null;
                         @endphp
                         <li>
-                            <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('H:i\Z') ?? '—' }}</span>
+                            <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('Y-m-d H:i:s\Z') ?? '—' }}</span>
                             <span class="echo-preview-activity-event"> · {{ $activityLabel }}</span>
                             @if($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_DELAYED)
                                 <span> · {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($oldEobt) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($newEobt) ?? 'N/A' }}</span>
@@ -1349,6 +1353,18 @@
                             @endif
                             @if($activityEvent->reason)
                                 <span> · {{ $activityEvent->reason }}</span>
+                            @endif
+                            @if(in_array($activityEvent->event_type, [\App\Models\FlightPlanEvent::TYPE_CREATED, \App\Models\FlightPlanEvent::TYPE_UPDATED, \App\Models\FlightPlanEvent::TYPE_MANIFEST_CREATED, \App\Models\FlightPlanEvent::TYPE_MANIFEST_UPDATED, \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED], true))
+                                <ul>
+                                    @foreach(array_diff_key(($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED ? $activityEvent->old_values : $activityEvent->new_values) ?? [], array_flip(['actor_name', 'actor_role'])) as $field => $value)
+                                        <li>{{ \Illuminate\Support\Str::headline($field) }}:
+                                            @if($activityEvent->event_type !== \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED && array_key_exists($field, $activityEvent->old_values ?? []))
+                                                {{ is_array($activityEvent->old_values[$field]) ? json_encode($activityEvent->old_values[$field], JSON_UNESCAPED_UNICODE) : ($activityEvent->old_values[$field] ?? 'Not set') }} →
+                                            @endif
+                                            {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE) : ($value ?? 'Not set') }}
+                                        </li>
+                                    @endforeach
+                                </ul>
                             @endif
                         </li>
                     @endforeach

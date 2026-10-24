@@ -8,6 +8,7 @@ use App\Models\Flight;
 use App\Models\FlightManifest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 use setasign\Fpdi\Tcpdf\Fpdi;
 
 class ManifestPdfService
@@ -78,7 +79,11 @@ class ManifestPdfService
         $pdf->AddPage('P', [612, 792]);
         $pdf->useTemplate($first, 0, 0, 612, 792);
         $data['owner_and_phone'] = implode("\n", array_filter([$data['aircraft_owner_name'] ?? '', $data['aircraft_owner_contact_number'] ?? ''], fn ($value): bool => filled($value)));
-        $data['credentials'] = implode("\n", array_filter([$data['pilot_license_no'] ?? '', $data['pilot_ratings'] ?? '', $data['license_expiry_date'] ?? ''], fn ($value): bool => filled($value)));
+        $credentials = array_map(fn (mixed $value): string => Str::squish((string) $value), [
+            $data['pilot_license_no'] ?? '', $data['pilot_ratings'] ?? '', $data['license_expiry_date'] ?? '',
+        ]);
+        $data['credentials'] = array_filter($credentials, fn (string $value): bool => filled($value)) === [] ? '' : implode('/', $credentials);
+        $data['pilot_in_command'] = Str::squish((string) ($data['pilot_in_command'] ?? ''));
         $overflow = [];
         foreach (ManifestPdfLayout::FIELDS as $key => $box) {
             $this->field($pdf, (string) ($data[$key] ?? ''), $box, $key, $overflow);
@@ -143,17 +148,58 @@ class ManifestPdfService
             }
         }
         [$x, $y, $width, $height] = $box;
+        $isPilotDetail = in_array($label, ['pilot_in_command', 'credentials'], true);
+        $alignment = $isPilotDetail ? 'C' : 'L';
         for ($size = 10; $size >= 7; $size -= 0.5) {
             $pdf->SetFont('dejavusans', '', $size);
-            if ($pdf->getStringHeight($width, $value) <= $height) {
-                $pdf->MultiCell($width, $height, $value, 0, 'L', false, 1, $x, $y, true, 0, false, true, $height, 'M');
+            if ($pdf->getStringHeight($width, $value) <= $height && (! $isPilotDetail || $pdf->GetStringWidth($value) <= $width)) {
+                $pdf->MultiCell($width, $height, $value, 0, $alignment, false, 1, $x, $y, true, 0, false, true, $height, 'M');
+
+                return;
+            }
+        }
+        if ($label === 'credentials') {
+            $lines = $this->credentialLines($pdf, $value, $width);
+            if ($lines !== null) {
+                [$x, $y, $width, $height] = ManifestPdfLayout::WRAPPED_CREDENTIALS;
+                $pdf->MultiCell($width, $height, implode("\n", $lines), 0, 'C', false, 1, $x, $y, true, 0, false, true, $height, 'B');
 
                 return;
             }
         }
         $overflow[$label] = $value;
         $pdf->SetFont('dejavusans', '', 7);
-        $pdf->MultiCell($width, $height, 'See full field values supplement', 0, 'L', false, 1, $x, $y);
+        $pdf->MultiCell($width, $height, 'See full field values supplement', 0, $alignment, false, 1, $x, $y, true, 0, false, true, $height, 'M');
+    }
+
+    /** @return array{string, string}|null */
+    private function credentialLines(Fpdi $pdf, string $value, float $width): ?array
+    {
+        $pdf->SetFont('dejavusans', '', 7);
+        $characters = mb_str_split($value);
+        foreach (['slash', 'space', 'character'] as $breakType) {
+            $bestLines = null;
+            $bestDifference = INF;
+            foreach ($characters as $index => $character) {
+                if ($index === count($characters) - 1
+                    || ($breakType === 'slash' && $character !== '/')
+                    || ($breakType === 'space' && $character !== ' ')) {
+                    continue;
+                }
+                $lines = [rtrim(mb_substr($value, 0, $index + 1)), ltrim(mb_substr($value, $index + 1))];
+                $widths = array_map(fn (string $line): float => $pdf->GetStringWidth($line), $lines);
+                $difference = abs($widths[0] - $widths[1]);
+                if (max($widths) <= $width && $difference < $bestDifference) {
+                    $bestLines = $lines;
+                    $bestDifference = $difference;
+                }
+            }
+            if ($bestLines !== null) {
+                return $bestLines;
+            }
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $data */
