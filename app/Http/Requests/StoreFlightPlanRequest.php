@@ -11,6 +11,7 @@ use App\Domain\FlightPlans\Rules\IcaoFlightRules;
 use App\Domain\FlightPlans\Rules\IcaoTypeOfFlight;
 use App\Domain\FlightPlans\Rules\IcaoWakeTurbulenceCategory;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -48,21 +49,21 @@ class StoreFlightPlanRequest extends FormRequest
 
         // Extract all tag values first
         $tagValues = [
-            'other_info_dof' => $dateOfFlightDof ?? $this->extractOtherInfoTagValue('DOF', $otherInformation),
-            'other_info_rmk' => $this->extractOtherInfoTagValue('RMK', $otherInformation),
-            'other_info_typ' => $this->extractOtherInfoTagValue('TYP', $otherInformation),
-            'other_info_dep' => $this->extractOtherInfoTagValue('DEP', $otherInformation),
-            'other_info_route' => $this->extractOtherInfoTagValue('RTE', $otherInformation),
-            'other_info_dest' => $this->extractOtherInfoTagValue('DEST', $otherInformation),
-            'other_info_altn_1' => $this->extractOtherInfoTagValue('ALTN', $otherInformation),
-            'other_info_altn_2' => $this->extractOtherInfoTagValue('ALTN2', $otherInformation),
-            'other_info_pbn' => $this->extractOtherInfoTagValue('PBN', $otherInformation),
-            'other_info_reg' => $this->extractOtherInfoTagValue('REG', $otherInformation),
-            'other_info_opr' => $this->extractOtherInfoTagValue('OPR', $otherInformation),
+            'other_info_dof' => $dateOfFlightDof ?? FlightPlanDataNormalizer::extractOtherInfoTagValue('DOF', $otherInformation),
+            'other_info_rmk' => FlightPlanDataNormalizer::extractOtherInfoTagValue('RMK', $otherInformation),
+            'other_info_typ' => FlightPlanDataNormalizer::extractOtherInfoTagValue('TYP', $otherInformation),
+            'other_info_dep' => FlightPlanDataNormalizer::extractOtherInfoTagValue('DEP', $otherInformation),
+            'other_info_route' => FlightPlanDataNormalizer::extractOtherInfoTagValue('RTE', $otherInformation),
+            'other_info_dest' => FlightPlanDataNormalizer::extractOtherInfoTagValue('DEST', $otherInformation),
+            'other_info_altn_1' => FlightPlanDataNormalizer::extractOtherInfoTagValue('ALTN', $otherInformation),
+            'other_info_altn_2' => FlightPlanDataNormalizer::extractOtherInfoTagValue('ALTN2', $otherInformation),
+            'other_info_pbn' => FlightPlanDataNormalizer::extractOtherInfoTagValue('PBN', $otherInformation),
+            'other_info_reg' => FlightPlanDataNormalizer::extractOtherInfoTagValue('REG', $otherInformation),
+            'other_info_opr' => FlightPlanDataNormalizer::extractOtherInfoTagValue('OPR', $otherInformation),
         ];
 
         // Reorganize tags according to hierarchy and rebuild other_information
-        $reorganizedInformation = $this->reorganizeTagsHierarchy($tagValues);
+        $reorganizedInformation = FlightPlanDataNormalizer::reorganizeOtherInformationTags($tagValues);
 
         $booleanCheckboxValues = [];
         foreach (self::BOOLEAN_CHECKBOX_FIELDS as $field) {
@@ -252,35 +253,6 @@ class StoreFlightPlanRequest extends FormRequest
         return $time === '' ? null : $time;
     }
 
-    private function reorganizeTagsHierarchy(array $tagValues): string
-    {
-        // Define the hierarchy order for tags
-        $hierarchy = [
-            'DOF' => 'other_info_dof',
-            'RMK' => 'other_info_rmk',
-            'TYP' => 'other_info_typ',
-            'DEP' => 'other_info_dep',
-            'RTE' => 'other_info_route',
-            'DEST' => 'other_info_dest',
-            'ALTN' => 'other_info_altn_1',
-            'ALTN2' => 'other_info_altn_2',
-            'PBN' => 'other_info_pbn',
-            'REG' => 'other_info_reg',
-            'OPR' => 'other_info_opr',
-        ];
-
-        $parts = [];
-
-        foreach ($hierarchy as $tag => $key) {
-            $value = $tagValues[$key] ?? null;
-            if ($value !== null) {
-                $parts[] = $tag.'/'.$value;
-            }
-        }
-
-        return implode(' ', $parts);
-    }
-
     private function formatDateForDofTag(mixed $value): ?string
     {
         if ($value === null) {
@@ -294,39 +266,5 @@ class StoreFlightPlanRequest extends FormRequest
         }
 
         return $digits;
-    }
-
-    private function extractOtherInfoTagValue(string $tag, string $text): ?string
-    {
-        if ($text === '') {
-            return null;
-        }
-
-        // Find the position of our tag
-        $tagWithSlash = $tag.'/';
-        $tagPos = stripos($text, $tagWithSlash);
-
-        if ($tagPos === false) {
-            return null;
-        }
-
-        // Start collecting from after the tag and slash
-        $startPos = $tagPos + strlen($tagWithSlash);
-
-        // Find the next tag pattern in the remaining text
-        $remainingText = substr($text, $startPos);
-
-        // Pattern to find the next tag: 2-5 capital letters/numbers followed by /
-        if (preg_match('/\s+[A-Z0-9]{2,5}\//i', $remainingText, $matches, PREG_OFFSET_CAPTURE)) {
-            // Extract value from start to where the next tag begins
-            $value = substr($remainingText, 0, $matches[0][1]);
-        } else {
-            // No next tag found, take everything remaining
-            $value = $remainingText;
-        }
-
-        $value = trim($value);
-
-        return $value === '' ? null : $value;
     }
 }

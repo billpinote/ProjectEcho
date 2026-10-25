@@ -13,6 +13,27 @@ use Illuminate\Validation\ValidationException;
 
 class FlightPlanMutationService
 {
+    public function reject(Flight $flight, User $actor, string $wiresign, string $reason): void
+    {
+        if (! $actor->can('reject', $flight)) {
+            throw new AuthorizationException;
+        }
+        $flight->forceFill([
+            'status' => FlightPlanStatus::Rejected,
+            'accepted_by_user_id' => null,
+            'accepted_by_wiresign' => null,
+            'rejected_by_wiresign' => $wiresign,
+            'rejection_reason' => trim($reason),
+            'received_by' => null,
+            'received_date' => null,
+            'received_time' => null,
+            'received_facility' => null,
+        ])->save();
+
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_ATC_REJECTED, $actor, null, null, $flight->rejection_reason);
+
+    }
+
     public function accept(Flight $flight, User $actor, string $wiresign): Flight
     {
         return DB::transaction(function () use ($flight, $actor, $wiresign): Flight {

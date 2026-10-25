@@ -2,6 +2,7 @@
 
 namespace App\Filament\Shared\Resources\Flights;
 
+use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Shared\Resources\Flights\Pages\EditFlight;
 use App\Filament\Shared\Resources\Flights\Pages\ListFlights;
@@ -223,17 +224,9 @@ class FlightResource extends Resource
             $data['authorized_representative_expiry_date'] = null;
         }
 
-        foreach ($data as $field => $value) {
-            if (is_string($value)) {
-                $data[$field] = strtoupper(trim($value));
-            }
-        }
-
-        foreach (['persons_on_board', 'dinghies_number', 'dinghies_capacity'] as $field) {
-            if (array_key_exists($field, $data) && $data[$field] !== null && $data[$field] !== '') {
-                $data[$field] = (int) $data[$field];
-            }
-        }
+        $normalizer = new FlightPlanDataNormalizer;
+        $data = $normalizer->uppercaseStringFlightFields($data);
+        $data = $normalizer->normalizeNumericFlightFields($data);
 
         return $data;
     }
@@ -248,7 +241,7 @@ class FlightResource extends Resource
 
         if (
             filled($data['date_of_flight'] ?? null)
-            && self::extractOtherInfoTagValue('DOF', $otherInformation) === null
+            && FlightPlanDataNormalizer::extractOtherInfoTagValue('DOF', $otherInformation) === null
         ) {
             $dateOfFlight = preg_replace('/\D/', '', (string) $data['date_of_flight']);
 
@@ -258,20 +251,20 @@ class FlightResource extends Resource
         }
 
         $tagValues = [
-            'other_info_dof' => self::extractOtherInfoTagValue('DOF', $otherInformation),
-            'other_info_rmk' => self::extractOtherInfoTagValue('RMK', $otherInformation),
-            'other_info_typ' => self::extractOtherInfoTagValue('TYP', $otherInformation),
-            'other_info_dep' => self::extractOtherInfoTagValue('DEP', $otherInformation),
-            'other_info_route' => self::extractOtherInfoTagValue('RTE', $otherInformation),
-            'other_info_dest' => self::extractOtherInfoTagValue('DEST', $otherInformation),
-            'other_info_altn_1' => self::extractOtherInfoTagValue('ALTN', $otherInformation),
-            'other_info_altn_2' => self::extractOtherInfoTagValue('ALTN2', $otherInformation),
-            'other_info_pbn' => self::extractOtherInfoTagValue('PBN', $otherInformation),
-            'other_info_reg' => self::extractOtherInfoTagValue('REG', $otherInformation),
-            'other_info_opr' => self::extractOtherInfoTagValue('OPR', $otherInformation),
+            'other_info_dof' => FlightPlanDataNormalizer::extractOtherInfoTagValue('DOF', $otherInformation),
+            'other_info_rmk' => FlightPlanDataNormalizer::extractOtherInfoTagValue('RMK', $otherInformation),
+            'other_info_typ' => FlightPlanDataNormalizer::extractOtherInfoTagValue('TYP', $otherInformation),
+            'other_info_dep' => FlightPlanDataNormalizer::extractOtherInfoTagValue('DEP', $otherInformation),
+            'other_info_route' => FlightPlanDataNormalizer::extractOtherInfoTagValue('RTE', $otherInformation),
+            'other_info_dest' => FlightPlanDataNormalizer::extractOtherInfoTagValue('DEST', $otherInformation),
+            'other_info_altn_1' => FlightPlanDataNormalizer::extractOtherInfoTagValue('ALTN', $otherInformation),
+            'other_info_altn_2' => FlightPlanDataNormalizer::extractOtherInfoTagValue('ALTN2', $otherInformation),
+            'other_info_pbn' => FlightPlanDataNormalizer::extractOtherInfoTagValue('PBN', $otherInformation),
+            'other_info_reg' => FlightPlanDataNormalizer::extractOtherInfoTagValue('REG', $otherInformation),
+            'other_info_opr' => FlightPlanDataNormalizer::extractOtherInfoTagValue('OPR', $otherInformation),
         ];
 
-        $data['other_information'] = self::reorganizeOtherInformationTags($tagValues);
+        $data['other_information'] = FlightPlanDataNormalizer::reorganizeOtherInformationTags($tagValues);
 
         return [
             ...$data,
@@ -282,58 +275,4 @@ class FlightResource extends Resource
     /**
      * @param  array<string, ?string>  $tagValues
      */
-    private static function reorganizeOtherInformationTags(array $tagValues): string
-    {
-        $hierarchy = [
-            'DOF' => 'other_info_dof',
-            'RMK' => 'other_info_rmk',
-            'TYP' => 'other_info_typ',
-            'DEP' => 'other_info_dep',
-            'RTE' => 'other_info_route',
-            'DEST' => 'other_info_dest',
-            'ALTN' => 'other_info_altn_1',
-            'ALTN2' => 'other_info_altn_2',
-            'PBN' => 'other_info_pbn',
-            'REG' => 'other_info_reg',
-            'OPR' => 'other_info_opr',
-        ];
-
-        $parts = [];
-
-        foreach ($hierarchy as $tag => $key) {
-            $value = $tagValues[$key] ?? null;
-
-            if ($value !== null) {
-                $parts[] = $tag.'/'.$value;
-            }
-        }
-
-        return implode(' ', $parts);
-    }
-
-    private static function extractOtherInfoTagValue(string $tag, string $text): ?string
-    {
-        if ($text === '') {
-            return null;
-        }
-
-        $tagWithSlash = $tag.'/';
-        $tagPosition = stripos($text, $tagWithSlash);
-
-        if ($tagPosition === false) {
-            return null;
-        }
-
-        $remainingText = substr($text, $tagPosition + strlen($tagWithSlash));
-
-        if (preg_match('/\s+[A-Z0-9]{2,5}\//i', $remainingText, $matches, PREG_OFFSET_CAPTURE)) {
-            $value = substr($remainingText, 0, $matches[0][1]);
-        } else {
-            $value = $remainingText;
-        }
-
-        $value = trim($value);
-
-        return $value === '' ? null : $value;
-    }
 }

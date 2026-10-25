@@ -2,10 +2,12 @@
 
 namespace App\Filament\Shared\Resources\Reports;
 
+use App\Domain\FlightPlans\Services\FlightReportQueryService;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Reports\Pages\ListAbbreviatedFlightReports;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class AbbreviatedFlightReportResource extends FlightResource
 {
@@ -25,13 +27,7 @@ class AbbreviatedFlightReportResource extends FlightResource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = static::getFlightPlanBaseQuery()->where('received_facility', 'RPUS');
-
-        if (! static::hasStatusColumn()) {
-            return $query->whereNotNull('accepted_by_user_id');
-        }
-
-        return $query->accepted();
+        return app(FlightReportQueryService::class)->abbreviated(Auth::user());
     }
 
     public static function getNavigationBadge(): ?string

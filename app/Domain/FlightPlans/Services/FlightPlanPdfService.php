@@ -4,12 +4,14 @@ namespace App\Domain\FlightPlans\Services;
 
 use App\Models\Flight;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class FlightPlanPdfService
 {
+    public function __construct(private FlightPlanQrRenderer $qrRenderer) {}
+
     public function regenerate(Flight $flight): string
     {
         $this->deleteExisting($flight);
@@ -17,12 +19,7 @@ class FlightPlanPdfService
         $folderName = now('UTC')->format('Ymd');
         $fileName = $this->uniqueFileName($flight, $folderName);
         $storagePath = 'flight-plans/'.$folderName.'/'.$fileName;
-        $payload = app(FlightPlanQrPayloadService::class)->buildPayload($flight);
-        $qrCodeBase64 = $payload === null
-            ? null
-            : 'data:image/svg+xml;base64,'.base64_encode(
-                QrCode::size(250)->margin(2)->format('svg')->generate($payload)
-            );
+        $qrCodeBase64 = $this->qrRenderer->generateFlightPlanQrCodeBase64($flight);
 
         $pdf = Pdf::loadView('flightplan.pdf', [
             'flight' => $flight,
@@ -34,8 +31,8 @@ class FlightPlanPdfService
         return $storagePath;
     }
 
-    /** @return \Illuminate\Support\Collection<int, string> */
-    public function storedPaths(Flight $flight)
+    /** @return Collection<int, string> */
+    public function storedPaths(Flight $flight): Collection
     {
         $baseName = $this->baseName($flight);
 
@@ -89,5 +86,42 @@ class FlightPlanPdfService
         $proposedTime = $timeDigits !== '' ? str_pad(substr($timeDigits, 0, 4), 4, '0', STR_PAD_LEFT) : '';
 
         return $aircraftIdentification.$dateOfFlight.$proposedTime;
+    }
+
+    public function resolveRequestedPath(mixed $requestedFile): ?string
+    {
+
+        if (! is_string($requestedFile) || $requestedFile === '') {
+            return null;
+        }
+
+        $safeFileName = basename($requestedFile);
+
+        return collect(Storage::disk('public')->allFiles('flight-plans'))
+            ->first(function (string $path) use ($safeFileName) {
+                return basename($path) === $safeFileName;
+            });
+    }
+
+    public function buildPdfOnlyFileName(Flight $flight): string
+    {
+        $baseName = $this->baseName($flight);
+
+        if ($baseName === '') {
+            $baseName = 'FLIGHTPLAN'.now('UTC')->format('YmdHi');
+        }
+
+        return $baseName.'-PDF-ONLY.pdf';
+    }
+
+    public function renderPdfOnly(Flight $flight): string
+    {
+        $pdf = Pdf::loadView('flightplan.pdf', [
+            'flight' => $flight,
+            'qrCodeBase64' => null,
+            'isPdfOnly' => true,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->output();
     }
 }

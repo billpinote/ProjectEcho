@@ -1,325 +1,283 @@
-<laravel-boost-guidelines>
-=== foundation rules ===
+# Project Echo — Agent Instructions
 
-# Laravel Boost Guidelines
+## Project Context
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
+Project Echo is a Laravel 12 and Filament 5 application for flight-plan filing, PIC authorization, operational review, manifests, and reporting.
 
-## Foundational Context
+Read the relevant implementation and tests before changing behavior. Treat the code and dependency lockfiles as the source of truth when documentation differs.
 
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+## Stack
 
-- php - 8.2
-- filament/filament (FILAMENT) - v5
-- laravel/framework (LARAVEL) - v12
-- laravel/prompts (PROMPTS) - v0
-- livewire/livewire (LIVEWIRE) - v4
-- laravel/boost (BOOST) - v2
-- laravel/mcp (MCP) - v0
-- laravel/pail (PAIL) - v1
-- laravel/pint (PINT) - v1
-- laravel/sail (SAIL) - v1
-- phpunit/phpunit (PHPUNIT) - v11
-- tailwindcss (TAILWINDCSS) - v4
+- PHP requirement: `^8.2`
+- Laravel: v12
+- Filament: v5
+- Livewire: verify the resolved version in `composer.lock`
+- PHPUnit: v11
+- Tailwind CSS: v4
+- Vite: v6
+- DomPDF for PDF generation
+- Simple QRCode and BaconQrCode for QR rendering
+- Laravel Pint for PHP formatting
 
-## Conventions
+Do not update dependencies unless the task authorizes it.
 
-- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
-- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
-- Check for existing components to reuse before writing a new one.
+## Architecture
 
-## Verification Scripts
+Follow `docs/architecture/folder-structure.md`.
 
-- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+- `app/Http/Controllers`: HTTP entry points and responses.
+- `app/Http/Requests`: request validation and request-specific authorization.
+- `app/Domain/FlightPlans`: flight-plan services, rules, enums, and support classes.
+- Other `app/Domain` folders: their corresponding business concepts.
+- `app/Models`: Eloquent models and relationships.
+- `app/Policies`: resource authorization.
+- `app/Filament/Panels/{PanelName}`: panel-owned route-facing resources, pages, and widgets.
+- `app/Filament/Shared`: reusable Filament implementations.
+- `app/Providers/Filament`: panel providers.
+- `resources/views`: Blade templates.
+- `tests/Feature` and `tests/Unit`: automated behavior checks.
 
-## Application Structure & Architecture
+Keep models in `app/Models`. Reuse existing classes before introducing new abstractions.
 
-- Stick to existing directory structure; don't create new base folders without approval.
-- Do not change the application's dependencies without approval.
+Cohesive subfolders within existing application directories are allowed when needed for an authorized task. Ask before introducing a new top-level architecture or changing dependencies.
 
-## Frontend Bundling
+Treat any synced `sources/` directory as read-only reference material.
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+## Controller and Service Boundaries
 
-## Documentation Files
+Controllers should:
 
-- You must only create documentation files if explicitly requested by the user.
+1. Authorize the operation.
+2. Validate input.
+3. Invoke focused services or queries.
+4. Return a view, redirect, download, or other HTTP response.
 
-## Replies
+Keep business mutations, reusable normalization, QR rendering, PDF storage, and reusable queries outside controllers.
 
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
+- Prefer constructor dependency injection.
+- Keep HTTP requests, responses, redirects, and browser-session management in the HTTP layer.
+- Domain services should accept explicit values, models, or typed data rather than HTTP requests.
+- Domain services must not depend on Filament resources or pages.
+- HTTP and Filament entry points should reuse the same business rules and mutation services.
+- Shared report queries should be usable by both Filament tables and PDF exports.
+- Avoid large traits, generic base controllers, pass-through classes, and repository layers introduced solely to reduce file length.
+- Choose class boundaries by responsibility rather than an arbitrary line limit.
 
-=== boost rules ===
+## Flight Controller Refactoring
 
-# Laravel Boost
+When splitting `FlightController`, group endpoints by workflow:
 
-## Artisan
+- Flight-plan form, submission, and saved-flight display.
+- Session preview creation, display, editing, and discard.
+- ATC acceptance and rejection.
+- QR display and image downloads.
+- QR lookup, scanned previews, and edit-from-QR.
+- Stored PDF downloads and PDF-only generation.
+- PIC authorization handoff previews.
+- Report PDF exports.
 
-- Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
-- Inspect routes with `php artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
-- Read configuration values using dot notation: `php artisan config:show app.name`, `php artisan config:show database.default`. Or read config files directly from the `config/` directory.
+Use `app/Http/Controllers/FlightPlans` and `app/Http/Controllers/Reports` when implementing this split.
 
-## Tinker
+Keep `FlightManifestController` separate.
 
-- Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
-- Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
-  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+Reuse and extend existing flight-plan services before adding alternatives. Search for direct callers, including Filament pages and tests, before moving or deleting methods.
 
-=== php rules ===
+## Behavior and Compatibility
 
-# PHP
+During refactoring, preserve unless explicitly authorized to change:
 
-- Always use curly braces for control structures, even for single-line bodies.
-- Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
-- Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
-- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
-- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
-- Use array shape type definitions in PHPDoc blocks.
+- Route names, URLs, and HTTP methods.
+- Status codes, redirects, validation errors, and response headers.
+- View variables and download filenames.
+- Session keys and preview behavior.
+- QR payload formats, signing, verification, and compatibility.
+- Policy checks and operator visibility restrictions.
+- Database transaction boundaries and audit events.
+- Existing PDF generation and retention behavior.
 
-=== deployments rules ===
+Refactor incrementally and verify each logical extraction.
 
-# Deployment
+Do not combine structural refactoring with unrelated behavior changes.
 
-- Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
+## Flight-Plan Workflow Rules
 
-=== tests rules ===
+Preserve these distinctions:
 
-# Test Enforcement
+- Saving a session preview does not create an operational flight record.
+- Filing an operational flight plan requires the appropriate user permissions and preparer/PIC context.
+- PDF-only generation does not create an operational filing or its QR code.
+- PIC authorization and ATC acceptance are separate decisions.
+- A pending or declined PIC authorization must retain its existing access and workflow restrictions.
+- Operator and preparer relationships must come from trusted application context where required.
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+Use the existing mutation services for status transitions and their audit events.
 
-=== laravel/core rules ===
+Keep related database mutations and audit records atomic where the workflow requires it. Do not assume filesystem writes participate in database transactions.
 
-# Do Things the Laravel Way
+Refresh database-generated defaults, including revision information, before signing a newly submitted flight snapshot.
 
-- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
-- If you're creating a generic PHP class, use `php artisan make:class`.
-- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
+Inspect the current status enum and transition rules rather than relying on a hard-coded status list in documentation.
 
-### Model Creation
+## Authorization and QR Access
 
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
+Keep these access paths explicit:
 
-## APIs & Eloquent Resources
+- Authenticated access through policies and role permissions.
+- Public access granted to specific flights through the browser session.
+- Signed offline QR snapshot previews.
+- PIC authorization handoff access.
 
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
+Successful QR verification establishes payload validity. It does not automatically authorize viewing every database record or performing mutations.
 
-## URL Generation
+Preserve existing authorization checks when extracting helpers or services.
 
-- When generating links to other pages, prefer named routes and the `route()` function.
+Resolve requested PDF assets within the authorized flight’s files. Do not treat a supplied filename or token alone as proof of access.
+
+## Validation and Normalization
+
+Use Form Requests for HTTP validation where appropriate.
+
+Reuse the existing ICAO rules in `app/Domain/FlightPlans/Rules`.
+
+Centralize normalization shared by HTTP forms and Filament, while preserving intentional differences between entry points.
+
+- Use the existing time helpers and tests for storage and display conventions.
+- Distinguish UTC clock times from durations such as endurance and total EET.
+- Avoid implicit server-timezone conversions.
+- Preserve minute precision and existing field formats.
+- Normalize numeric inputs before persistence.
+- Apply uppercase normalization only to fields whose established contract requires it.
+- Keep `other_information` tag parsing and formatting consistent across forms, previews, and QR snapshots.
+- Do not overwrite trusted operator or pilot context with untrusted submitted values.
+
+## Filament Ownership
+
+Panel providers should register classes from their corresponding panel folders.
+
+Route-facing resources and pages belong to the panel that owns them. Reusable implementations belong in `app/Filament/Shared`, with panel wrappers where required for routing.
+
+Artisan is the technical maintenance panel. Do not duplicate operational workflows there. Use the real operational panels when supporting or testing operational workflows.
+
+For Filament 5:
+
+- Form fields: `Filament\Forms\Components`.
+- Layout components: `Filament\Schemas\Components`.
+- Schema utilities: `Filament\Schemas\Components\Utilities`.
+- Infolist entries: `Filament\Infolists\Components`.
+- Actions: `Filament\Actions`.
+- Use `Filament\Support\Icons\Heroicon` where appropriate.
+- Preserve inherited property types when overriding pages, resources, and widgets.
+- Set file visibility and layout column spans explicitly when required.
+
+Use the installed version’s APIs. Consult official version-specific documentation when uncertain.
+
+## PHP Conventions
+
+Follow neighboring code and existing naming conventions.
+
+- Use descriptive class, method, and variable names.
+- Add explicit parameter and return types where practical.
+- Use constructor property promotion when appropriate.
+- Use braces for control structures.
+- Prefer PHPDoc for useful type information, including array shapes.
+- Add comments for non-obvious decisions rather than restating code.
+- Preserve existing enum cases and backing values.
+- Avoid unrelated cleanup in focused changes.
+
+## Laravel Conventions
+
+- Prefer named routes and `route()` for application links.
+- Use Eloquent relationships and existing query scopes.
+- Use policies for resource authorization.
+- Prefer existing factories and factory states in tests.
+- Use Artisan generators when available and suitable.
+- Pass `--no-interaction` to commands that support it.
+- Inspect command help when options are uncertain.
+
+Middleware and exception configuration belongs in `bootstrap/app.php`. Application providers are registered in `bootstrap/providers.php`.
+
+When modifying database columns, preserve required existing attributes.
+
+Do not create or modify database records through Tinker unless authorized by the task. Prefer factories and tests for verification.
+
+Do not run destructive database commands against an unverified database.
 
 ## Testing
 
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
+Use PHPUnit classes and `Livewire::test()` for Filament/Livewire tests.
 
-## Vite Error
+- Run relevant existing tests for every behavior-affecting change or refactor.
+- Add or update tests when behavior changes or relevant coverage is missing.
+- Existing behavior tests can verify a pure extraction; do not add tests that merely mirror implementation details.
+- Cover meaningful success, validation failure, authorization failure, and edge cases affected by the change.
+- Authenticate with the appropriate role and panel context for Filament tests.
+- Do not convert unrelated tests between frameworks.
+- Do not delete tests without explicit authorization.
 
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+For flight-plan refactoring, select relevant coverage for:
 
-=== laravel/v12 rules ===
+- Session previews and PDF-only generation.
+- QR parsing, signing, lookup, and scanned previews.
+- Flight submission and operational transitions.
+- PIC authorization.
+- Operator isolation and policy enforcement.
+- Time storage and normalization.
+- Manifest requirements and audit events.
 
-# Laravel 12
+Run focused tests after each logical step. Broaden testing when shared changes or failures justify it.
 
-- Since Laravel 11, Laravel has a new streamlined file structure which this project uses.
+Commands:
 
-## Laravel 12 Structure
+    php artisan test --compact
+    php artisan test --compact tests/Feature/FlightPlanPreviewActionsTest.php
+    php artisan test --compact --filter=TestName
 
-- In Laravel 12, middleware are no longer registered in `app/Http/Kernel.php`.
-- Middleware are configured declaratively in `bootstrap/app.php` using `Application::configure()->withMiddleware()`.
-- `bootstrap/app.php` is the file to register middleware, exceptions, and routing files.
-- `bootstrap/providers.php` contains application specific service providers.
-- The `app/Console/Kernel.php` file no longer exists; use `bootstrap/app.php` or `routes/console.php` for console configuration.
-- Console commands in `app/Console/Commands/` are automatically available and do not require manual registration.
+Check `phpunit.xml` and test setup before running database-backed tests. Verify that tests use an isolated database.
 
-## Database
+If tooling is unavailable, report what could not run and why. Do not claim checks passed without running them.
 
-- When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
-- Laravel 12 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
+## Formatting and Assets
 
-### Models
+After modifying PHP, run the installed Pint formatter on affected files or the dirty working tree:
 
-- Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
+    php vendor/bin/pint --dirty
 
-=== pint/core rules ===
+Inspect the installed formatter’s help before using version-specific options.
 
-# Laravel Pint Code Formatter
+For frontend changes, run the relevant build when available:
 
-- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
+    npm run build
 
-=== phpunit/core rules ===
+Use `npm run dev` or `composer run dev` only when a development server is needed. Avoid starting duplicate long-running processes.
 
-# PHPUnit
+## Documentation and Instruction Maintenance
 
-- This application uses PHPUnit for testing. All tests must be written as PHPUnit classes. Use `php artisan make:test --phpunit {name}` to create a new test.
-- If you see a test using "Pest", convert it to PHPUnit.
-- Every time a test has been updated, run that singular test.
-- When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite to make sure everything is still passing.
-- Tests should cover all happy paths, failure paths, and edge cases.
-- You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files; these are core to the application.
+Create documentation files only when requested. Update existing documentation when the task includes documentation changes.
 
-## Running Tests
+Keep project instructions consistent with:
 
-- Run the minimal number of tests, using an appropriate filter, before finalizing.
-- To run all tests: `php artisan test --compact`.
-- To run all tests in a file: `php artisan test --compact tests/Feature/ExampleTest.php`.
-- To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file).
+- `docs/architecture/folder-structure.md`
+- `docs/architecture/filament-panels.md`
+- `docs/copilot-instructions.md`
 
-=== filament/filament rules ===
+Avoid duplicating changing implementation details such as exact file lengths, test counts, field counts, or full status lists.
 
-## Filament
+See `docs/architecture/controllers.md` for controller responsibilities,
+service ownership, access boundaries, and relevant tests. Keep it aligned
+with the implemented structure when changing those boundaries.
 
-- Filament is used by this application. Follow the existing conventions for how and where it is implemented.
-- Filament is a Server-Driven UI (SDUI) framework for Laravel that lets you define user interfaces in PHP using structured configuration objects. Built on Livewire, Alpine.js, and Tailwind CSS.
-- Use the `search-docs` tool for official documentation on Artisan commands, code examples, testing, relationships, and idiomatic practices. If `search-docs` is unavailable, refer to https://filamentphp.com/docs.
+Do not document proposed classes as existing until they are implemented.
 
-### Artisan
+## Working Style and Completion
 
-- Always use Filament-specific Artisan commands to create files. Find available commands with the `list-artisan-commands` tool, or run `php artisan --help`.
-- Always inspect required options before running a command, and always pass `--no-interaction`.
+Proceed with routine, reversible work within the authorized task.
 
-### Patterns
+Ask for clarification when a missing decision materially affects behavior, security, schema, dependencies, or scope.
 
-Always use static `make()` methods to initialize components. Most configuration methods accept a `Closure` for dynamic values.
+Before finishing:
 
-Use `Get $get` to read other form field values for conditional logic:
-
-<code-snippet name="Conditional form field visibility" lang="php">
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Utilities\Get;
-
-Select::make('type')
-    ->options(CompanyType::class)
-    ->required()
-    ->live(),
-
-TextInput::make('company_name')
-    ->required()
-    ->visible(fn (Get $get): bool => $get('type') === 'business'),
-
-</code-snippet>
-
-Use `state()` with a `Closure` to compute derived column values:
-
-<code-snippet name="Computed table column value" lang="php">
-use Filament\Tables\Columns\TextColumn;
-
-TextColumn::make('full_name')
-    ->state(fn (User $record): string => "{$record->first_name} {$record->last_name}"),
-
-</code-snippet>
-
-Actions encapsulate a button with an optional modal form and logic:
-
-<code-snippet name="Action with modal form" lang="php">
-use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
-
-Action::make('updateEmail')
-    ->schema([
-        TextInput::make('email')
-            ->email()
-            ->required(),
-    ])
-    ->action(fn (array $data, User $record) => $record->update($data))
-
-</code-snippet>
-
-### Testing
-
-Always authenticate before testing panel functionality. Filament uses Livewire, so use `Livewire::test()` or `livewire()` (available when `pestphp/pest-plugin-livewire` is in `composer.json`):
-
-<code-snippet name="Table test" lang="php">
-use function Pest\Livewire\livewire;
-
-livewire(ListUsers::class)
-    ->assertCanSeeTableRecords($users)
-    ->searchTable($users->first()->name)
-    ->assertCanSeeTableRecords($users->take(1))
-    ->assertCanNotSeeTableRecords($users->skip(1));
-
-</code-snippet>
-
-<code-snippet name="Create resource test" lang="php">
-use function Pest\Laravel\assertDatabaseHas;
-use function Pest\Livewire\livewire;
-
-livewire(CreateUser::class)
-    ->fillForm([
-        'name' => 'Test',
-        'email' => 'test@example.com',
-    ])
-    ->call('create')
-    ->assertNotified()
-    ->assertRedirect();
-
-assertDatabaseHas(User::class, [
-    'name' => 'Test',
-    'email' => 'test@example.com',
-]);
-
-</code-snippet>
-
-<code-snippet name="Testing validation" lang="php">
-use function Pest\Livewire\livewire;
-
-livewire(CreateUser::class)
-    ->fillForm([
-        'name' => null,
-        'email' => 'invalid-email',
-    ])
-    ->call('create')
-    ->assertHasFormErrors([
-        'name' => 'required',
-        'email' => 'email',
-    ])
-    ->assertNotNotified();
-
-</code-snippet>
-
-<code-snippet name="Calling actions in pages" lang="php">
-use Filament\Actions\DeleteAction;
-use function Pest\Livewire\livewire;
-
-livewire(EditUser::class, ['record' => $user->id])
-    ->callAction(DeleteAction::class)
-    ->assertNotified()
-    ->assertRedirect();
-
-</code-snippet>
-
-<code-snippet name="Calling actions in tables" lang="php">
-use Filament\Actions\Testing\TestAction;
-use function Pest\Livewire\livewire;
-
-livewire(ListUsers::class)
-    ->callAction(TestAction::make('promote')->table($user), [
-        'role' => 'admin',
-    ])
-    ->assertNotified();
-
-</code-snippet>
-
-### Correct Namespaces
-
-- Form fields (`TextInput`, `Select`, etc.): `Filament\Forms\Components\`
-- Infolist entries (`TextEntry`, `IconEntry`, etc.): `Filament\Infolists\Components\`
-- Layout components (`Grid`, `Section`, `Fieldset`, `Tabs`, `Wizard`, etc.): `Filament\Schemas\Components\`
-- Schema utilities (`Get`, `Set`, etc.): `Filament\Schemas\Components\Utilities\`
-- Actions (`DeleteAction`, `CreateAction`, etc.): `Filament\Actions\`. Never use `Filament\Tables\Actions\`, `Filament\Forms\Actions\`, or any other sub-namespace for actions.
-- Icons: `Filament\Support\Icons\Heroicon` enum (e.g., `Heroicon::PencilSquare`)
-
-### Common Mistakes
-
-- **Never assume public file visibility.** File visibility is `private` by default. Always use `->visibility('public')` when public access is needed.
-- **Never assume full-width layout.** `Grid`, `Section`, and `Fieldset` do not span all columns by default. Explicitly set column spans when needed.
-- **Use correct property types when overriding Page, Resource, and Widget properties.** These properties have union types or changed modifiers that must be preserved:
-  - `$navigationIcon`: `protected static string | BackedEnum | null` (not `?string`)
-  - `$navigationGroup`: `protected static string | UnitEnum | null` (not `?string`)
-  - `$view`: `protected string` (not `protected static string`) on Page and Widget classes
-
-</laravel-boost-guidelines>
+- Review the diff for accidental changes.
+- Run appropriate tests and formatting.
+- Report what changed and why.
+- List the checks actually run.
+- Identify remaining failures, limitations, or follow-up work.
