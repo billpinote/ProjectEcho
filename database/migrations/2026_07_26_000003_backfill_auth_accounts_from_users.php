@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
@@ -10,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        DB::table('users')->orderBy('id')->chunk(100, function (array $users): void {
+        DB::table('users')->orderBy('id')->chunk(100, function (Collection $users): void {
             $rows = [];
 
             foreach ($users as $user) {
