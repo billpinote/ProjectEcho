@@ -2,12 +2,14 @@
 
 namespace App\Filament\Panels\Pilot\Pages;
 
+use App\Auth\AuthenticationEvidence;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Users\Enums\UserRole;
-use App\Filament\Shared\Pages\ImportScanQr;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
+use App\Filament\Shared\Pages\ImportScanQr;
 use App\Models\Flight;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Validation\ValidationException;
 
@@ -97,7 +99,11 @@ class ScanAuthorizationQr extends ImportScanQr
     public function authorizeAsPic(): void
     {
         try {
-            app(PicAuthorizationService::class)->authorizeFromHandoff($this->picAuthorizationHandoffToken ?? '', auth()->user());
+            app(PicAuthorizationService::class)->authorizeFromHandoff(
+                $this->picAuthorizationHandoffToken ?? '',
+                auth()->user(),
+                AuthenticationEvidence::fromSession(Filament::auth()),
+            );
             $this->picAuthorizationHandoffToken = null;
             Notification::make()->success()->title('Flight plan authorized as PIC')->send();
         } catch (ValidationException $exception) {
@@ -119,7 +125,12 @@ class ScanAuthorizationQr extends ImportScanQr
         }
 
         try {
-            app(PicAuthorizationService::class)->declineFromHandoff($this->picAuthorizationHandoffToken ?? '', auth()->user(), $this->declineReason);
+            app(PicAuthorizationService::class)->declineFromHandoff(
+                $this->picAuthorizationHandoffToken ?? '',
+                auth()->user(),
+                $this->declineReason,
+                AuthenticationEvidence::fromSession(Filament::auth()),
+            );
             $this->picAuthorizationHandoffToken = null;
             Notification::make()->success()->title('Flight plan declined and moved to your archive.')->send();
             $this->redirect(MyArchivedFlightResource::getUrl('index', panel: 'pilot'));

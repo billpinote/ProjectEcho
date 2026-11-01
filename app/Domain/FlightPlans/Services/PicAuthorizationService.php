@@ -2,6 +2,7 @@
 
 namespace App\Domain\FlightPlans\Services;
 
+use App\Auth\AuthenticationEvidence;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
@@ -64,16 +65,18 @@ class PicAuthorizationService
         return $flight;
     }
 
-    public function authorizeFromPayload(string $payload, User $authorizer): Flight
+    public function authorizeFromPayload(string $payload, User $authorizer, ?AuthenticationEvidence $evidence = null): Flight
     {
+        $evidence?->assertActor($authorizer);
         $flight = $this->resolveAccessibleFlightFromPayload($payload, $authorizer);
         $token = $this->createAuthorizationHandoff($flight);
 
-        return $this->authorizeFromHandoff($token, $authorizer);
+        return $this->authorizeFromHandoff($token, $authorizer, $evidence);
     }
 
-    public function authorizeFromHandoff(string $token, User $authorizer): Flight
+    public function authorizeFromHandoff(string $token, User $authorizer, ?AuthenticationEvidence $evidence = null): Flight
     {
+        $evidence?->assertActor($authorizer);
         $flight = $this->resolveAuthorizationHandoff($token);
         if ($flight === null) {
             throw ValidationException::withMessages(['payload' => 'This PIC authorization handoff is invalid, expired, or no longer current.']);
@@ -82,7 +85,7 @@ class PicAuthorizationService
         $this->guardPicAccess($flight, $authorizer);
         $credentials = $this->eligibleCredentials($authorizer, $flight);
 
-        $authorizedFlight = DB::transaction(function () use ($flight, $authorizer, $credentials, $token): Flight {
+        $authorizedFlight = DB::transaction(function () use ($flight, $authorizer, $credentials, $token, $evidence): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $this->guardCurrentAuthorizationState($flight, $authorizer);
             $this->guardHandoffToken($flight, $token);
@@ -107,29 +110,33 @@ class PicAuthorizationService
                 'status' => FlightPlanStatus::Pending,
             ])->save();
 
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_PIC_AUTHORIZED, $authorizer, null, [
+                'revision_number' => $flight->revision_number,
+                'authorization_method' => 'QR',
+                ...($evidence === null ? [] : ['authentication' => $evidence->auditValues()]),
+            ]);
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $authorizer);
+
             return $flight->refresh();
         });
 
         app(FlightPlanPdfService::class)->regenerate($authorizedFlight);
-        FlightPlanEvent::record($authorizedFlight, FlightPlanEvent::TYPE_PIC_AUTHORIZED, $authorizer, null, [
-            'revision_number' => $authorizedFlight->revision_number,
-            'authorization_method' => 'QR',
-        ]);
-        FlightPlanEvent::record($authorizedFlight, FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $authorizer);
 
         return $authorizedFlight;
     }
 
-    public function declineFromPayload(string $payload, User $user, ?string $reason = null): Flight
+    public function declineFromPayload(string $payload, User $user, ?string $reason = null, ?AuthenticationEvidence $evidence = null): Flight
     {
+        $evidence?->assertActor($user);
         $flight = $this->resolveAccessibleFlightFromPayload($payload, $user);
         $token = $this->createAuthorizationHandoff($flight);
 
-        return $this->declineFromHandoff($token, $user, $reason);
+        return $this->declineFromHandoff($token, $user, $reason, $evidence);
     }
 
-    public function declineFromHandoff(string $token, User $user, ?string $reason = null): Flight
+    public function declineFromHandoff(string $token, User $user, ?string $reason = null, ?AuthenticationEvidence $evidence = null): Flight
     {
+        $evidence?->assertActor($user);
         $reason = filled($reason) ? trim($reason) : null;
         if ($reason === null || mb_strlen($reason) > 500) {
             throw ValidationException::withMessages(['declineReason' => 'A reason for declining is required and must not exceed 500 characters.']);
@@ -142,7 +149,7 @@ class PicAuthorizationService
         $this->guardPicAccess($flight, $user);
         $this->eligibleCredentials($user, $flight);
 
-        $declinedFlight = DB::transaction(function () use ($flight, $user, $reason, $token): Flight {
+        $declinedFlight = DB::transaction(function () use ($flight, $user, $reason, $token, $evidence): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $this->guardCurrentAuthorizationState($flight, $user);
             $this->guardHandoffToken($flight, $token);
@@ -156,10 +163,14 @@ class PicAuthorizationService
                 'pic_authorization_token_expires_at' => null,
             ])->save();
 
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_PIC_DECLINED, $user, null, [
+                'revision_number' => $flight->revision_number,
+                'authorization_method' => 'QR',
+                ...($evidence === null ? [] : ['authentication' => $evidence->auditValues()]),
+            ], $reason);
+
             return $flight->refresh();
         });
-
-        FlightPlanEvent::record($declinedFlight, FlightPlanEvent::TYPE_PIC_DECLINED, $user, null, null, $reason);
 
         return $declinedFlight;
     }
