@@ -37,13 +37,13 @@ class ManifestPdfService
             return $bytes;
         }
 
-        return $this->render($this->dataFor($flight, $manifest));
+        return $this->render($this->dataFor($flight, $manifest), app(FilingAuthorizationService::class)->signatureBytes($flight));
     }
 
     public function snapshot(Flight $flight): void
     {
         $manifest = $flight->manifest()->with('persons')->firstOrFail();
-        $bytes = $this->render($this->dataFor($flight, $manifest));
+        $bytes = $this->render($this->dataFor($flight, $manifest), app(FilingAuthorizationService::class)->signatureBytes($flight));
         $manifest->forceFill([
             'accepted_pdf_content' => Crypt::encryptString(base64_encode($bytes)),
             'accepted_pdf_sha256' => hash('sha256', $bytes),
@@ -53,7 +53,7 @@ class ManifestPdfService
     }
 
     /** @param array<string, mixed> $data */
-    public function render(array $data): string
+    public function render(array $data, ?string $signatureBytes = null): string
     {
         $pdf = new Fpdi('P', 'pt', [612, 792], true, 'UTF-8', false);
         $pdf->setPrintHeader(false);
@@ -78,6 +78,10 @@ class ManifestPdfService
         }
         $pdf->AddPage('P', [612, 792]);
         $pdf->useTemplate($first, 0, 0, 612, 792);
+        if ($signatureBytes !== null) {
+            [$x, $y, $width, $height] = ManifestPdfLayout::SIGNATURE;
+            $pdf->Image('@'.$signatureBytes, $x, $y, $width, $height, 'PNG', '', '', true, 300, '', false, false, 0, 'CM', false, false);
+        }
         $data['owner_and_phone'] = implode("\n", array_filter([$data['aircraft_owner_name'] ?? '', $data['aircraft_owner_contact_number'] ?? ''], fn ($value): bool => filled($value)));
         $credentials = array_map(fn (mixed $value): string => Str::squish((string) $value), [
             $data['pilot_license_no'] ?? '', $data['pilot_ratings'] ?? '', $data['license_expiry_date'] ?? '',

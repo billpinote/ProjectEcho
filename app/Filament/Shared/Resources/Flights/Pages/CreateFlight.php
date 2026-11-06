@@ -18,9 +18,13 @@ use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 
 class CreateFlight extends CreateRecord
 {
+    #[Locked]
+    public ?int $correctionSourceId = null;
+
     protected static string $resource = FlightResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -58,6 +62,7 @@ class CreateFlight extends CreateRecord
             'pic_authorization_declined_at', 'pic_authorization_decline_reason', 'accepted_by_user_id',
             'accepted_by_wiresign', 'rejected_by_wiresign', 'rejection_reason', 'reviewed_at'];
         $this->form->fill(collect($source->getAttributes())->except($excluded)->all());
+        $this->correctionSourceId = (int) $source->getKey();
         $this->data['revision_of_id'] = $source->getKey();
     }
 
@@ -98,7 +103,7 @@ class CreateFlight extends CreateRecord
             $data = PilotFlightPlanCredentials::applySnapshot($data, $user);
         }
 
-        $sourceId = (int) ($data['revision_of_id'] ?? request()->integer('correct_from'));
+        $sourceId = $this->correctionSourceId ?? 0;
         $source = $sourceId > 0 ? Flight::query()->find($sourceId) : null;
         if ($source !== null) {
             abort_unless($source->pic_authorization_status === 'declined'

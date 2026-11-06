@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanPdfService;
 use App\Domain\FlightPlans\Support\FlightManifestData;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
@@ -218,7 +219,8 @@ class FlightManifestTest extends TestCase
         $this->assertSame(1, $flight->events()->where('event_type', FlightPlanEvent::TYPE_ATC_ACCEPTED)->count());
         $this->assertTrue(app(FlightManifestService::class)->view($flight, $flight->filedBy)->is($manifest));
         $this->assertFalse($flight->filedBy->can('update', $manifest->fresh()));
-        $this->assertNotEmpty(Storage::disk('public')->allFiles());
+        $this->assertNotEmpty(app(FlightPlanPdfService::class)->storedPaths($flight->fresh()));
+        $this->assertEmpty(Storage::disk('public')->allFiles());
     }
 
     #[DataProvider('lockedMutations')]

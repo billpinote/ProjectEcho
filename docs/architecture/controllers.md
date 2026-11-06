@@ -23,6 +23,7 @@ Controllers under `app/Http/Controllers/FlightPlans`:
 | FlightPlanScanController | Look up QR payloads, display scanned previews, and prefill forms from QR data |
 | FlightPlanPdfController | Download stored PDFs and generate PDF-only flight plans |
 | PicAuthorizationPreviewController | Display flight plans reached through PIC authorization handoffs |
+| FilingAuthorizationController | Serve authorized package documents/history and explicit self-prepared filing consent |
 
 Other controllers:
 
@@ -62,6 +63,7 @@ Flight-plan services live in `app/Domain/FlightPlans/Services`.
 | FlightPlanQrLookupService | Resolve verified payloads into lookup results |
 | PicAuthorizationService | Enforce PIC eligibility and manage authorization handoffs and decisions |
 | FlightManifestService | Save manifests and enforce manifest requirements |
+| FilingAuthorizationService | Preserve filing review/decision evidence, signature versions, and material-change invalidation |
 
 Shared data normalization belongs in
 `app/Domain/FlightPlans/Support/FlightPlanDataNormalizer`.
@@ -98,6 +100,11 @@ PIC scanner actions obtain authenticated session evidence at the Filament entry
 point. `PicAuthorizationService` consumes that explicit evidence without depending
 on the session or login mechanism. See [Authentication and PIC Authorization](authentication.md)
 for current audit metadata and future authentication integration boundaries.
+
+See [Unified Filing Authorization](filing-authorization.md) for document registry,
+package snapshots, explicit signature consent, material-change classification,
+and private PDF retention. Package document access uses the existing flight or
+PIC handoff access paths; it does not grant access to standalone profile images.
 
 ### QR Processing
 

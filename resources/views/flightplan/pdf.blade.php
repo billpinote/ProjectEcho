@@ -455,6 +455,37 @@
     </style>
 </head>
 <body class="{{ isset($isPreview) ? 'preview' : '' }}{{ isset($isPreview) && ($showReviewActions ?? false) ? ' preview-has-review-toolbar' : '' }}">
+    @if(isset($filingPackage))
+        <section style="background: white; padding: 12px; margin: 12px auto; max-width: 794px;">
+            <strong>Review complete filing #{{ $filingPackage->id }}</strong>
+            <p>One PIC decision covers the exact documents listed here. Review each document before authorizing.</p>
+            @foreach($filingPackage->documents as $type => $document)
+                <p><a href="{{ route('filing.document', ['package' => $filingPackage, 'type' => $type, 'token' => $filingToken]) }}" target="_blank" rel="noopener noreferrer">{{ str($type)->headline() }} — revision {{ $document['revision'] }}</a></p>
+            @endforeach
+            @if($selfFilingAuthorization ?? false)
+                <form method="POST" action="{{ route('filing.authorize-self', ['token' => $filingToken]) }}">
+                    @csrf
+                    <p>Explicitly authorize this complete filing. Electronic signing uses your currently approved signature version.</p>
+                    <button name="apply_signature" value="0">Authorize without signature image</button>
+                    @if($hasApprovedPilotSignature ?? false)
+                        <button name="apply_signature" value="1">Authorize and apply verified signature</button>
+                    @else
+                        <p>No approved signature is available. Submit one for verification in your profile, or authorize without an electronic signature.</p>
+                    @endif
+                    @error('signature')<p role="alert">{{ $message }}</p>@enderror
+                    @error('payload')<p role="alert">{{ $message }}</p>@enderror
+                    @error('manifest')<p role="alert">{{ $message }}</p>@enderror
+                </form>
+            @endif
+        </section>
+    @elseif(($isPreview ?? false) && $flight->exists && auth()->check())
+        <div style="background: white; padding: 8px; margin: 8px auto; max-width: 794px;">
+            <a href="{{ route('filing.history', $flight) }}">Filing authorization history</a>
+            @if($canReviewOwnFiling ?? false)
+                <a href="{{ route('filing.review-self', $flight) }}">Review filing and authorize signature application</a>
+            @endif
+        </div>
+    @endif
     @php
         $isPdfOnly = (bool) ($isPdfOnly ?? false);
         $charBoxes = function (mixed $value): \Illuminate\Support\HtmlString {
@@ -1173,7 +1204,12 @@
             <td colspan="2">
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr>
-                        <td style="width: 23%;  padding: 2px; border-bottom: 1px solid #000; text-align: center;">
+                        <td style="width: 23%; padding: 2px; border-bottom: 1px solid #000; text-align: center;">
+                            @if($pilotSignatureDataUrl ?? null)
+                                <div style="height: 24px; margin-top: -24px; line-height: 24px; text-align: center;">
+                                    <img src="{{ $pilotSignatureDataUrl }}" alt="Authorized PIC signature" style="width: {{ $pilotSignatureWidth }}px; height: {{ $pilotSignatureHeight }}px;" />
+                                </div>
+                            @endif
                             <span style="font-weight: bold;">{{ $flight->pilot_in_command ?? '' }}</span>
                         </td>
                         <td style="width: 1%; text-align: center;">
@@ -1345,6 +1381,9 @@
                         <li>
                             <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('Y-m-d H:i:s\Z') ?? '—' }}</span>
                             <span class="echo-preview-activity-event"> · {{ $activityLabel }}</span>
+                            @if(isset($activityEvent->new_values['filing_authorization_id']))
+                                <a href="{{ route('filing.history', $flight) }}"> · Filing package #{{ $activityEvent->new_values['filing_authorization_id'] }}</a>
+                            @endif
                             @if($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_DELAYED)
                                 <span> · {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($oldEobt) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($newEobt) ?? 'N/A' }}</span>
                             @endif

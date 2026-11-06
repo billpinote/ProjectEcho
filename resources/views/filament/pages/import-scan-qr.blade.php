@@ -490,11 +490,23 @@
                             @elseif($this->canAuthorizeMatchedFlight())
                                 <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #b7791f; border-radius: 0.75rem; background: #fff8e1;">
                                     <strong>PIC Authorization Required</strong>
-                                    <p style="margin: 0.4rem 0 0;">Review this flight plan carefully. By authorizing it, you identify yourself as the Pilot-in-Command for this flight.</p>
+                                    <p style="margin: 0.4rem 0 0;">Review every document below. One authorization covers this complete filing and identifies you as its Pilot-in-Command.</p>
+                                    @foreach($this->filingDocuments() as $document)
+                                        <p><a href="{{ $document['url'] }}" target="_blank" rel="noopener noreferrer">Review {{ $document['label'] }}</a></p>
+                                    @endforeach
                                 </div>
                                 <button type="button" wire:click="authorizeAsPic" wire:loading.attr="disabled" class="echo-button echo-button-accent" style="margin-top: 1rem;">
                                     Authorize as PIC
                                 </button>
+                                <p class="mt-2 text-sm">Authorize as PIC records your decision without applying a signature image.</p>
+                                @if($this->hasApprovedSignature())
+                                    <button type="button" wire:click="authorizeAndSignAsPic" wire:loading.attr="disabled" class="echo-button echo-button-accent mt-3">Authorize filing and apply verified signature</button>
+                                @else
+                                    <p class="mt-2 text-sm">No approved signature is available. You can authorize without an electronic signature, or submit your signature for verification in your profile.</p>
+                                @endif
+                                @error('signature')<p role="alert">{{ $message }}</p>@enderror
+                                @error('payload')<p role="alert">{{ $message }}</p>@enderror
+                                @error('manifest')<p role="alert">{{ $message }}</p>@enderror
                             @else
                                 <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #718096; border-radius: 0.75rem; background: #edf2f7;">
                                     <strong>PIC Authorization Required</strong>

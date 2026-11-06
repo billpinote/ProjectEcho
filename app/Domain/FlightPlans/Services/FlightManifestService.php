@@ -29,7 +29,7 @@ class FlightManifestService
     /** @param array<string, mixed> $attributes */
     public function save(Flight $flight, User $actor, array $attributes): FlightManifest
     {
-        return DB::transaction(function () use ($flight, $actor, $attributes): FlightManifest {
+        return app(FilingAuthorizationService::class)->mutate($flight, function () use ($flight, $actor, $attributes): FlightManifest {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $manifest = $flight->manifest()->first();
             Gate::forUser($actor)->authorize($manifest === null ? 'create' : 'update', $manifest ?? [FlightManifest::class, $flight]);

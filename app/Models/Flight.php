@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Users\Enums\UserRole;
 use Carbon\CarbonInterface;
@@ -20,6 +21,21 @@ use Illuminate\Validation\ValidationException;
 
 class Flight extends Model
 {
+    public function filingAuthorizations(): HasMany
+    {
+        return $this->hasMany(FilingAuthorization::class);
+    }
+
+    public function save(array $options = []): bool
+    {
+        if (! $this->exists) {
+            return parent::save($options);
+        }
+
+        return app(FilingAuthorizationService::class)
+            ->mutate($this, fn (): bool => parent::save($options));
+    }
+
     private const OPERATIONS_TIMEZONE = 'Asia/Manila';
 
     private const MINUTE_PRECISION_TIME_FIELDS = [
@@ -193,6 +209,9 @@ class Flight extends Model
             }
         });
         static::deleting(function (self $flight): void {
+            if ($flight->filingAuthorizations()->exists()) {
+                throw ValidationException::withMessages(['flight' => 'Filing authorization history must be preserved. Cancel this flight instead.']);
+            }
             if ($flight->hasBeenAccepted()) {
                 throw ValidationException::withMessages(['flight' => 'Accepted filings must be preserved.']);
             }
@@ -533,6 +552,9 @@ class Flight extends Model
 
     public function requiresPicAuthorization(): bool
     {
+        if ($this->exists && $this->filingAuthorizations()->exists() && ! $this->isPicAuthorizationCurrent()) {
+            return true;
+        }
         if ($this->preparedBy?->isOperatorStaff()) {
             return true;
         }
@@ -564,9 +586,17 @@ class Flight extends Model
 
     public function isPicAuthorizationCurrent(): bool
     {
-        return $this->isPicAuthorized()
+        $current = $this->isPicAuthorized()
             && $this->pic_authorized_revision !== null
             && (int) $this->pic_authorized_revision === (int) ($this->revision_number ?? 1);
+
+        if (! $current || ! $this->exists) {
+            return $current;
+        }
+        $packages = app(FilingAuthorizationService::class);
+        $package = $packages->latestFor($this);
+
+        return $package === null || $packages->isCurrent($this, $package);
     }
 
     public function canSubmitToAtc(): bool

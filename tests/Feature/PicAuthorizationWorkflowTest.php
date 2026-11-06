@@ -359,7 +359,7 @@ class PicAuthorizationWorkflowTest extends TestCase
         $flight = $this->awaitingFlight($pilot);
         $pdfService = app(FlightPlanPdfService::class);
         $path = $pdfService->regenerate($flight);
-        $before = Storage::disk('public')->get($path);
+        $before = Storage::disk('local')->get($path);
         $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
 
         app(PicAuthorizationService::class)->authorizeFromHandoff($token, $pilot);
@@ -367,8 +367,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $flight->refresh();
         $expectedPilotName = strtoupper($pilot->fullName());
         $this->assertSame($expectedPilotName, $flight->pilot_in_command);
-        $this->assertNotSame($before, Storage::disk('public')->get($path));
-        $this->assertCount(1, Storage::disk('public')->allFiles('flight-plans'));
+        $this->assertNotSame($before, Storage::disk('local')->get($pdfService->storedPaths($flight)->first()));
+        $this->assertEmpty(Storage::disk('public')->allFiles('flight-plans'));
         $this->actingAs($pilot)
             ->get(route('flights.view', $flight))
             ->assertSee($expectedPilotName, false);

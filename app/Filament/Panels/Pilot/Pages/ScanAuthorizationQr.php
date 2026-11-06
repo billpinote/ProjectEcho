@@ -3,6 +3,7 @@
 namespace App\Filament\Panels\Pilot\Pages;
 
 use App\Auth\AuthenticationEvidence;
+use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Users\Enums\UserRole;
@@ -98,11 +99,41 @@ class ScanAuthorizationQr extends ImportScanQr
 
     public function authorizeAsPic(): void
     {
+        $this->authorizeFiling(false);
+    }
+
+    public function authorizeAndSignAsPic(): void
+    {
+        $this->authorizeFiling(true);
+    }
+
+    public function filingDocuments(): array
+    {
+        $flight = app(PicAuthorizationService::class)->resolveAuthorizationHandoff($this->picAuthorizationHandoffToken ?? '');
+        if ($flight === null || ! FlightAccess::canAccessPicAuthorization(auth()->user(), $flight)) {
+            return [];
+        }
+        $package = app(FilingAuthorizationService::class)->latestFor($flight);
+
+        return collect($package?->documents ?? [])->map(fn (array $document, string $type): array => [
+            'label' => str($type)->headline()->toString(),
+            'url' => route('filing.document', ['package' => $package, 'type' => $type, 'token' => $this->picAuthorizationHandoffToken]),
+        ])->all();
+    }
+
+    public function hasApprovedSignature(): bool
+    {
+        return auth()->user()?->approvedSignature()->where('status', 'approved')->exists() ?? false;
+    }
+
+    private function authorizeFiling(bool $applySignature): void
+    {
         try {
             app(PicAuthorizationService::class)->authorizeFromHandoff(
                 $this->picAuthorizationHandoffToken ?? '',
                 auth()->user(),
                 AuthenticationEvidence::fromSession(Filament::auth()),
+                applySignature: $applySignature,
             );
             $this->picAuthorizationHandoffToken = null;
             Notification::make()->success()->title('Flight plan authorized as PIC')->send();

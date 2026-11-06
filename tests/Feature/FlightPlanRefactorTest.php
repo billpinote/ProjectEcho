@@ -72,13 +72,20 @@ class FlightPlanRefactorTest extends TestCase
     public function test_public_pdf_download_requires_a_session_grant_and_keeps_exact_file_selection(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $flight = Flight::factory()->create();
+        $pdfs = app(FlightPlanPdfService::class);
+        $path = $pdfs->regenerate($flight);
+        Storage::disk('local')->put($path, '%PDF-owned');
         Storage::disk('public')->put('flight-plans/20260101/exact.pdf', '%PDF-test');
-        $url = route('flights.pdf.download', ['flight' => $flight, 'file' => 'exact.pdf']);
+        $url = route('flights.pdf.download', ['flight' => $flight, 'file' => basename($path)]);
         $this->get($url)->assertForbidden();
         $this->withSession(['public_flight_access' => [(string) $flight->id]])->get($url)
-            ->assertOk()->assertDownload('exact.pdf');
-        $this->assertSame('flight-plans/20260101/exact.pdf', app(FlightPlanPdfService::class)->resolveRequestedPath('../exact.pdf'));
+            ->assertOk()->assertDownload(basename($path))->assertStreamedContent('%PDF-owned');
+        $this->assertSame($path, $pdfs->resolveRequestedPath('../'.basename($path), $flight));
+        $this->assertNull($pdfs->resolveRequestedPath('../exact.pdf', $flight));
+        $this->get(route('flights.pdf.download', ['flight' => $flight, 'file' => 'exact.pdf']))
+            ->assertDownload(basename($path))->assertStreamedContent('%PDF-owned');
     }
 
     public function test_rejection_validation_does_not_persist_and_success_records_the_event(): void

@@ -49,7 +49,8 @@ class FlightPolicy
      */
     public function delete(User $user, Flight $flight): bool
     {
-        return $user->hasFullFlightAccess() && ! $flight->hasBeenAccepted();
+        return $user->hasFullFlightAccess() && ! $flight->hasBeenAccepted()
+            && ! $flight->filingAuthorizations()->exists();
     }
 
     /**

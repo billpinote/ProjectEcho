@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\FlightPlans\Services\FlightPlanPdfService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
@@ -101,7 +102,9 @@ class FlightPlanPreviewActionsTest extends TestCase
             ->assertSessionMissing('status')
             ->assertSessionMissing('pdf_download_url');
 
-        Storage::disk('public')->assertExists($expectedFile);
+        $path = app(FlightPlanPdfService::class)->storedPaths($flight)->first();
+        Storage::disk('local')->assertExists($path);
+        Storage::disk('public')->assertMissing($expectedFile);
     }
 
     public function test_authenticated_pilot_filing_records_filed_by_user_id(): void

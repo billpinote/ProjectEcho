@@ -63,13 +63,16 @@ entered again for the PIC action. Its audit representation is:
 
 The service checks the evidence actor before acting. PIC approval/decline events
 and the related database mutation are recorded in the same database transaction.
-Approval PDF generation remains outside that transaction: a filesystem/rendering
-failure cannot roll back a committed decision, and now cannot remove its audit
-evidence. No PDF layout or signature application is changed.
+The unified filing workflow also preserves authorized document PDFs inside that
+transaction. Rendering failure rolls back the decision; the subsequent private
+PDF cache write remains outside the transaction. See
+[Unified Filing Authorization](filing-authorization.md) for package and signature consent.
 
 `pic_authorization_method = QR` continues to describe the authorization channel;
 it must not be repurposed to describe authentication. Authentication metadata
-uses the existing `flight_plan_events.new_values` JSON, so no migration is needed.
+uses the existing `flight_plan_events.new_values` JSON, so no authentication-schema
+migration is needed. The unified filing milestone separately adds its package
+evidence table.
 
 Existing trusted in-process callers may omit the optional evidence argument.
 Those calls retain their authorization checks and do not invent authentication
@@ -91,16 +94,15 @@ as password verification or backfilled as a new ceremony.
 | Authorized revision | `pic_authorized_revision`; decision event revision |
 | Authorization timestamp | `pic_authorized_at`; event `created_at` |
 | Authentication method | New browser decision event JSON; unknown for older/trusted calls |
-| Manifest revision | Not captured; manifests have no authorization revision binding |
-| Signature version | Not captured; profile verification is separate from document consent |
+| Manifest revision | Captured as a content-addressed revision in new filing packages |
+| Signature version | Captured only when the PIC explicitly authorizes signature application |
 
 The existing profile signature architecture remains authoritative:
 `User::approvedSignature()` selects the active version; `PilotSignatureService`
 checks file hashes and manages review; prior versions are preserved. No signature
-is applied merely because the user is authenticated. Manifest signing and
-signature-version binding require a separate approved workflow, including how
-post-authorization manifest edits affect consent. Existing manifest editing and
-accepted PDF snapshots are unchanged.
+is applied merely because the user is authenticated. New filing packages bind
+signature versions through explicit consent and invalidate current authorization
+on material document edits. Existing accepted PDF snapshots remain in use.
 
 ## Future passkey and TOTP integration (not implemented)
 
@@ -159,12 +161,10 @@ action-bound evidence, replay protection, revocation handling, and server-side
 reconciliation before operational acceptance. WebAuthn's local authenticator and
 TOTP's local code generation alone do not provide that protocol.
 
-Maintain existing signature image access restrictions and audit history. Future
-signed documents must explicitly bind the authorized signature and document
-versions. Existing separate concerns remain: manifest edits before ATMO acceptance
-are allowed, and flight-plan material-edit/revision invalidation must be assessed
-before adding document signatures. No new guarantees about those workflows are
-introduced by authentication metadata.
+Maintain existing signature image access restrictions and audit history. Signed
+filing documents bind the authorized signature and document versions through the
+unified filing package. Authentication metadata alone never authorizes changed
+documents or signature application.
 
 ## Verification
 

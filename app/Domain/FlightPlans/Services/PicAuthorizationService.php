@@ -24,20 +24,25 @@ class PicAuthorizationService
         PilotLicenseType::AirlineTransportPilot,
     ];
 
-    public function createAuthorizationHandoff(Flight $flight): string
+    public function createAuthorizationHandoff(Flight $flight, bool $selfPrepared = false): string
     {
-        abort_unless($flight->requiresPicAuthorization()
-            && ! $flight->isPicAuthorizationCurrent()
-            && ! $flight->isPicAuthorizationDeclined(), 422);
+        return DB::transaction(function () use ($flight, $selfPrepared): string {
+            $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
+            abort_unless(($selfPrepared || $flight->requiresPicAuthorization())
+                && ($selfPrepared || ! $flight->isPicAuthorizationCurrent())
+                && ! $flight->hasBeenAccepted()
+                && ! $flight->isPicAuthorizationDeclined(), 422);
 
-        $token = Str::random(64);
-        $revision = (int) ($flight->revision_number ?? 1);
-        $flight->forceFill([
-            'pic_authorization_token' => hash('sha256', $token.'.'.$revision),
-            'pic_authorization_token_expires_at' => now()->addMinutes(self::HANDOFF_TTL_MINUTES),
-        ])->saveQuietly();
+            app(FilingAuthorizationService::class)->request($flight);
+            $token = Str::random(64);
+            $revision = (int) ($flight->revision_number ?? 1);
+            $flight->forceFill([
+                'pic_authorization_token' => hash('sha256', $token.'.'.$revision),
+                'pic_authorization_token_expires_at' => now()->addMinutes(self::HANDOFF_TTL_MINUTES),
+            ])->saveQuietly();
 
-        return $token;
+            return $token;
+        });
     }
 
     public function resolveAuthorizationHandoff(string $token): ?Flight
@@ -65,16 +70,16 @@ class PicAuthorizationService
         return $flight;
     }
 
-    public function authorizeFromPayload(string $payload, User $authorizer, ?AuthenticationEvidence $evidence = null): Flight
+    public function authorizeFromPayload(string $payload, User $authorizer, ?AuthenticationEvidence $evidence = null, bool $applySignature = false): Flight
     {
         $evidence?->assertActor($authorizer);
         $flight = $this->resolveAccessibleFlightFromPayload($payload, $authorizer);
         $token = $this->createAuthorizationHandoff($flight);
 
-        return $this->authorizeFromHandoff($token, $authorizer, $evidence);
+        return $this->authorizeFromHandoff($token, $authorizer, $evidence, $applySignature);
     }
 
-    public function authorizeFromHandoff(string $token, User $authorizer, ?AuthenticationEvidence $evidence = null): Flight
+    public function authorizeFromHandoff(string $token, User $authorizer, ?AuthenticationEvidence $evidence = null, bool $applySignature = false, bool $selfPrepared = false): Flight
     {
         $evidence?->assertActor($authorizer);
         $flight = $this->resolveAuthorizationHandoff($token);
@@ -82,15 +87,38 @@ class PicAuthorizationService
             throw ValidationException::withMessages(['payload' => 'This PIC authorization handoff is invalid, expired, or no longer current.']);
         }
 
-        $this->guardPicAccess($flight, $authorizer);
-        $credentials = $this->eligibleCredentials($authorizer, $flight);
+        if ($selfPrepared) {
+            abort_unless($authorizer->isPilot()
+                && (int) $flight->prepared_by_user_id === (int) $authorizer->getKey()
+                && (int) $flight->pilot_in_command_user_id === (int) $authorizer->getKey(), 403);
+        }
 
-        $authorizedFlight = DB::transaction(function () use ($flight, $authorizer, $credentials, $token, $evidence): Flight {
+        if (! $selfPrepared) {
+            $this->guardPicAccess($flight, $authorizer);
+        }
+        $this->eligibleCredentials($authorizer, $flight);
+
+        $authorizedFlight = DB::transaction(function () use ($flight, $authorizer, $token, $evidence, $applySignature, $selfPrepared): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
-            $this->guardCurrentAuthorizationState($flight, $authorizer);
+            $authorizer = User::query()->lockForUpdate()->findOrFail($authorizer->getKey());
+            if ($selfPrepared) {
+                abort_unless($authorizer->isPilot()
+                    && (int) $flight->prepared_by_user_id === (int) $authorizer->id
+                    && (int) $flight->pilot_in_command_user_id === (int) $authorizer->id, 403);
+            }
+            if (! $selfPrepared) {
+                $this->guardPicAccess($flight, $authorizer);
+            } else {
+                abort_unless(FlightAccess::canView($authorizer, $flight), 403);
+            }
+            $credentials = $this->eligibleCredentials($authorizer, $flight);
+            $this->guardCurrentAuthorizationState($flight, $authorizer, ! $selfPrepared);
             $this->guardHandoffToken($flight, $token);
+            $packages = app(FilingAuthorizationService::class);
+            $package = $packages->assertReviewedPackageCurrent($flight);
+            $signature = $applySignature ? $packages->approvedSignature($authorizer) : null;
 
-            $flight->forceFill([
+            $packages->recordingDecision($flight, fn () => $flight->forceFill([
                 'pilot_in_command_user_id' => $authorizer->getKey(),
                 'pilot_id' => $authorizer->getKey(),
                 'pilot_in_command' => $credentials['pilot_name'],
@@ -108,11 +136,17 @@ class PicAuthorizationService
                 'pic_authorization_token' => null,
                 'pic_authorization_token_expires_at' => null,
                 'status' => FlightPlanStatus::Pending,
-            ])->save();
+            ])->save());
+
+            if ($flight->manifest()->exists()) {
+                app(FlightManifestService::class)->assertComplete($flight);
+            }
+            $packages->decide($package, $flight, $authorizer, true, $evidence, $signature);
 
             FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_PIC_AUTHORIZED, $authorizer, null, [
                 'revision_number' => $flight->revision_number,
                 'authorization_method' => 'QR',
+                'filing_authorization_id' => $package->getKey(),
                 ...($evidence === null ? [] : ['authentication' => $evidence->auditValues()]),
             ]);
             FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $authorizer);
@@ -151,8 +185,13 @@ class PicAuthorizationService
 
         $declinedFlight = DB::transaction(function () use ($flight, $user, $reason, $token, $evidence): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
+            $user = User::query()->lockForUpdate()->findOrFail($user->getKey());
+            $this->guardPicAccess($flight, $user);
+            $this->eligibleCredentials($user, $flight);
             $this->guardCurrentAuthorizationState($flight, $user);
             $this->guardHandoffToken($flight, $token);
+            $packages = app(FilingAuthorizationService::class);
+            $package = $packages->assertReviewedPackageCurrent($flight);
 
             $flight->forceFill([
                 'pic_authorization_status' => 'declined',
@@ -163,9 +202,12 @@ class PicAuthorizationService
                 'pic_authorization_token_expires_at' => null,
             ])->save();
 
+            $packages->decide($package, $flight, $user, false, $evidence, null, $reason);
+
             FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_PIC_DECLINED, $user, null, [
                 'revision_number' => $flight->revision_number,
                 'authorization_method' => 'QR',
+                'filing_authorization_id' => $package->getKey(),
                 ...($evidence === null ? [] : ['authentication' => $evidence->auditValues()]),
             ], $reason);
 

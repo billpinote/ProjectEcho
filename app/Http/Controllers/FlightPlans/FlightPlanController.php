@@ -75,6 +75,12 @@ class FlightPlanController extends Controller
             return view('flightplan.pic-authorization-required', [
                 'noticeHeading' => 'PIC Authorization Pending',
                 'noticeMessage' => 'This flight plan is not yet available for operational review. PIC authorization must be completed first.',
+                'filingHistoryUrl' => route('filing.history', $flight),
+                'selfFilingReviewUrl' => Auth::user()->isPilot()
+                    && (int) $flight->prepared_by_user_id === (int) Auth::id()
+                    && (int) $flight->pilot_in_command_user_id === (int) Auth::id()
+                    && ! $flight->hasBeenAccepted() && ! $flight->isPicAuthorizationDeclined()
+                    ? route('filing.review-self', $flight) : null,
             ]);
         }
 

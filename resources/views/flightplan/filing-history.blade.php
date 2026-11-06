@@ -1,0 +1,17 @@
+<x-manifest-layout title="Filing authorization history">
+    <h1 class="text-2xl font-semibold">Filing authorization history</h1>
+    <p>Flight {{ $flight->aircraft_identification }}. Previous decisions remain preserved when a filing changes.</p>
+    @forelse($packages as $package)
+        <section class="rounded-lg border p-4">
+            <h2 class="font-semibold">Package #{{ $package->id }} — {{ str($package->status)->headline() }}</h2>
+            <p>{{ $currentPackageId === $package->id ? 'Current filing authorization' : 'Historical package — this is not current filing authorization' }}</p>
+            <p>Flight revision {{ $package->flight_revision }} · {{ $package->decided_at ?? $package->requested_at }}</p>
+            <p>Authentication: {{ $package->authentication['method'] ?? 'Not captured' }}. Signature: {{ $package->signature_version === null ? 'Not applied' : 'Version '.$package->signature_version }}.</p>
+            @foreach(($package->authorized_documents ?? $package->documents) as $type => $document)
+                <p><a href="{{ route('filing.document', ['package' => $package, 'type' => $type]) }}" target="_blank" rel="noopener noreferrer">{{ str($type)->headline() }} — preserved package document</a></p>
+            @endforeach
+        </section>
+    @empty
+        <p>No package evidence was captured for this legacy filing. Existing authorization history remains in the flight activity timeline.</p>
+    @endforelse
+</x-manifest-layout>
