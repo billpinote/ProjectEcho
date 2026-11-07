@@ -24,6 +24,7 @@ use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
@@ -237,11 +238,14 @@ class CreateFlight extends CreateRecord
                 $this->reportAuthorizationFailure($exception);
             }
         }
-        $flight = static::getModel()::create($data);
 
-        app(FlightPlanMutationService::class)->recordSubmission($flight, auth()->user());
+        return DB::transaction(function () use ($data): Flight {
+            $flight = static::getModel()::create($data)->refresh();
 
-        return $flight;
+            app(FlightPlanMutationService::class)->recordSubmission($flight, auth()->user());
+
+            return $flight;
+        });
     }
 
     protected function getCreateFormAction(): Action

@@ -289,8 +289,11 @@
         .echo-preview-activity summary { min-height: 44px; padding: 12px 14px; color: #334155; font-size: 13px; font-weight: 700; cursor: pointer; list-style-position: inside; }
         .echo-preview-activity summary::marker { color: #64748b; }
         .echo-preview-activity-timeline { margin: 0; padding: 0 14px 12px 34px; border-top: 1px solid #f1f5f9; list-style: none; }
-        .echo-preview-activity-timeline li { position: relative; margin: 0; padding: 10px 0 0 14px; border-left: 2px solid #dbeafe; font-size: 12px; line-height: 1.45; }
-        .echo-preview-activity-timeline li::before { position: absolute; top: 14px; left: -5px; width: 7px; height: 7px; border-radius: 50%; background: #60a5fa; content: ""; }
+        .echo-preview-activity-timeline > li { position: relative; margin: 0; padding: 10px 0 0 14px; border-left: 2px solid #dbeafe; font-size: 12px; line-height: 1.45; }
+        .echo-preview-activity-timeline > li::before { position: absolute; top: 14px; left: -5px; width: 7px; height: 7px; border-radius: 50%; background: #60a5fa; content: ""; }
+        .echo-preview-activity-timeline details > summary { min-height: auto; padding: 6px 0; }
+        .echo-preview-activity-timeline dt { font-weight: 600; }
+        .echo-preview-activity-timeline dd { margin: 0 0 6px; overflow-wrap: anywhere; }
         .echo-preview-activity-time { color: #64748b; font-variant-numeric: tabular-nums; }
         .echo-preview-activity-event { color: #1e293b; font-weight: 700; }
 
@@ -479,13 +482,6 @@
                 </form>
             @endif
         </section>
-    @elseif(($isPreview ?? false) && $flight->exists && auth()->check())
-        <div style="background: white; padding: 8px; margin: 8px auto; max-width: 794px;">
-            <a href="{{ route('filing.history', $flight) }}">Filing authorization history</a>
-            @if($canReviewOwnFiling ?? false)
-                <a href="{{ route('filing.review-self', $flight) }}">Review filing and authorize signature application</a>
-            @endif
-        </div>
     @endif
     @php
         $isPdfOnly = (bool) ($isPdfOnly ?? false);
@@ -539,7 +535,7 @@
 
         <div class="echo-review-page echo-preview-header">
             <div>
-                <p class="echo-review-eyebrow">ATMO · Echo</p>
+                <p class="echo-review-eyebrow">{{ auth()->user()?->role ? strtoupper(auth()->user()->role->label()).' · ECHO' : 'ECHO' }}</p>
                 <h1 class="echo-preview-title">Flight Plan Preview</h1>
                 <p class="echo-preview-aircraft">{{ $flight->aircraft_identification }}</p>
             </div>
@@ -1341,77 +1337,9 @@
     </div>
     @endif
 
-    @if(isset($isPreview))
-        @php
-            $activityEvents = $flight->events()->with('actor')->orderBy('created_at')->orderBy('id')->get();
-        @endphp
-        <details class="echo-preview-activity">
-            <summary>Flight Plan Activity · {{ $activityEvents->count() }} {{ $activityEvents->count() === 1 ? 'event' : 'events' }}</summary>
-            @if($activityEvents->isNotEmpty())
-                <ol class="echo-preview-activity-timeline">
-                    @foreach($activityEvents as $activityEvent)
-                        @php
-                            $activityLabel = match ($activityEvent->event_type) {
-                                \App\Models\FlightPlanEvent::TYPE_CREATED => 'Flight plan created',
-                                \App\Models\FlightPlanEvent::TYPE_UPDATED => 'Flight plan updated',
-                                \App\Models\FlightPlanEvent::TYPE_MANIFEST_CREATED => 'Manifest created',
-                                \App\Models\FlightPlanEvent::TYPE_MANIFEST_UPDATED => 'Manifest updated',
-                                \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED => 'Manifest deleted',
-                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION => 'Submitted for PIC authorization',
-                                \App\Models\FlightPlanEvent::TYPE_PIC_AUTHORIZED => 'PIC authorized',
-                                \App\Models\FlightPlanEvent::TYPE_PIC_DECLINED => 'PIC declined',
-                                \App\Models\FlightPlanEvent::TYPE_SUBMITTED_TO_ATC => 'Submitted to ATMO',
-                                \App\Models\FlightPlanEvent::TYPE_ATC_ACCEPTED => 'Accepted by ATMO',
-                                \App\Models\FlightPlanEvent::TYPE_ATC_REJECTED => 'Rejected by ATMO',
-                                \App\Models\FlightPlanEvent::TYPE_DELAYED => 'Flight delayed',
-                                \App\Models\FlightPlanEvent::TYPE_CANCELLED => 'Flight plan cancelled',
-                                \App\Models\FlightPlanEvent::TYPE_ARCHIVED => 'Flight plan archived',
-                                \App\Models\FlightPlanEvent::TYPE_STARTUP_RECORDED => 'Start-up recorded',
-                                \App\Models\FlightPlanEvent::TYPE_BLOCK_OFF_RECORDED => 'Block off recorded',
-                                \App\Models\FlightPlanEvent::TYPE_AIRBORNE => 'Airborne recorded',
-                                \App\Models\FlightPlanEvent::TYPE_TOUCHDOWN => 'Touchdown recorded',
-                                \App\Models\FlightPlanEvent::TYPE_SHUTDOWN_RECORDED => 'Shutdown recorded',
-                                \App\Models\FlightPlanEvent::TYPE_FLIGHT_COMPLETED => 'Flight completed',
-                                default => \Illuminate\Support\Str::headline((string) $activityEvent->event_type),
-                            };
-                            $oldEobt = $activityEvent->old_values['eobt'] ?? $activityEvent->old_values['proposed_time'] ?? null;
-                            $newEobt = $activityEvent->new_values['eobt'] ?? $activityEvent->new_values['proposed_time'] ?? null;
-                            $activityActor = $activityEvent->new_values['actor_name'] ?? $activityEvent->actor?->name;
-                            $activityRole = $activityEvent->new_values['actor_role'] ?? $activityEvent->actor?->role?->value ?? null;
-                        @endphp
-                        <li>
-                            <span class="echo-preview-activity-time">{{ $activityEvent->created_at?->copy()->utc()->format('Y-m-d H:i:s\Z') ?? '—' }}</span>
-                            <span class="echo-preview-activity-event"> · {{ $activityLabel }}</span>
-                            @if(isset($activityEvent->new_values['filing_authorization_id']))
-                                <a href="{{ route('filing.history', $flight) }}"> · Filing package #{{ $activityEvent->new_values['filing_authorization_id'] }}</a>
-                            @endif
-                            @if($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_DELAYED)
-                                <span> · {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($oldEobt) ?? 'N/A' }} → {{ \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($newEobt) ?? 'N/A' }}</span>
-                            @endif
-                            @if($activityActor)
-                                <span> · {{ $activityActor }}@if($activityRole) · {{ \Illuminate\Support\Str::headline($activityRole) }}@endif</span>
-                            @endif
-                            @if($activityEvent->reason)
-                                <span> · {{ $activityEvent->reason }}</span>
-                            @endif
-                            @if(in_array($activityEvent->event_type, [\App\Models\FlightPlanEvent::TYPE_CREATED, \App\Models\FlightPlanEvent::TYPE_UPDATED, \App\Models\FlightPlanEvent::TYPE_MANIFEST_CREATED, \App\Models\FlightPlanEvent::TYPE_MANIFEST_UPDATED, \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED], true))
-                                <ul>
-                                    @foreach(array_diff_key(($activityEvent->event_type === \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED ? $activityEvent->old_values : $activityEvent->new_values) ?? [], array_flip(['actor_name', 'actor_role'])) as $field => $value)
-                                        <li>{{ \Illuminate\Support\Str::headline($field) }}:
-                                            @if($activityEvent->event_type !== \App\Models\FlightPlanEvent::TYPE_MANIFEST_DELETED && array_key_exists($field, $activityEvent->old_values ?? []))
-                                                {{ is_array($activityEvent->old_values[$field]) ? json_encode($activityEvent->old_values[$field], JSON_UNESCAPED_UNICODE) : ($activityEvent->old_values[$field] ?? 'Not set') }} →
-                                            @endif
-                                            {{ is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE) : ($value ?? 'Not set') }}
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @endif
-                        </li>
-                    @endforeach
-                </ol>
-            @endif
-        </details>
-    @endif
+    @isset($activityEvents)
+        @include('flightplan.partials.activity')
+    @endisset
 
     @if(isset($isPreview) && (($showReviewActions ?? false) || ($reviewCompleted ?? false)))
         @if($showReviewActions ?? false)

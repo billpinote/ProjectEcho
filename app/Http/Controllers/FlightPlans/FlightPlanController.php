@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\FlightPlans;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrRenderer;
 use App\Domain\FlightPlans\Services\FlightPlanSubmissionService;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
@@ -12,6 +13,7 @@ use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResour
 use App\Http\Controllers\Controller;
 use App\Http\Support\FlightPlanBrowserContext;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,11 +78,27 @@ class FlightPlanController extends Controller
         $this->browser->ensureFlightUserAccess();
         abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
 
+        $events = $flight->events()->orderBy('created_at')->orderBy('id')->get();
+        $flight->loadMissing(['manifest.persons', 'filingAuthorizations.pilotSignature']);
+        $packages = $flight->filingAuthorizations->sortBy('id')->keyBy('id');
+        $linkedPackages = $events->map(fn ($event) => $event->new_values['filing_authorization_id'] ?? null)->filter();
+        $filing = app(FilingAuthorizationService::class);
+        $activity = [
+            'activityPackages' => $packages,
+            'creationRecorded' => $events->contains('event_type', FlightPlanEvent::TYPE_CREATED),
+            'activityEvents' => $events->toBase()->concat($packages->except($linkedPackages->all()))
+                ->sortBy(fn ($entry) => ($entry->created_at ?? $entry->requested_at)?->getTimestamp() ?? 0),
+            'currentDocumentPackages' => $packages->isEmpty() ? [] : [
+                'flight_plan' => $filing->currentForDocument($flight, 'flight_plan', requireSignature: false, loaded: true)?->id,
+                'passenger_cargo_manifest' => $filing->currentForDocument($flight, 'passenger_cargo_manifest', requireSignature: false, loaded: true)?->id,
+            ],
+        ];
+
         if ($flight->requiresPicAuthorization() && ! $flight->isPicAuthorizationCurrent()) {
             return view('flightplan.pic-authorization-required', [
                 'noticeHeading' => 'PIC Authorization Pending',
                 'noticeMessage' => 'This flight plan is not yet available for operational review. PIC authorization must be completed first.',
-                'filingHistoryUrl' => route('filing.history', $flight),
+                ...$activity,
                 'selfFilingReviewUrl' => Auth::user()->isPilot()
                     && (int) $flight->prepared_by_user_id === (int) Auth::id()
                     && (int) $flight->pilot_in_command_user_id === (int) Auth::id()
@@ -94,9 +112,9 @@ class FlightPlanController extends Controller
         }
 
         $backActionUrl = $this->browser->roleAwarePanelUrl();
-        $flight->loadMissing('manifest');
 
         return view('flightplan.pdf', [
+            ...$activity,
             'flight' => $flight,
             'qrCodeBase64' => $this->qrRenderer->generateFlightPlanQrCodeBase64($flight),
             'isPreview' => true,

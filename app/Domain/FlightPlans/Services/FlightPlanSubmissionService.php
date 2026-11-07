@@ -68,11 +68,9 @@ class FlightPlanSubmissionService
             if (array_keys(app(FilingDocumentRegistry::class)->snapshots($flight)) !== $reviewedDocumentTypes) {
                 throw ValidationException::withMessages(['signature' => 'The included filing documents changed. Review and confirm the complete document set again.']);
             }
-            $this->mutations->recordSubmission($flight, $pic);
-            $event = $flight->events()->where('event_type', FlightPlanEvent::TYPE_CREATED)->sole();
-            $event->update(['new_values' => [
-                ...$event->new_values, 'self_submission_id' => $submissionId, 'submission_fingerprint' => $fingerprint,
-            ]]);
+            $this->mutations->recordSubmission($flight, $pic, [
+                'self_submission_id' => $submissionId, 'submission_fingerprint' => $fingerprint,
+            ]);
 
             return app(PicAuthorizationService::class)->authorizeSelfFiling($flight, $pic, $evidence, $signatureId);
         });
@@ -92,7 +90,7 @@ class FlightPlanSubmissionService
         $flightData = AuthenticatedOperatorFlightData::apply($flightData, $user);
 
         $flight = DB::transaction(function () use ($flightData, $user) {
-            $flight = Flight::create($flightData);
+            $flight = Flight::create($flightData)->refresh();
 
             $this->mutations->recordSubmission($flight, $user);
 

@@ -32,11 +32,6 @@ class AppServiceProvider extends ServiceProvider
             $data = $view->getData();
             $actor = Auth::user();
             $flight = $data['flight'];
-            $canReviewOwn = ($data['isPreview'] ?? false) && $flight->exists && $actor?->isPilot()
-                && $actor->is_active && (int) $flight->prepared_by_user_id === (int) $actor->id
-                && (int) $flight->pilot_in_command_user_id === (int) $actor->id
-                && ! $flight->hasBeenAccepted() && ! $flight->isPicAuthorizationDeclined();
-            $view->with('canReviewOwnFiling', $canReviewOwn);
             $view->with('hasApprovedPilotSignature', isset($data['filingPackage']) && $actor?->approvedSignature()->where('status', 'approved')->exists());
             if (! array_key_exists('pilotSignatureDataUrl', $data)) {
                 $bytes = $actor?->is_active && $actor->can('view', $flight)

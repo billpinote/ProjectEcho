@@ -64,16 +64,17 @@ class FilingAuthorizationController extends Controller
         ]);
     }
 
-    public function history(Request $request, Flight $flight): View
+    public function history(Request $request, Flight $flight): View|RedirectResponse
     {
         $actor = $request->user();
         abort_unless($actor?->is_active && $actor->canViewFlightPlans(), 403);
         abort_if($actor->role === UserRole::Atmo && ! $actor->can('view', $flight), 403);
         $query = $flight->filingAuthorizations()->latest('id');
-        if (! $actor->can('view', $flight)) {
-            abort_unless(FlightAccess::operatorMatches($actor, $flight) && (clone $query)->where('pic_user_id', $actor->id)->exists(), 403);
-            $query->where('pic_user_id', $actor->id);
+        if ($actor->can('view', $flight)) {
+            return redirect(route('flights.view', $flight).'#flight-plan-activity');
         }
+        abort_unless(FlightAccess::operatorMatches($actor, $flight) && (clone $query)->where('pic_user_id', $actor->id)->exists(), 403);
+        $query->where('pic_user_id', $actor->id);
 
         return view('flightplan.filing-history', [
             'flight' => $flight, 'packages' => $query->get(),

@@ -567,6 +567,7 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
             ->assertOk()
+            ->assertSee('ATMO · ECHO')
             ->assertSee('Close Review')
             ->assertSee('data-close-review-tab', false)
             ->assertSee('echo-review-toolbar', false)
@@ -637,7 +638,10 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Close Preview')
             ->assertSee('data-close-review-tab', false)
-            ->assertDontSee('/pilot', false);
+            ->assertDontSee('/pilot', false)
+            ->assertSee('<p class="echo-review-eyebrow">PILOT · ECHO</p>', false)
+            ->assertDontSee('ATMO · ECHO')
+            ->assertDontSee('Review filing and authorize signature application');
     }
 
     public function test_dispatch_saved_flight_preview_can_close_without_dashboard_navigation(): void

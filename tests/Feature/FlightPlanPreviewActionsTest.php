@@ -331,8 +331,7 @@ class FlightPlanPreviewActionsTest extends TestCase
             ->assertSee('Flight delayed')
             ->assertSee('1430')
             ->assertSee('1530')
-            ->assertSee('<details class="echo-preview-activity">', false)
-            ->assertDontSee('<details class="echo-preview-activity" open>', false)
+            ->assertSee('<details class="echo-preview-activity" id="flight-plan-activity">', false)
             ->assertDontSee('Delay history');
     }
 

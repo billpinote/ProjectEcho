@@ -63,7 +63,7 @@ class FlightManifestService
 
             $manifest->load('persons');
             FlightPlanEvent::recordChanges($flight, $creating ? FlightPlanEvent::TYPE_MANIFEST_CREATED : FlightPlanEvent::TYPE_MANIFEST_UPDATED,
-                $actor, $before, $this->auditValues($manifest));
+                $actor, $before, $this->auditValues($manifest), $this->submissionSnapshot($flight, $manifest));
 
             return $manifest;
         });
@@ -75,7 +75,7 @@ class FlightManifestService
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
             $manifest = $flight->manifest()->firstOrFail();
             Gate::forUser($actor)->authorize('delete', $manifest);
-            $before = $this->auditValues($manifest->load('persons'));
+            $before = $this->submissionSnapshot($flight, $manifest->load('persons'));
             $manifest->delete();
             FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_MANIFEST_DELETED, $actor, $before);
         });
@@ -152,6 +152,12 @@ class FlightManifestService
     private function personName(?string $name): string
     {
         return Str::upper(Str::squish((string) $name));
+    }
+
+    /** @return array<string, mixed> */
+    private function submissionSnapshot(Flight $flight, FlightManifest $manifest): array
+    {
+        return [...$this->data->fromFlight($flight), ...$this->auditValues($manifest)];
     }
 
     /** @return array<string, mixed> */

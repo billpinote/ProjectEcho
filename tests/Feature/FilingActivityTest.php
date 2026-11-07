@@ -7,11 +7,42 @@ use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Models\Flight;
 use App\Models\FlightPlanEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use LogicException;
 use Tests\TestCase;
 
 class FilingActivityTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_creation_activity_keeps_original_fields_and_actor(): void
+    {
+        $flight = Flight::factory()->create(['remarks' => 'Original remarks', 'dinghies_enabled' => false]);
+        $creator = $flight->filedBy;
+        $originalName = $creator->name;
+        app(FlightPlanMutationService::class)->recordSubmission($flight, $creator);
+        $event = $flight->events()->where('event_type', FlightPlanEvent::TYPE_CREATED)->sole();
+
+        $flight->updateQuietly(['remarks' => 'Current remarks']);
+        $creator->update(['name' => 'Renamed account']);
+
+        $this->assertSame('Original remarks', $event->fresh()->new_values['remarks']);
+        $this->assertFalse($event->new_values['dinghies_enabled']);
+        $this->actingAs($creator)->get(route('flights.view', $flight))
+            ->assertOk()->assertSee('Original flight plan submission')->assertSee('Original remarks')
+            ->assertSee($originalName)->assertDontSee('Filing authorization history');
+
+        $this->expectException(LogicException::class);
+        $event->update(['new_values' => ['remarks' => 'Rewritten history']]);
+    }
+
+    public function test_legacy_creation_activity_marks_uncaptured_fields(): void
+    {
+        $flight = Flight::factory()->create(['remarks' => 'Only on the current plan']);
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, newValues: ['route' => 'Legacy route']);
+
+        $this->actingAs($flight->filedBy)->get(route('flights.view', $flight))
+            ->assertOk()->assertSee('Legacy route')->assertSee('Not captured')->assertSee('Actor not captured');
+    }
 
     public function test_content_changes_record_actor_and_only_changed_values(): void
     {
@@ -39,9 +70,14 @@ class FilingActivityTest extends TestCase
         $service->save($flight, $flight->filedBy, $values);
         $service->save($flight, $flight->filedBy, [...$values, 'remarks' => 'New cargo']);
         $this->assertSame(1, $flight->events()->where('event_type', FlightPlanEvent::TYPE_MANIFEST_CREATED)->count());
+        $original = $flight->events()->where('event_type', FlightPlanEvent::TYPE_MANIFEST_CREATED)->sole();
+        $this->assertNull($original->new_values['manifest_snapshot']['remarks']);
         $event = $flight->events()->where('event_type', FlightPlanEvent::TYPE_MANIFEST_UPDATED)->sole();
         $this->assertSame(['remarks' => null], $event->old_values);
         $this->assertSame('New cargo', $event->new_values['remarks']);
+        $this->assertSame('1.000', $event->new_values['manifest_snapshot']['total_cargo_weight']);
+        $this->assertSame($values['persons'], $event->new_values['manifest_snapshot']['persons']);
+        $this->assertSame($flight->pilot_in_command, $event->new_values['manifest_snapshot']['pilot_in_command']);
         $this->assertSame($flight->filedBy->id, $event->actor_user_id);
         $this->actingAs($flight->filedBy)->get(route('flights.view', $flight))->assertOk()->assertSee('Manifest created')->assertSee('Manifest updated')->assertSee('New cargo');
         $service->save($flight, $flight->filedBy, ['remarks' => null]);

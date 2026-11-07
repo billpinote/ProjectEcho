@@ -73,7 +73,10 @@ class UnifiedFilingAuthorizationTest extends TestCase
             $this->get(route('filing.document', ['package' => $package, 'type' => $type]))
                 ->assertOk()->assertContent($bytes);
         }
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Authorized PIC signature');
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Authorized PIC signature')
+            ->assertSeeInOrder(['Flight Plan Activity', 'PIC authorized', 'Authorization record #'.$package->id, 'Version '.$signature->version])
+            ->assertSee('Current document authorization')->assertDontSee('Filing authorization history')
+            ->assertDontSee($package->signature_sha256);
     }
 
     public static function documentSets(): array
@@ -88,6 +91,8 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
         $this->assertNull($flight->filingAuthorizations()->sole()->pilot_signature_id);
         $this->assertNull(app(FilingAuthorizationService::class)->signatureBytes($flight));
+        $this->get(route('flights.view', $flight))->assertOk()
+            ->assertSee('Not applied')->assertSee('Current document authorization');
     }
 
     public function test_pending_signature_cannot_be_applied_and_handoff_is_not_consumed(): void
@@ -105,6 +110,18 @@ class UnifiedFilingAuthorizationTest extends TestCase
             $this->assertNull($flight->refresh()->pic_authorized_at);
             $this->assertSame('pending', $flight->filingAuthorizations()->sole()->status);
         }
+    }
+
+    public function test_pending_package_appears_in_activity_without_a_document_link(): void
+    {
+        [$flight, , $preparer] = $this->filing();
+        app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+        $package = $flight->filingAuthorizations()->sole();
+
+        $this->actingAs($preparer)->get(route('flights.view', $flight))
+            ->assertOk()->assertSeeInOrder(['Flight Plan Activity', 'Pilot approval requested', 'Pilot approval pending', 'Authorization record #'.$package->id])
+            ->assertDontSee('Filing authorization history')
+            ->assertDontSee(route('filing.document', ['package' => $package, 'type' => 'flight_plan']));
     }
 
     public function test_tampered_signature_fails_safely(): void
@@ -155,7 +172,12 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $this->assertFalse($flight->canSubmitToAtc());
         $this->assertNull(app(FilingAuthorizationService::class)->signatureBytes($flight));
         $this->assertSame($original, $package->fresh()->pdf_documents);
-        $this->get(route('filing.history', $flight))->assertOk()->assertSee('Package #'.$package->id);
+        $this->get(route('filing.history', $flight))->assertRedirect(route('flights.view', $flight).'#flight-plan-activity');
+        $this->get(route('flights.view', $flight))->assertOk()
+            ->assertSeeInOrder(['Flight Plan Activity', 'PIC authorized', 'Authorization record #'.$package->id])
+            ->assertSee('Historical authorization evidence')
+            ->assertSee('Flight plan changed. Pilot approval needed again.')
+            ->assertDontSee('Filing authorization history');
         $this->get(route('filing.document', ['package' => $package, 'type' => 'flight_plan']))
             ->assertOk()->assertContent(base64_decode($original['flight_plan']['bytes']));
     }
