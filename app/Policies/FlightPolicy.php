@@ -40,6 +40,7 @@ class FlightPolicy
     {
         return $user->is_active
             && $user->hasFullFlightAccess()
+            && FlightAccess::canView($user, $flight)
             && ! $flight->hasBeenAccepted()
             && $flight->pic_authorization_status !== 'declined';
     }

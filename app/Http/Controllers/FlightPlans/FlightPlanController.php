@@ -6,6 +6,7 @@ use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Services\FlightPlanQrRenderer;
 use App\Domain\FlightPlans\Services\FlightPlanSubmissionService;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
+use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Filament\Panels\Pilot\Resources\Flights\FlightResource as PilotFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Http\Controllers\Controller;
@@ -52,6 +53,10 @@ class FlightPlanController extends Controller
             && $user->canCreateFlightPlans(),
             403
         );
+
+        if (FlightPlanPreparerContext::for($user, $flightData)->preparerActsAsPic()) {
+            return redirect()->to(PilotFlightResource::getUrl('create', ['from_preview' => 1], panel: 'pilot'));
+        }
 
         ['flight' => $flight, 'pdf_path' => $storedPdfPath] = $this->submissions->submit($flightData, $user);
 

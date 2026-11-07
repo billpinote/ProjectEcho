@@ -2,6 +2,8 @@
 
 namespace App\Domain\FlightPlans\Support;
 
+use App\Domain\FlightPlans\Services\FilingAuthorizationService;
+use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,6 +12,9 @@ class FlightAccess
 {
     public static function canView(User $user, Flight $flight): bool
     {
+        if ($user->role === UserRole::Atmo && ! app(FilingAuthorizationService::class)->isReadyForAtmo($flight)) {
+            return false;
+        }
         if (! $user->is_active || ! $user->canViewFlightPlans()) {
             return false;
         }
@@ -33,6 +38,9 @@ class FlightAccess
 
     public static function canAccessPicAuthorization(User $user, Flight $flight): bool
     {
+        if ($user->role === UserRole::Atmo) {
+            return self::canView($user, $flight);
+        }
         if (! $user->is_active || ! $user->canViewFlightPlans()) {
             return false;
         }
@@ -51,6 +59,9 @@ class FlightAccess
 
     public static function canOperationallyUpdate(User $user, Flight $flight): bool
     {
+        if ($user->role === UserRole::Atmo && ! self::canView($user, $flight)) {
+            return false;
+        }
         if (! $user->is_active) {
             return false;
         }
@@ -80,6 +91,9 @@ class FlightAccess
     {
         if ($user === null || ! $user->is_active || ! $user->canViewFlightPlans()) {
             return $query->whereRaw('1 = 0');
+        }
+        if ($user->role === UserRole::Atmo) {
+            return $query->whereKey(app(FilingAuthorizationService::class)->readyIds($query));
         }
 
         if ($user->isPilot()) {

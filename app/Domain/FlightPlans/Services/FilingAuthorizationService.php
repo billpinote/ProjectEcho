@@ -11,8 +11,10 @@ use App\Models\FlightPlanEvent;
 use App\Models\PilotSignature;
 use App\Models\User;
 use App\Services\ProfileUpdates\PilotSignatureService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class FilingAuthorizationService
 {
@@ -21,7 +23,7 @@ class FilingAuthorizationService
 
     public function __construct(private FilingDocumentRegistry $documents, private PilotSignatureService $signatures) {}
 
-    public function request(Flight $flight): FilingAuthorization
+    public function request(Flight $flight, ?array $signedDocumentTypes = null): FilingAuthorization
     {
         $documents = $this->documents->snapshots($flight);
         $package = new FilingAuthorization;
@@ -29,6 +31,7 @@ class FilingAuthorizationService
             'flight_id' => $flight->getKey(), 'flight_revision' => (int) ($flight->revision_number ?? 1),
             'status' => 'pending', 'documents' => $documents,
             'fingerprint' => FilingDocumentRegistry::fingerprint($documents), 'requested_at' => now(),
+            'signed_document_types' => $signedDocumentTypes,
         ])->save();
 
         return $package;
@@ -59,7 +62,7 @@ class FilingAuthorizationService
         $pdfs = [];
         if ($approve) {
             $bytes = $signature === null ? null : $this->signatures->verifiedBytes($signature);
-            foreach (array_keys($authorized) as $type) {
+            foreach ($package->signed_document_types ?? array_keys($authorized) as $type) {
                 $pdf = $this->documents->render($type, $authorized, $bytes);
                 $pdfs[$type] = ['bytes' => base64_encode($pdf), 'sha256' => hash('sha256', $pdf)];
             }
@@ -77,7 +80,7 @@ class FilingAuthorizationService
     public function approvedSignature(User $pic): PilotSignature
     {
         User::query()->lockForUpdate()->findOrFail($pic->getKey());
-        $signature = $pic->approvedSignature()->first();
+        $signature = $pic->approvedSignature()->lockForUpdate()->first();
         if ($signature === null || $signature->status !== 'approved' || (int) $signature->user_id !== (int) $pic->getKey()) {
             throw ValidationException::withMessages(['signature' => 'No approved signature is available. Submit a signature for verification, or authorize this filing without an electronic signature.']);
         }
@@ -94,17 +97,81 @@ class FilingAuthorizationService
             && hash_equals((string) $package->authorized_fingerprint, FilingDocumentRegistry::fingerprint($this->documents->snapshots($flight)));
     }
 
-    public function signatureBytes(Flight $flight): ?string
+    public function signatureBytes(Flight $flight, string $type = 'flight_plan'): ?string
     {
-        if (! $flight->exists || $flight->isPicAuthorizationDeclined() || ! $flight->isPicAuthorizationCurrent()) {
+        $package = $this->currentForDocument($flight, $type);
+
+        return $package === null ? null : $this->historicalSignatureBytes($package);
+    }
+
+    public function currentForDocument(Flight $flight, string $type, bool $requireSignature = true, bool $loaded = false): ?FilingAuthorization
+    {
+        if (! $flight->exists || $flight->isPicAuthorizationDeclined()) {
             return null;
         }
-        $package = $this->latestFor($flight);
-        if ($package?->pilot_signature_id === null || ! $this->isCurrent($flight, $package)) {
+        $flight = $loaded ? $flight : $this->currentState($flight);
+        if ($flight === null || $flight->isPicAuthorizationDeclined()) {
             return null;
+        }
+        $documents = $this->documents->snapshots($flight, false);
+        if (! isset($documents[$type])) {
+            return null;
+        }
+        foreach ($flight->filingAuthorizations->sortByDesc('id') as $package) {
+            $types = $package->signed_document_types ?? array_keys($package->authorized_documents ?? []);
+            if ($package->status !== 'authorized' || ! in_array($type, $types, true)
+                || ! isset($package->authorized_documents[$type])
+                || (int) $package->pic_user_id !== (int) $flight->pilot_in_command_user_id
+                || ! hash_equals(FilingDocumentRegistry::documentFingerprint($documents, $type),
+                    FilingDocumentRegistry::documentFingerprint($package->authorized_documents, $type))) {
+                continue;
+            }
+            if ($requireSignature) {
+                if ($package->pilot_signature_id === null) {
+                    return null;
+                }
+                try {
+                    $this->historicalSignatureBytes($package);
+                } catch (HttpException) {
+                    return null;
+                }
+            }
+
+            return $package;
         }
 
-        return $this->historicalSignatureBytes($package);
+        return null;
+    }
+
+    public function isReadyForAtmo(Flight $flight, bool $loaded = false): bool
+    {
+        $flight = $loaded ? $flight : $this->currentState($flight);
+        if ($flight === null || $flight->manifest === null || $flight->isPicAuthorizationDeclined()) {
+            return false;
+        }
+
+        return $this->currentForDocument($flight, 'flight_plan', loaded: true) !== null
+            && $this->currentForDocument($flight, 'passenger_cargo_manifest', loaded: true) !== null;
+    }
+
+    public function readyIds(Builder $query): array
+    {
+        return (clone $query)->whereHas('filingAuthorizations', fn (Builder $query) => $query->where('status', 'authorized')->whereNotNull('pilot_signature_id'))
+            ->with(['manifest.persons', 'filingAuthorizations' => fn ($query) => $query->select([
+                'id', 'flight_id', 'status', 'pic_user_id', 'pilot_signature_id', 'signature_version', 'signature_sha256',
+                'signed_document_types', 'authorized_documents',
+            ]), 'filingAuthorizations.pilotSignature'])->get()
+            ->filter(fn (Flight $flight): bool => $this->isReadyForAtmo($flight, true))->modelKeys();
+    }
+
+    private function currentState(Flight $flight): ?Flight
+    {
+        return Flight::query()->whereKey($flight->id)->lockForUpdate()->with([
+            'manifest' => fn ($query) => $query->lockForUpdate(),
+            'manifest.persons' => fn ($query) => $query->lockForUpdate(),
+            'filingAuthorizations' => fn ($query) => $query->lockForUpdate(),
+            'filingAuthorizations.pilotSignature' => fn ($query) => $query->lockForUpdate(),
+        ])->first();
     }
 
     public function historicalSignatureBytes(FilingAuthorization $package): ?string
@@ -120,21 +187,6 @@ class FilingAuthorizationService
         return $this->signatures->verifiedBytes($signature);
     }
 
-    public function documentChanged(Flight $flight): void
-    {
-        if (! $flight->filingAuthorizations()->exists()) {
-            return;
-        }
-        $flight->forceFill([
-            'revision_number' => max(1, (int) $flight->revision_number) + 1,
-            'pic_authorized_by_user_id' => null, 'pic_authorized_at' => null,
-            'pic_authorized_revision' => null, 'pic_authorization_method' => null,
-            'pic_authorization_token' => null, 'pic_authorization_token_expires_at' => null,
-            'pic_authorization_status' => null,
-            'status' => FlightPlanStatus::AwaitingPic,
-        ]);
-    }
-
     public function mutate(Flight $flight, \Closure $mutation): mixed
     {
         $id = (int) $flight->getKey();
@@ -147,14 +199,30 @@ class FilingAuthorizationService
             $this->mutating[$id] = true;
             try {
                 $hasHistory = $locked->filingAuthorizations()->exists();
-                $before = $hasHistory ? FilingDocumentRegistry::fingerprint($this->documents->snapshots($locked)) : null;
+                $before = $hasHistory ? $this->documents->snapshots($locked) : null;
                 $result = $mutation();
                 $locked->refresh();
-                if ($hasHistory && ! hash_equals($before, FilingDocumentRegistry::fingerprint($this->documents->snapshots($locked)))) {
-                    $this->documentChanged($locked);
+                $after = $hasHistory ? $this->documents->snapshots($locked) : null;
+                if ($hasHistory && ! hash_equals(FilingDocumentRegistry::fingerprint($before), FilingDocumentRegistry::fingerprint($after))) {
+                    $flightChanged = FilingDocumentRegistry::documentFingerprint($before, 'flight_plan') !== FilingDocumentRegistry::documentFingerprint($after, 'flight_plan');
+                    $manifestChanged = FilingDocumentRegistry::documentFingerprint($before, 'passenger_cargo_manifest') !== FilingDocumentRegistry::documentFingerprint($after, 'passenger_cargo_manifest');
+                    $locked->forceFill([
+                        'revision_number' => max(1, (int) $locked->revision_number) + 1,
+                        'flight_document_revision' => max(1, (int) $locked->flight_document_revision) + ($flightChanged ? 1 : 0),
+                        'pic_authorization_token' => null, 'pic_authorization_token_expires_at' => null,
+                        'status' => FlightPlanStatus::AwaitingPic, 'reviewed_at' => null,
+                    ]);
+                    if ($flightChanged) {
+                        $locked->forceFill(['pic_authorized_by_user_id' => null, 'pic_authorized_at' => null,
+                            'pic_authorized_revision' => null, 'pic_authorization_method' => null, 'pic_authorization_status' => null]);
+                    }
+                    if ($manifestChanged && ($manifest = $locked->manifest()->first()) !== null) {
+                        $manifest->forceFill(['document_revision' => max(1, (int) $manifest->document_revision) + 1])->saveQuietly();
+                    }
                     $locked->saveQuietly();
                     FlightPlanEvent::record($locked, 'filing_authorization_invalidated', auth()->user(), null, [
                         'revision_number' => $locked->revision_number,
+                        'flight_plan_changed' => $flightChanged, 'manifest_changed' => $manifestChanged,
                     ]);
                     $flight->setRawAttributes($locked->getAttributes(), true);
                 }

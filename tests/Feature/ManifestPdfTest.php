@@ -21,7 +21,7 @@ use Tests\TestCase;
 
 class ManifestPdfTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_pilot_and_credential_values_are_centered_above_the_original_labels(): void
     {
@@ -135,7 +135,9 @@ class ManifestPdfTest extends TestCase
         $this->get($url)->assertRedirect(route('gateway'));
         $this->actingAs(User::factory()->create(['role' => UserRole::Pilot]))->get($url)->assertForbidden();
         $this->actingAs(User::factory()->create(['role' => UserRole::Pilot, 'is_active' => false]))->get($url)->assertForbidden();
-        $this->actingAs($this->atmo())->get($url)->assertOk();
+        $this->actingAs($this->atmo())->get($url)->assertForbidden();
+        $this->signFlightDocuments($flight);
+        $this->get($url)->assertOk();
         $this->get(route('flights.manifest.pdf', ['flight' => 999999]))->assertNotFound();
     }
 
@@ -228,6 +230,7 @@ class ManifestPdfTest extends TestCase
     public function test_acceptance_captures_snapshot_and_later_download_never_renders_again(): void
     {
         $flight = $this->completeFlight();
+        $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $flight->refresh();
         $service = app(ManifestPdfService::class);
@@ -246,6 +249,7 @@ class ManifestPdfTest extends TestCase
     public function test_failed_render_rolls_back_acceptance(): void
     {
         $flight = $this->completeFlight();
+        $this->signFlightDocuments($flight);
         $this->partialMock(ManifestPdfService::class, fn ($mock) => $mock->shouldReceive('render')->andThrow(new \RuntimeException('PDF unavailable')));
         try {
             app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
@@ -262,6 +266,7 @@ class ManifestPdfTest extends TestCase
     public function test_accepted_snapshot_cannot_be_overwritten(): void
     {
         $flight = $this->completeFlight();
+        $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $this->expectException(QueryException::class);
         DB::table('flight_manifests')->where('flight_id', $flight->id)->update(['accepted_pdf_sha256' => 'changed']);
@@ -272,6 +277,7 @@ class ManifestPdfTest extends TestCase
         $flight = $this->completeFlight();
         DB::unprepared("CREATE TRIGGER fail_acceptance_event BEFORE INSERT ON flight_plan_events BEGIN SELECT RAISE(ABORT, 'Simulated acceptance event failure'); END");
         try {
+            $this->signFlightDocuments($flight);
             app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
             $this->fail('Acceptance should roll back if recording the event fails.');
         } catch (QueryException $exception) {

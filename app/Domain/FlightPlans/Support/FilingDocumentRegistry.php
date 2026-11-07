@@ -39,17 +39,21 @@ class FilingDocumentRegistry
         $this->documents = [
             'flight_plan' => fn (Flight $flight): array => [
                 'id' => $flight->getKey(), 'revision' => (int) ($flight->revision_number ?? 1),
+                'document_revision' => (int) ($flight->flight_document_revision ?? 1),
                 'content' => $flight->only($this->materialFlightFields()),
             ],
             'passenger_cargo_manifest' => function (Flight $flight): ?array {
-                $manifest = $flight->manifest()->lockForUpdate()->first();
+                $manifest = $flight->relationLoaded('manifest') ? $flight->manifest : $flight->manifest()->lockForUpdate()->first();
                 if ($manifest === null) {
                     return null;
                 }
-                $manifest->setRelation('persons', $manifest->persons()->lockForUpdate()->get());
+                if (! $manifest->relationLoaded('persons')) {
+                    $manifest->setRelation('persons', $manifest->persons()->lockForUpdate()->get());
+                }
 
                 return [
                     'id' => $manifest->getKey(),
+                    'document_revision' => (int) ($manifest->document_revision ?? 1),
                     // A content-addressed revision includes ordered persons and cargo.
                     'revision' => self::fingerprint($content = [
                         ...$manifest->only($manifest->getFillable()),
@@ -106,9 +110,10 @@ class FilingDocumentRegistry
         return array_values(array_diff((new Flight)->getFillable(), self::OPERATIONAL_FIELDS, self::AUTHORIZATION_FIELDS));
     }
 
-    public function snapshots(Flight $flight): array
+    public function snapshots(Flight $flight, bool $refresh = true): array
     {
-        $flight = $flight->exists ? ($flight->fresh() ?? $flight) : $flight;
+        $flight = $refresh && $flight->exists
+            ? (Flight::query()->whereKey($flight->id)->lockForUpdate()->first() ?? $flight) : $flight;
         $documents = [];
         foreach ($this->documents as $type => $snapshot) {
             if (($document = $snapshot($flight)) !== null) {
@@ -117,6 +122,22 @@ class FilingDocumentRegistry
         }
 
         return $documents;
+    }
+
+    public static function documentFingerprint(array $documents, string $type): string
+    {
+        $document = $documents[$type] ?? [];
+        $value = ['id' => $document['id'] ?? null, 'revision' => $document['document_revision'] ?? 1,
+            'content' => $document['content'] ?? []];
+        if ($type === 'passenger_cargo_manifest') {
+            $value['flight_context'] = array_intersect_key($documents['flight_plan']['content'] ?? [], array_flip([
+                'aircraft_identification', 'type_of_aircraft', 'date_of_flight', 'departure_aerodrome',
+                'destination_aerodrome', 'pilot_in_command', 'pilot_license_no', 'pilot_ratings',
+                'license_expiry_date', 'persons_on_board',
+            ]));
+        }
+
+        return self::fingerprint($value);
     }
 
     public static function fingerprint(array $value): string

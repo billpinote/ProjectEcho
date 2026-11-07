@@ -15,6 +15,7 @@ use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Filament\Shared\Pages\ImportScanQr;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Models\Flight;
+use App\Models\FlightManifest;
 use App\Models\FlightPlanEvent;
 use App\Models\Operator;
 use App\Models\User;
@@ -29,7 +30,7 @@ use Tests\TestCase;
 
 class PicAuthorizationWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_browser_approval_records_session_evidence_without_fresh_verification(): void
     {
@@ -178,8 +179,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->assertSame($authorizer->id, $authorized->pic_authorized_by_user_id);
         $this->assertSame('QR', $authorized->pic_authorization_method);
         $this->assertTrue($authorized->isPicAuthorizationCurrent());
-        $this->assertTrue($authorized->canSubmitToAtc());
-        $this->assertSame(FlightPlanStatus::Pending, $authorized->status);
+        $this->assertFalse($authorized->canSubmitToAtc());
+        $this->assertSame(FlightPlanStatus::AwaitingPic, $authorized->status);
     }
 
     #[DataProvider('eligibleLicenseTypes')]
@@ -195,7 +196,7 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->assertFalse(FlightAccess::canView($authorizer, $flight));
         $this->assertTrue(FlightAccess::canAccessPicAuthorization($authorizer, $flight));
-        $this->assertTrue(app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer)->canSubmitToAtc());
+        $this->assertFalse(app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer)->canSubmitToAtc());
     }
 
     public function test_same_operator_pilot_loads_another_pilots_qr_through_the_scanner(): void
@@ -347,7 +348,7 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
-        $this->assertSame(FlightPlanStatus::Pending, $flight->status);
+        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
     }
 
     public function test_pic_authorization_regenerates_the_official_pdf_with_uppercase_credentials(): void
@@ -560,6 +561,8 @@ class PicAuthorizationWorkflowTest extends TestCase
             'prepared_by_user_id' => $atmo->id,
             'pilot_in_command_user_id' => $atmo->id,
         ]);
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
 
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
@@ -580,12 +583,7 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
-            ->assertOk()
-            ->assertSeeText('PIC Authorization Pending')
-            ->assertSeeText('This flight plan is not yet available for operational review. PIC authorization must be completed first.')
-            ->assertSeeText('Close')
-            ->assertDontSee('FLIGHT PLAN', false)
-            ->assertDontSeeText('PIC-001');
+            ->assertForbidden();
     }
 
     public function test_avsec_cannot_view_flight_before_pic_authorization(): void
@@ -611,6 +609,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $flight = $this->awaitingFlight($pic);
 
         app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $pic);
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
 
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
@@ -618,12 +618,10 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertSee('FLIGHT PLAN', false)
             ->assertDontSeeText('PIC Authorization Pending');
 
-        $flight->incrementRevisionNumber();
+        $flight->update(['route' => 'CHANGED']);
 
         $this->get(route('flights.view', $flight))
-            ->assertOk()
-            ->assertSeeText('PIC Authorization Pending')
-            ->assertDontSee('FLIGHT PLAN', false);
+            ->assertForbidden();
     }
 
     public function test_pilot_saved_flight_preview_can_close_without_dashboard_navigation(): void

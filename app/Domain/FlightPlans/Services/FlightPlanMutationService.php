@@ -41,6 +41,9 @@ class FlightPlanMutationService
             if (! $actor->can('accept', $flight)) {
                 throw new AuthorizationException;
             }
+            if (! $flight->canSubmitToAtc()) {
+                throw ValidationException::withMessages(['flight' => 'Both current flight documents must have valid PIC signatures before ATMO acceptance.']);
+            }
             if ($flight->isPendingExpired()) {
                 throw ValidationException::withMessages(['flight' => 'This flight plan has expired.']);
             }
@@ -79,7 +82,7 @@ class FlightPlanMutationService
             'persons_on_board', 'pilot_in_command', 'pilot_license_no', 'pilot_ratings', 'license_expiry_date',
         ])]);
 
-        FlightPlanEvent::record($flight, $flight->requiresPicAuthorization()
+        FlightPlanEvent::record($flight, ($flight->status === FlightPlanStatus::AwaitingPic || $flight->requiresPicAuthorization())
             ? FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION
             : FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $actor, null, [
                 'status' => $flight->status?->value ?? $flight->status,

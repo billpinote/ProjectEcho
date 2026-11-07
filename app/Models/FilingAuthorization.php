@@ -21,6 +21,7 @@ class FilingAuthorization extends Model
             'pdf_documents' => 'encrypted:array',
             'authentication' => 'array', 'requested_at' => 'datetime', 'decided_at' => 'datetime',
             'flight_revision' => 'integer', 'signature_version' => 'integer',
+            'signed_document_types' => 'array',
         ];
     }
 
@@ -28,7 +29,7 @@ class FilingAuthorization extends Model
     {
         static::updating(function (self $package): void {
             if ($package->getRawOriginal('status') !== 'pending'
-                || $package->isDirty(['flight_id', 'flight_revision', 'documents', 'fingerprint', 'requested_at'])
+                || $package->isDirty(['flight_id', 'flight_revision', 'documents', 'fingerprint', 'requested_at', 'signed_document_types'])
                 || ! in_array($package->status, ['authorized', 'declined'], true)) {
                 throw ValidationException::withMessages(['filing' => 'Filing authorization evidence is immutable.']);
             }

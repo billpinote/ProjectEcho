@@ -422,6 +422,9 @@ class Flight extends Model
         return $query->where(function (Builder $query): void {
             $query
                 ->pendingActive()
+                ->orWhere(fn (Builder $query): Builder => $query->where('status', FlightPlanStatus::AwaitingPic)
+                    ->whereNotNull('pilot_in_command_user_id')->whereHas('filingAuthorizations')
+                    ->where(fn (Builder $query): Builder => $query->whereNull('pic_authorization_status')->orWhere('pic_authorization_status', '!=', 'declined')))
                 ->orWhere(fn (Builder $query): Builder => $query->ready())
                 ->orWhere(fn (Builder $query): Builder => $query->active())
                 ->orWhere(fn (Builder $query): Builder => $query->airborne())
@@ -448,9 +451,15 @@ class Flight extends Model
     public function scopeAwaitingPicAuthorization(Builder $query): Builder
     {
         return $query
+            ->whereNot(fn (Builder $query) => $query->whereNotNull('prepared_by_user_id')
+                ->whereNotNull('pilot_in_command_user_id')->whereColumn('prepared_by_user_id', 'pilot_in_command_user_id')
+                ->whereHas('filingAuthorizations'))
             ->where(function (Builder $query): void {
                 $query
                     ->whereHas('preparedBy', fn (Builder $query): Builder => $query->where('role', UserRole::OperatorStaff->value))
+                    ->orWhere(fn (Builder $query): Builder => $query
+                        ->where('status', FlightPlanStatus::AwaitingPic)
+                        ->whereHas('filingAuthorizations'))
                     ->orWhere(function (Builder $query): void {
                         $query
                             ->where(function (Builder $query): void {
@@ -590,26 +599,34 @@ class Flight extends Model
             && $this->pic_authorized_revision !== null
             && (int) $this->pic_authorized_revision === (int) ($this->revision_number ?? 1);
 
-        if (! $current || ! $this->exists) {
+        if (! $this->exists) {
             return $current;
         }
         $packages = app(FilingAuthorizationService::class);
         $package = $packages->latestFor($this);
 
-        return $package === null || $packages->isCurrent($this, $package);
+        return $package === null ? $current : $packages->currentForDocument($this, 'flight_plan', false) !== null;
     }
 
     public function canSubmitToAtc(): bool
     {
-        if ($this->isPicAuthorizationDeclined()) {
-            return false;
+        return app(FilingAuthorizationService::class)->isReadyForAtmo($this);
+    }
+
+    public function documentSignatureStatus(): string
+    {
+        $packages = app(FilingAuthorizationService::class);
+        if ($packages->currentForDocument($this, 'flight_plan') === null) {
+            return 'Flight plan signature needed';
+        }
+        if (! $this->manifest()->exists()) {
+            return 'Manifest needed';
+        }
+        if ($packages->currentForDocument($this, 'passenger_cargo_manifest') === null) {
+            return 'Manifest signature needed';
         }
 
-        if (! $this->requiresPicAuthorization()) {
-            return true;
-        }
-
-        return $this->pilot_in_command_user_id !== null && $this->isPicAuthorizationCurrent();
+        return 'Pending ATMO Acceptance';
     }
 
     public function invalidatePicAuthorization(): void

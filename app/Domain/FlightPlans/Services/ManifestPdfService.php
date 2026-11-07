@@ -37,13 +37,13 @@ class ManifestPdfService
             return $bytes;
         }
 
-        return $this->render($this->dataFor($flight, $manifest), app(FilingAuthorizationService::class)->signatureBytes($flight));
+        return $this->render($this->dataFor($flight, $manifest), app(FilingAuthorizationService::class)->signatureBytes($flight, 'passenger_cargo_manifest'));
     }
 
     public function snapshot(Flight $flight): void
     {
         $manifest = $flight->manifest()->with('persons')->firstOrFail();
-        $bytes = $this->render($this->dataFor($flight, $manifest), app(FilingAuthorizationService::class)->signatureBytes($flight));
+        $bytes = $this->render($this->dataFor($flight, $manifest), app(FilingAuthorizationService::class)->signatureBytes($flight, 'passenger_cargo_manifest'));
         $manifest->forceFill([
             'accepted_pdf_content' => Crypt::encryptString(base64_encode($bytes)),
             'accepted_pdf_sha256' => hash('sha256', $bytes),

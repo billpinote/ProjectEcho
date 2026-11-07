@@ -7,6 +7,7 @@ use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\FlightPlanQrRenderer;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
+use App\Domain\Users\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LookupFlightPlanQrRequest;
 use App\Http\Support\FlightPlanBrowserContext;
@@ -43,6 +44,9 @@ class FlightPlanScanController extends Controller
         $validated = $request->validated();
 
         $matchedFlight = $this->lookup->lookup((string) $validated['payload']);
+        if ($request->user()?->role === UserRole::Atmo) {
+            abort_unless(($matchedFlight['flight'] ?? null) instanceof Flight && $request->user()->can('view', $matchedFlight['flight']), 403);
+        }
 
         if ($matchedFlight === null) {
             return back()
@@ -77,6 +81,10 @@ class FlightPlanScanController extends Controller
         $validated = $request->validated();
 
         $parsedPayload = $this->payloads->parsePayload((string) $validated['payload']);
+        if ($request->user()?->role === UserRole::Atmo) {
+            $flight = Flight::find((int) ($parsedPayload['flight_id'] ?? 0));
+            abort_unless($flight !== null && $request->user()->can('view', $flight), 403);
+        }
 
         if ($parsedPayload === null || ($parsedPayload['format'] ?? null) !== 'v2-offline') {
             return back()->withErrors([
@@ -117,6 +125,7 @@ class FlightPlanScanController extends Controller
                 $user = Auth::user();
                 $canView = $user?->can('view', $flight) ?? false;
                 $canReadDeclinedPicScan = $flight->isPicAuthorizationDeclined()
+                    && $user->role !== UserRole::Atmo
                     && FlightAccess::canAccessPicAuthorization($user, $flight);
 
                 abort_unless($canView || $canReadDeclinedPicScan, 403);
@@ -124,6 +133,7 @@ class FlightPlanScanController extends Controller
         }
 
         if (! $flight) {
+            abort_if($request->user()?->role === UserRole::Atmo, 403);
             $flight = new Flight($this->normalizer->preparePreviewFlightAttributes($preview['snapshot']));
         }
 

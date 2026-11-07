@@ -167,10 +167,12 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $this->signature($pilot);
         $this->authorize($flight, $pilot, true);
         $manifest->update(['cargo_quantity' => '3 boxes']);
-        $this->assertFalse($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertFalse($flight->canSubmitToAtc());
         $this->authorize($flight, $pilot, true);
         $manifest->persons()->first()->update(['nationality' => 'US']);
-        $this->assertFalse($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertFalse($flight->canSubmitToAtc());
         $this->assertCount(2, $flight->filingAuthorizations()->get());
     }
 
@@ -190,7 +192,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $manifest = $this->manifest($flight, $pilot, $preparer, false);
         $this->authorize($flight, $pilot, false);
         $manifest->newQuery()->whereKey($manifest->id)->update(['remarks' => 'Changed externally']);
-        $this->assertFalse($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
         $this->assertFalse($flight->canSubmitToAtc());
     }
 

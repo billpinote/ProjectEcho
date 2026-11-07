@@ -460,6 +460,7 @@
             <strong>Review complete filing #{{ $filingPackage->id }}</strong>
             <p>One PIC decision covers the exact documents listed here. Review each document before authorizing.</p>
             @foreach($filingPackage->documents as $type => $document)
+                @continue($filingPackage->signed_document_types !== null && !in_array($type, $filingPackage->signed_document_types, true))
                 <p><a href="{{ route('filing.document', ['package' => $filingPackage, 'type' => $type, 'token' => $filingToken]) }}" target="_blank" rel="noopener noreferrer">{{ str($type)->headline() }} — revision {{ $document['revision'] }}</a></p>
             @endforeach
             @if($selfFilingAuthorization ?? false)

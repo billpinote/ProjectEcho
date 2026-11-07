@@ -80,6 +80,13 @@ Saving a preview stores draft data in the browser session. It does not create an
 
 Operational filing applies trusted preparer, pilot, and operator context, creates the record, and records the submission event.
 
+Self-PIC session-preview approval redirects to the prefilled Pilot create page
+without creating a record. Its Filament confirmation calls
+`FlightPlanSubmissionService::submitSelfAuthorized()` and
+`PicAuthorizationService::authorizeSelfFiling()` to capture signature consent,
+versioned package PDFs, and Pending submission in one transaction. Representative
+filings retain their existing QR authorization path.
+
 Refresh database-generated defaults before signing the submitted flight snapshot.
 
 ### PDF-Only Generation

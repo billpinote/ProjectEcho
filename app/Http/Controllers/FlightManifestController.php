@@ -81,7 +81,9 @@ class FlightManifestController extends Controller
             try {
                 $this->manifests->assertComplete($flight);
                 $complete = true;
-                $completionMessage = 'Manifest complete and ready for ATMO review. PIC authorization is checked separately.';
+                $completionMessage = $flight->canSubmitToAtc()
+                    ? 'Both current documents are signed and ready for ATMO review.'
+                    : 'Manifest complete. Both current documents require valid PIC signatures before ATMO review.';
             } catch (ValidationException $exception) {
                 $completionMessage = implode(' ', $exception->errors()['manifest'] ?? []);
             }
@@ -98,7 +100,15 @@ class FlightManifestController extends Controller
     {
         $this->manifests->save($flight, $request->user(), $request->validated());
 
-        $url = $request->user()->isPilot()
+        $actor = $request->user();
+        if ($actor->isPilot()
+            && (int) $flight->pilot_in_command_user_id === (int) $actor->id
+            && ! $flight->isPicAuthorizationDeclined()
+            && ! $flight->hasBeenAccepted()) {
+            return redirect(EditFlightManifest::getUrl(['flight' => $flight, 'confirm_signature' => 1], panel: 'pilot'));
+        }
+
+        $url = $actor->isPilot()
             ? EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot')
             : route('flights.manifest.edit', $flight);
 

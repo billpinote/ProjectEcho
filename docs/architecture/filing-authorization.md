@@ -21,15 +21,17 @@ TOTP, AVSEC form, or authentication challenge.
    adds package review links; each linked preview renders the preserved snapshot,
    not a newly selected live manifest.
 3. The PIC explicitly chooses unsigned authorization, authorization with the
-   verified signature image, or decline. One decision covers the complete package.
+   verified signature image, or decline. For representative QR filings, one
+   decision covers the reviewed package. Self-filing signs each document in a
+   separate confirmation.
 4. With the flight and document rows locked, the service verifies that the reviewed
    package fingerprint still matches. It resolves fresh PIC credentials, optionally
    verifies and captures the approved signature version, and saves the decision,
    authorized snapshots, preserved PDFs, and activity events atomically.
    An attached manifest must pass the existing completeness/PIC/person-count/cargo
-   checks before that decision commits. A flight-only package is allowed; attaching
-   the manifest later requires renewed review. ATMO's existing manifest requirement
-   remains in place.
+   checks before that decision commits. A flight-only package is allowed; a later
+   manifest needs its own signature. ATMO requires valid signatures on both
+   current documents.
 5. The package becomes `authorized` or `declined` and cannot be edited or deleted
    through Eloquent. SQLite triggers also protect decided evidence and all package
    deletion from bulk SQL operations. No historical records are backfilled.
@@ -51,8 +53,9 @@ being manufactured. Browser decisions always provide session evidence.
 
 Creating another handoff rotates the existing token and captures another package.
 Older pending packages remain historical requests; they do not authorize anything.
-The latest package must be authorized and match the current document fingerprints
-before it can supply a current signature or allow ATMO acceptance.
+Each current document must match an authorized, signed package for the assigned
+PIC. Flight-plan and manifest signatures may come from different packages. ATMO
+visibility and acceptance require both.
 
 ## Document registry and fingerprints
 
@@ -88,18 +91,39 @@ version/migration plan; do not reinterpret historical snapshot arrays.
 
 ## Signature consent and preservation
 
-Unsigned authorization remains supported. Logging in, filing a flight, opening a
-preview, or approving a profile signature does not apply a signature image.
-The scanner offers a separate explicit signed-authorization action. Self-prepared
-flights retain their ordinary filing path and expose an explicit review/signing
-action from the saved flight preview. Creating that review request makes the
-package pending until the PIC decides it; opening it does not sign it.
+Unsigned authorization remains supported in the representative/QR workflow.
+Logging in, opening a preview, or approving a profile signature does not sign a
+filing. The scanner retains its separate signed and unsigned actions.
+
+New self-PIC filings require the Filament `Authorize Flight Filing` confirmation,
+which identifies the registered document types. Cancel preserves the form without
+creating a flight. `Authorize & Submit` revalidates the form, pilot, operator,
+approved signature ID, and integrity; it creates the flight, authorization package,
+preserved PDFs, and audit events atomically. The flight appears in pilot Current
+with Manifest needed.
+The new-flight form has no manifest attachment editor, so its initial package is
+flight-plan-only. Saving a manifest opens a separate confirmation for that saved
+version. Cancel or a failed signature leaves it saved with Manifest signature
+needed. The manifest page can reopen confirmation without re-entering data. An
+unchanged flight-plan signature remains valid.
+Self-PIC session-preview submissions redirect to the same prefilled Filament form;
+the session preview is cleared only after successful creation.
+
+The modal captures a locked form fingerprint and signature ID. A changed form,
+profile, operator, signature, or document set requires another confirmation.
+Pilot/profile row locks serialize relevant updates. A per-page submission ID is
+recorded on the creation audit event; retries under the pilot row lock reuse the
+same flight rather than creating duplicate filings or authorization packages.
+Direct self-filing records `pic_authorization_method = SELF`; the existing QR
+handoff retains `QR`. Neither value changes password authentication evidence.
 
 Electronic signing requires the active approved signature to belong to the PIC.
 `PilotSignatureService::verifiedBytes()` verifies its stored bytes before the
 decision. The package preserves its ID, version, and SHA-256. Missing/pending
-signatures produce a clear validation message; unsigned authorization remains
-available. Integrity failures abort the transaction without consuming the handoff.
+signatures produce a clear validation message. Self-PIC submission cannot silently
+fall back to unsigned authorization. QR unsigned authorization remains available.
+Integrity failures abort the transaction without consuming the handoff or creating
+a new self-filed operational record.
 
 Replacing the profile signature does not change older packages. Historical
 signature bytes are selected by the captured ID/version/hash, including a version
@@ -109,9 +133,11 @@ evidence of the original decision, not proof that the current filing is authoriz
 
 The flight-plan signature uses the existing pilot name/signature cell without
 moving its name or credentials. FPDI/TCPDF overlays the signature in the existing
-manifest signature area above the printed name. The same captured version supplies
-saved previews, regenerated PDFs, and accepted manifest snapshots. No image is
-rendered on a current unsigned, declined, or materially changed filing.
+manifest signature area above the printed name. Each document uses its own
+captured signature version for previews, regenerated PDFs, and accepted manifest
+snapshots. No image is rendered on an unsigned, declined, or materially changed
+document. A newer matching unsigned or invalid signature decision fails closed;
+it never restores an older signature.
 
 This is the display of a verified handwritten signature image and recorded PIC
 consent. It is not a cryptographic PDF digital signature.
@@ -136,9 +162,13 @@ registration; do not infer additional aviation rules from this implementation.
 registered document set before and after a mutation. Flight, manifest, and person
 model saves participate, including quiet saves. Manifest service row replacement
 is grouped into one outer mutation so a no-op save does not invalidate consent.
-Material changes increment the filing's flight revision, clear current approval
-and handoff fields, return the filing to awaiting PIC, and record an invalidation
-event. Prior packages are never overwritten. Operational updates leave the
+Material changes increment the aggregate QR revision and the affected document
+revision, clear the handoff, return the filing to awaiting PIC, and record an
+invalidation event. Each document loses only its own current signature. Shared
+fields rendered on the manifest also invalidate the manifest when changed. Pilot
+Current retains incomplete filings; ATMO Pending, previews, PDFs, QR access, and
+acceptance require both current signatures. Prior packages are never overwritten.
+Operational updates leave the
 fingerprint and authorization intact.
 
 Direct bulk/query-builder writes bypass Eloquent mutation hooks and must not be
@@ -175,8 +205,11 @@ locks and encrypted manifest PDF snapshots remain in effect.
 The additive `create_filing_authorizations_table` migration preserves existing
 flights, signatures, and events. Run it through the normal deployment process;
 development/testing here uses SQLite in memory and does not migrate the live DB.
-Historical authorizations without package evidence retain legacy behavior until
-a new package request is made. They do not acquire electronic signatures.
+The additive `add_document_signature_revisions` migration adds independent
+revision counters and immutable signed-document membership. Existing packages
+with null membership retain their original document membership; missing
+historical document counters resolve to revision one. Existing records and PDFs
+are preserved. Unsigned legacy records do not become ATMO-ready automatically.
 
 Package evidence and its preserved PDFs commit together. The subsequent private
 flight-plan cache write remains a filesystem operation outside the transaction;
@@ -216,3 +249,5 @@ Paths below are relative to the repository root. New files are identified with
 | `database/migrations/` | `2026_11_01_000001_create_filing_authorizations_table.php` (new) |
 | `tests/Feature/` | `UnifiedFilingAuthorizationTest.php` (new), `FlightManifestTest.php`, `FlightPlanPreviewActionsTest.php`, `FlightPlanRefactorTest.php`, `PicAuthorizationWorkflowTest.php` |
 | `docs/architecture/` | `filing-authorization.md` (new), `authentication.md`, `controllers.md` |
+
+ATMO queries batch-check current snapshots and signature integrity before returning IDs. Large filing histories may require a measured query/readiness optimization. SQLite tests do not verify MySQL locking behavior. SeparateDocumentSignaturesTest covers saved-version consent, cancel/resume, stale and failed confirmations, independent revisions, direct-access gates, representative QR, and preserved historical PDFs.

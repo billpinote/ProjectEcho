@@ -4,15 +4,18 @@ namespace App\Domain\FlightPlans\Services;
 
 use App\Auth\AuthenticationEvidence;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Models\Flight;
 use App\Models\FlightPlanEvent;
+use App\Models\PilotSignature;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class PicAuthorizationService
 {
@@ -24,16 +27,95 @@ class PicAuthorizationService
         PilotLicenseType::AirlineTransportPilot,
     ];
 
+    public function selfFilingSignature(User $pic, ?int $expectedId = null): PilotSignature
+    {
+        try {
+            $signature = app(FilingAuthorizationService::class)->approvedSignature($pic);
+        } catch (ValidationException) {
+            throw ValidationException::withMessages(['signature' => 'An approved pilot signature is required. Submit your signature for administrator approval before authorizing this filing.']);
+        } catch (HttpException $exception) {
+            if (! in_array($exception->getStatusCode(), [404, 409], true)) {
+                throw $exception;
+            }
+            throw ValidationException::withMessages(['signature' => 'Your approved signature could not be verified. Contact an administrator before authorizing this filing. Your entered flight information has been preserved.']);
+        }
+        if ($expectedId !== null && $signature->getKey() !== $expectedId) {
+            throw ValidationException::withMessages(['signature' => 'Your approved signature changed. Review and confirm the filing again.']);
+        }
+
+        return $signature;
+    }
+
+    public function authorizeSelfFiling(Flight $flight, User $pic, AuthenticationEvidence $evidence, int $signatureId, ?string $reviewedFingerprint = null, string $documentType = 'flight_plan'): Flight
+    {
+        $evidence->assertActor($pic);
+
+        return DB::transaction(function () use ($flight, $pic, $evidence, $signatureId, $reviewedFingerprint, $documentType): Flight {
+            $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
+            $pic = User::query()->lockForUpdate()->findOrFail($pic->getKey());
+            $profile = $pic->pilotProfile()->lockForUpdate()->first();
+            if ($profile !== null) {
+                $profile->setRelation('qualifications', $profile->qualifications()->lockForUpdate()->get());
+            }
+            $pic->setRelation('pilotProfile', $profile);
+            abort_unless($pic->is_active && $pic->isPilot() && $pic->canCreateFlightPlans()
+                && in_array($documentType, ['flight_plan', 'passenger_cargo_manifest'], true)
+                && ($documentType === 'passenger_cargo_manifest' || (int) $flight->prepared_by_user_id === (int) $pic->id)
+                && (int) $flight->pilot_in_command_user_id === (int) $pic->id
+                && FlightAccess::canView($pic, $flight)
+                && ! $flight->hasBeenAccepted() && ! $flight->isPicAuthorizationDeclined()
+                && in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true), 403);
+            $this->eligibleCredentials($pic, $flight, lockForUpdate: true);
+            $signature = $this->selfFilingSignature($pic, $signatureId);
+            $documents = app(FilingDocumentRegistry::class);
+            $snapshots = $documents->snapshots($flight);
+            abort_unless(isset($snapshots[$documentType]), 422);
+            $fingerprint = $documents::documentFingerprint($snapshots, $documentType);
+            if ($reviewedFingerprint !== null && ! hash_equals($reviewedFingerprint, $fingerprint)) {
+                throw ValidationException::withMessages(['signature' => 'The filing documents changed. Review and confirm the current documents again.']);
+            }
+            $packages = app(FilingAuthorizationService::class);
+            if (($current = $packages->currentForDocument($flight, $documentType)) !== null && $current->pilot_signature_id === $signatureId) {
+                return $flight;
+            }
+            $package = $packages->request($flight, [$documentType]);
+            if ($documentType === 'passenger_cargo_manifest') {
+                app(FlightManifestService::class)->assertComplete($flight);
+            }
+            if ($documentType === 'flight_plan') {
+                $packages->recordingDecision($flight, fn () => $flight->forceFill([
+                    'pic_authorized_by_user_id' => $pic->id, 'pic_authorized_at' => now(),
+                    'pic_authorized_revision' => (int) $flight->revision_number,
+                    'pic_authorization_method' => 'SELF', 'pic_authorization_status' => 'authorized',
+                    'pic_authorization_token' => null, 'pic_authorization_token_expires_at' => null,
+                    'status' => FlightPlanStatus::Pending,
+                ])->save());
+            }
+            $packages->decide($package, $flight, $pic, true, $evidence, $signature);
+            $ready = $packages->isReadyForAtmo($flight);
+            $flight->forceFill(['status' => $ready ? FlightPlanStatus::Pending : FlightPlanStatus::AwaitingPic])->saveQuietly();
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_PIC_AUTHORIZED, $pic, null, [
+                'revision_number' => $flight->revision_number, 'authorization_method' => 'SELF',
+                'filing_authorization_id' => $package->id, 'authentication' => $evidence->auditValues(),
+                'document_type' => $documentType,
+            ]);
+            if ($ready) {
+                FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $pic);
+            }
+
+            return $flight->refresh();
+        });
+    }
+
     public function createAuthorizationHandoff(Flight $flight, bool $selfPrepared = false): string
     {
         return DB::transaction(function () use ($flight, $selfPrepared): string {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
-            abort_unless(($selfPrepared || $flight->requiresPicAuthorization())
-                && ($selfPrepared || ! $flight->isPicAuthorizationCurrent())
+            abort_unless(($selfPrepared || ! $flight->canSubmitToAtc())
                 && ! $flight->hasBeenAccepted()
                 && ! $flight->isPicAuthorizationDeclined(), 422);
 
-            app(FilingAuthorizationService::class)->request($flight);
+            app(FilingAuthorizationService::class)->request($flight, $selfPrepared ? ['flight_plan'] : null);
             $token = Str::random(64);
             $revision = (int) ($flight->revision_number ?? 1);
             $flight->forceFill([
@@ -61,8 +143,7 @@ class PicAuthorizationService
 
         if ($flight === null
             || $flight->pic_authorization_token_expires_at?->isPast()
-            || ! $flight->requiresPicAuthorization()
-            || $flight->isPicAuthorizationCurrent()
+            || $flight->canSubmitToAtc()
         ) {
             return null;
         }
@@ -138,10 +219,12 @@ class PicAuthorizationService
                 'status' => FlightPlanStatus::Pending,
             ])->save());
 
-            if ($flight->manifest()->exists()) {
+            if ($flight->manifest()->exists() && ($package->signed_document_types === null || in_array('passenger_cargo_manifest', $package->signed_document_types, true))) {
                 app(FlightManifestService::class)->assertComplete($flight);
             }
             $packages->decide($package, $flight, $authorizer, true, $evidence, $signature);
+            $ready = $packages->isReadyForAtmo($flight);
+            $flight->forceFill(['status' => $ready ? FlightPlanStatus::Pending : FlightPlanStatus::AwaitingPic])->saveQuietly();
 
             FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_PIC_AUTHORIZED, $authorizer, null, [
                 'revision_number' => $flight->revision_number,
@@ -149,7 +232,9 @@ class PicAuthorizationService
                 'filing_authorization_id' => $package->getKey(),
                 ...($evidence === null ? [] : ['authentication' => $evidence->auditValues()]),
             ]);
-            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $authorizer);
+            if ($ready) {
+                FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $authorizer);
+            }
 
             return $flight->refresh();
         });
@@ -218,11 +303,11 @@ class PicAuthorizationService
     }
 
     /** @return array{pilot_name: ?string, license: ?string, ratings: ?string, license_expiry_date: ?string} */
-    public function eligibleCredentials(User $user, Flight $flight): array
+    public function eligibleCredentials(User $user, Flight $flight, bool $lockForUpdate = false): array
     {
         $this->guardEligiblePic($user);
 
-        $credentials = PilotFlightPlanCredentials::forUser($user, $flight->date_of_flight);
+        $credentials = PilotFlightPlanCredentials::forUser($user, $flight->date_of_flight, $lockForUpdate);
 
         if (! $credentials['license_valid'] || blank($credentials['license']) || blank($credentials['pilot_name'])) {
             throw ValidationException::withMessages(['payload' => 'Your verified pilot profile is incomplete or expired for this flight.']);
@@ -268,7 +353,7 @@ class PicAuthorizationService
             throw ValidationException::withMessages(['payload' => 'This QR payload is stale. Scan the current flight-plan QR again.']);
         }
 
-        if (! $flight->requiresPicAuthorization() || $flight->isPicAuthorizationCurrent()) {
+        if ($flight->canSubmitToAtc()) {
             throw ValidationException::withMessages(['payload' => 'This flight plan no longer requires PIC authorization.']);
         }
 
@@ -277,7 +362,7 @@ class PicAuthorizationService
 
     private function guardCurrentAuthorizationState(Flight $flight, User $user, bool $enforcePreparerRestriction = true): void
     {
-        if (! $flight->requiresPicAuthorization() || $flight->isPicAuthorizationCurrent()) {
+        if ($flight->canSubmitToAtc()) {
             throw ValidationException::withMessages(['payload' => 'This flight plan no longer requires PIC authorization.']);
         }
 

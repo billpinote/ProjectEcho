@@ -2,9 +2,9 @@
 
 namespace App\Filament\Shared\Widgets;
 
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Filament\Shared\Resources\Flights\Schemas\FlightForm;
 use App\Models\Flight;
-use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use Filament\Support\Enums\FontFamily;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -20,6 +20,7 @@ class AlphaFlightsTable extends TableWidget
             ->heading(false)
             ->query(
                 Flight::query()
+                    ->visibleTo(auth()->user())
                     ->where('status', 'accepted')
                     ->whereNull('time_airborne')
                     ->where(function ($query) {

@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\FlightPlans;
 
 use App\Auth\AuthenticationEvidence;
+use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\Users\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\FilingAuthorization;
 use App\Models\Flight;
@@ -45,6 +47,7 @@ class FilingAuthorizationController extends Controller
         $this->guardPackage($request, $package);
         $documents = $package->status === 'authorized' ? $package->authorized_documents : $package->documents;
         abort_unless(isset($documents[$type]), 404);
+        abort_unless($package->signed_document_types === null || in_array($type, $package->signed_document_types, true), 404);
 
         $preserved = $package->pdf_documents[$type] ?? null;
         if ($preserved !== null) {
@@ -65,6 +68,7 @@ class FilingAuthorizationController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor?->is_active && $actor->canViewFlightPlans(), 403);
+        abort_if($actor->role === UserRole::Atmo && ! $actor->can('view', $flight), 403);
         $query = $flight->filingAuthorizations()->latest('id');
         if (! $actor->can('view', $flight)) {
             abort_unless(FlightAccess::operatorMatches($actor, $flight) && (clone $query)->where('pic_user_id', $actor->id)->exists(), 403);
@@ -74,6 +78,9 @@ class FilingAuthorizationController extends Controller
         return view('flightplan.filing-history', [
             'flight' => $flight, 'packages' => $query->get(),
             'currentPackageId' => $flight->isPicAuthorizationCurrent() ? $flight->filingAuthorizations()->latest('id')->value('id') : null,
+            'currentDocumentPackages' => collect(['flight_plan', 'passenger_cargo_manifest'])->mapWithKeys(fn ($type) => [
+                $type => app(FilingAuthorizationService::class)->currentForDocument($flight, $type)?->id,
+            ])->all(),
         ]);
     }
 
@@ -81,6 +88,7 @@ class FilingAuthorizationController extends Controller
     {
         $actor = $request->user();
         abort_unless($actor?->is_active && $actor->canViewFlightPlans(), 403);
+        abort_if($actor->role === UserRole::Atmo && ! $actor->can('view', $package->flight), 403);
         if ($package->status === 'pending') {
             try {
                 $this->pic->guardEligiblePic($actor);

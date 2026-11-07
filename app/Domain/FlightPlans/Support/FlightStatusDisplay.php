@@ -101,6 +101,14 @@ final class FlightStatusDisplay
     {
         $status = self::status($flight);
 
+        if (self::resolveViewerRole($viewerRole) === UserRole::Pilot
+            && in_array($status, [self::PENDING, self::AWAITING_PIC], true)
+            && ! $flight->isPicAuthorizationDeclined()) {
+            return ['key' => 'document_signatures', 'label' => $flight->documentSignatureStatus(),
+                'color' => 'warning', 'icon' => 'heroicon-o-document-text', 'outlined' => false,
+                'tooltip' => 'Both current documents must be signed before ATMO review.'];
+        }
+
         return [
             'key' => $status,
             'label' => self::label($status, $viewerRole),

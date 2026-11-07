@@ -4,13 +4,19 @@ namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Services\FlightPlanPdfService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
+use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Pilot\Resources\Flights\Pages\CreateFlight;
 use App\Models\Flight;
 use App\Models\FlightPlanEvent;
+use App\Models\PilotSignature;
 use App\Models\User;
+use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -66,7 +72,7 @@ class FlightPlanPreviewActionsTest extends TestCase
         $this->assertDatabaseCount('flights', 0);
     }
 
-    public function test_approve_creates_flight_generates_pdf_and_clears_preview_session(): void
+    public function test_approve_requires_confirmation_then_creates_signed_flight_and_clears_preview_session(): void
     {
         Storage::fake('public');
 
@@ -84,6 +90,10 @@ class FlightPlanPreviewActionsTest extends TestCase
             ->withSession(['flight_plan_preview' => $flightData])
             ->post(route('flightplan.approve'));
 
+        $response->assertRedirectContains('from_preview=1')->assertSessionHas('flight_plan_preview');
+        $this->assertDatabaseCount('flights', 0);
+        $this->confirmPreview($pilot);
+
         $this->assertDatabaseHas('flights', [
             'aircraft_identification' => 'N12345',
             'flight_rules' => 'I',
@@ -93,14 +103,8 @@ class FlightPlanPreviewActionsTest extends TestCase
         $flight = Flight::firstOrFail();
         $expectedFile = 'flight-plans/'.now('UTC')->format('Ymd').'/N12345'.str_replace('-', '', $flightData['date_of_flight']).'143000.pdf';
 
-        $response
-            ->assertRedirect(route('flights.qr', [
-                'flight' => $flight,
-                'file' => basename($expectedFile),
-            ]))
-            ->assertSessionMissing('flight_plan_preview')
-            ->assertSessionMissing('status')
-            ->assertSessionMissing('pdf_download_url');
+        $this->assertFalse(session()->has('flight_plan_preview'));
+        $this->get(route('flights.pdf.download', $flight))->assertOk();
 
         $path = app(FlightPlanPdfService::class)->storedPaths($flight)->first();
         Storage::disk('local')->assertExists($path);
@@ -130,10 +134,26 @@ class FlightPlanPreviewActionsTest extends TestCase
             ->post(route('flightplan.approve'))
             ->assertRedirect();
 
+        $this->confirmPreview($pilot);
+
         $this->assertDatabaseHas('flights', [
             'aircraft_identification' => 'N12345',
             'filed_by_user_id' => $pilot->id,
         ]);
+    }
+
+    private function confirmPreview(User $pilot): void
+    {
+        Storage::fake('local');
+        Filament::setCurrentPanel('pilot');
+        $pilot->pilotProfile()->create([
+            'license_type' => PilotLicenseType::CommercialPilot, 'license_number' => 'TEST-123',
+            'license_expiry_date' => now()->addYears(2)->toDateString(),
+        ]);
+        $signature = PilotSignature::factory()->create(['user_id' => $pilot->id]);
+        app(ProfileUpdateRequestService::class)->approve($signature->request, User::factory()->create(['role' => UserRole::Admin]));
+        Livewire::actingAs($pilot)->withQueryParams(['from_preview' => 1])->test(CreateFlight::class)
+            ->call('create')->callMountedAction()->assertHasNoErrors();
     }
 
     public function test_non_rpus_departure_previews_as_pdf_only_without_qr_actions(): void

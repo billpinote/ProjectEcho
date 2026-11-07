@@ -10,6 +10,7 @@ use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
+use App\Models\FlightManifest;
 use App\Models\FlightPlanEvent;
 use App\Models\Operator;
 use App\Models\User;
@@ -20,7 +21,7 @@ use Tests\TestCase;
 
 class FlightPlanRefactorTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_public_and_filament_dof_precedence_remains_distinct(): void
     {
@@ -92,6 +93,8 @@ class FlightPlanRefactorTest extends TestCase
     {
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'is_active' => true, 'wiresign' => 'AT', 'station' => 'RPUS']);
         $flight = Flight::factory()->create();
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
         $this->actingAs($atmo)->post(route('flights.reject', $flight), ['rejection_reason' => ''])
             ->assertSessionHasErrors('rejection_reason');
         $this->assertSame(FlightPlanStatus::Pending, $flight->refresh()->status);
@@ -118,9 +121,12 @@ class FlightPlanRefactorTest extends TestCase
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'is_active' => true, 'station' => 'RPUS']);
         $date = now('UTC')->addDay()->toDateString();
         $flight = Flight::factory()->create([
-            'status' => FlightPlanStatus::Accepted, 'received_facility' => 'RPUS',
+            'status' => FlightPlanStatus::Pending, 'received_facility' => 'RPUS',
             'date_of_flight' => $date, 'time_airborne' => '12:30',
         ]);
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
+        $flight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
         Flight::factory()->create([
             'status' => FlightPlanStatus::Accepted, 'received_facility' => 'RPUS',
             'date_of_flight' => now('UTC')->addDays(2)->toDateString(), 'time_airborne' => '12:30',

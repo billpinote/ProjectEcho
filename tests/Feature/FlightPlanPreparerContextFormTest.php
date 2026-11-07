@@ -7,16 +7,19 @@ use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
-use App\Filament\Panels\Dispatch\Resources\Flights\Pages\CreateFlight as DispatchCreateFlight;
 use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource as DispatchAwaitingAuthorizationFlightResource;
+use App\Filament\Panels\Dispatch\Resources\Flights\Pages\CreateFlight as DispatchCreateFlight;
 use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Models\Flight;
 use App\Models\Operator;
+use App\Models\PilotSignature;
 use App\Models\User;
+use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -131,6 +134,9 @@ class FlightPlanPreparerContextFormTest extends TestCase
     public function test_pilot_self_pic_save_stores_only_pic_certification_data(): void
     {
         $pilot = $this->pilotWithCredentials();
+        Storage::fake('local');
+        $signature = PilotSignature::factory()->create(['user_id' => $pilot->id]);
+        app(ProfileUpdateRequestService::class)->approve($signature->request, $this->user(UserRole::Admin));
 
         Livewire::actingAs($pilot)
             ->test(CreateFlight::class)
@@ -142,6 +148,7 @@ class FlightPlanPreparerContextFormTest extends TestCase
                 'authorized_representative_expiry_date' => '2035-01-01',
             ]))
             ->call('create')
+            ->callMountedAction()
             ->assertHasNoFormErrors()
             ->assertRedirect(MyCurrentFlightResource::getUrl('index', panel: 'pilot'));
 

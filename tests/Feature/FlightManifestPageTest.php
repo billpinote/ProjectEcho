@@ -16,7 +16,7 @@ use Tests\TestCase;
 
 class FlightManifestPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_manifest_menu_opens_guest_sign_in_prompt_without_persisting_data(): void
     {
@@ -96,6 +96,7 @@ class FlightManifestPageTest extends TestCase
         $flight = Flight::factory()->create();
         app(FlightManifestService::class)->save($flight, $flight->filedBy, $this->completeData($flight));
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
+        $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $atmo, 'AT');
         $this->actingAs($flight->filedBy)->get(EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot'))->assertOk()
             ->assertSeeText('Accepted filing')->assertDontSeeText('Save manifest')->assertDontSee('data-person-add', false);
@@ -182,6 +183,7 @@ class FlightManifestPageTest extends TestCase
         $manifest = app(FlightManifestService::class)->save($flight, $flight->filedBy, $this->completeData($flight));
         $before = $manifest->fresh()->getAttributes();
         $persons = $manifest->persons->toArray();
+        $this->signFlightDocuments($flight);
         $this->get(route('flights.manifest.edit', $flight))->assertRedirect(route('flights.manifest.pdf', $flight));
         $this->get(route('flights.manifest.pdf', $flight))->assertOk()->assertHeader('Content-Type', 'application/pdf');
         foreach ([['remarks' => 'Changed'], ['persons' => []], ['persons' => [['full_name' => 'Replacement', 'nationality' => 'Other', 'classification' => 'pic']]], ['persons' => [...$persons, ['full_name' => 'Added', 'classification' => 'crew']]]] as $data) {
