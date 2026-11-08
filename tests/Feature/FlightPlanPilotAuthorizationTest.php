@@ -646,7 +646,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         $this->assertTrue($admin->can('update', $flight));
 
         $this->actingAs($artisan)
-            ->get(route('filament.atmo.resources.flights.edit', ['record' => $flight]))
+            ->get(route('filament.atmo.resources.all-flight-plans.edit', ['record' => $flight]))
             ->assertOk();
     }
 

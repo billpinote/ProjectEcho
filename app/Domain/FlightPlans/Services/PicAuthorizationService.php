@@ -63,7 +63,7 @@ class PicAuthorizationService
                 && ($documentType === 'passenger_cargo_manifest' || (int) $flight->prepared_by_user_id === (int) $pic->id)
                 && (int) $flight->pilot_in_command_user_id === (int) $pic->id
                 && FlightAccess::canView($pic, $flight)
-                && ! $flight->hasBeenAccepted() && ! $flight->isPicAuthorizationDeclined()
+                && ! $flight->hasBeenAccepted() && ! $flight->isAvsecFrozen() && ! $flight->isPicAuthorizationDeclined()
                 && in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true), 403);
             $this->eligibleCredentials($pic, $flight, lockForUpdate: true);
             $signature = $this->selfFilingSignature($pic, $signatureId);

@@ -68,6 +68,7 @@ class FlightManifest extends Model
     public function ensureEditable(): void
     {
         $flightId = $this->exists ? $this->getRawOriginal('flight_id') : $this->flight_id;
+        Flight::query()->findOrFail($flightId)->assertAvsecEditable();
         if (Flight::query()->findOrFail($flightId)->hasBeenAccepted()) {
             throw ValidationException::withMessages(['manifest' => 'This accepted manifest is read-only. Create a new flight plan and manifest for changes.']);
         }

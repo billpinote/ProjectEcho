@@ -2,6 +2,7 @@
 
 namespace App\Domain\FlightPlans\Support;
 
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
@@ -12,6 +13,10 @@ class FlightAccess
 {
     public static function canView(User $user, Flight $flight): bool
     {
+        if ($user->isAvsec() && (! AvsecVerificationService::eligibleOfficer($user)
+            || ! AvsecVerificationService::requiredFor($flight))) {
+            return false;
+        }
         if ($user->role === UserRole::Atmo && ! app(FilingAuthorizationService::class)->isReadyForAtmo($flight)) {
             return false;
         }
@@ -91,6 +96,11 @@ class FlightAccess
     {
         if ($user === null || ! $user->is_active || ! $user->canViewFlightPlans()) {
             return $query->whereRaw('1 = 0');
+        }
+        if ($user->isAvsec()) {
+            return AvsecVerificationService::eligibleOfficer($user)
+                ? $query->whereRaw('UPPER(TRIM(departure_aerodrome)) = ?', ['RPUS'])
+                : $query->whereRaw('1 = 0');
         }
         if ($user->role === UserRole::Atmo) {
             return $query->whereKey(app(FilingAuthorizationService::class)->readyIds($query));

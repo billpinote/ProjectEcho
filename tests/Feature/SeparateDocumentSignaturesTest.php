@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Auth\AuthenticationEvidence;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
@@ -11,6 +12,7 @@ use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Atmo\Resources\AwaitingAvsecFlights\AwaitingAvsecFlightResource;
 use App\Filament\Panels\Atmo\Resources\Flights\FlightResource as AtmoFlights;
 use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
@@ -139,10 +141,17 @@ class SeparateDocumentSignaturesTest extends TestCase
         $this->manifestPage($flight, $pilot)->callMountedAction()->assertHasNoErrors();
         $this->actingAs($atmo);
         Filament::setCurrentPanel('atmo');
-        $this->assertTrue(AtmoFlights::getEloquentQuery()->whereKey($flight)->exists());
+        $this->assertFalse(AtmoFlights::getEloquentQuery()->whereKey($flight)->exists());
+        $this->assertTrue(AwaitingAvsecFlightResource::getEloquentQuery()->whereKey($flight)->exists());
         foreach (['flights.view', 'flights.pdf.download', 'flights.qr', 'flights.qr.download', 'flights.manifest.pdf'] as $route) {
             $this->get(route($route, $flight))->assertOk();
         }
+        $this->assertFalse($atmo->can('accept', $flight->fresh()));
+        app(AvsecVerificationService::class)->confirm(
+            app(FlightPlanQrPayloadService::class)->buildPayload($flight->fresh()),
+            User::factory()->create(['role' => UserRole::Avsec, 'station' => 'RPUS']), true,
+        );
+        $this->assertTrue(AtmoFlights::getEloquentQuery()->whereKey($flight)->exists());
         $this->assertTrue($atmo->can('accept', $flight->fresh()));
         app(FlightPlanMutationService::class)->accept($flight, $atmo, 'TEST');
         $this->assertTrue($flight->fresh()->hasBeenAccepted());

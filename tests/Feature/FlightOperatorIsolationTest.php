@@ -157,9 +157,11 @@ class FlightOperatorIsolationTest extends TestCase
     public function test_authorized_atmo_admin_and_artisan_can_view_and_operate_but_not_edit_accepted_filings(): void
     {
         [, $alpha] = $this->operators();
-        $flight = $this->flight($alpha, ['status' => FlightPlanStatus::Pending]);
-        FlightManifest::factory()->for($flight)->create();
+        $flight = Flight::factory()->create(['operator_id' => $alpha->id]);
+        $manifest = FlightManifest::factory()->for($flight)->create();
+        $manifest->persons()->create(['sequence_number' => 1, 'full_name' => $flight->pilot_in_command, 'nationality' => 'PH', 'classification' => 'pic']);
         $this->signFlightDocuments($flight);
+        $this->confirmFlightAvsec($flight);
         $flight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
 
         foreach ([

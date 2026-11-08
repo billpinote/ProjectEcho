@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Models\Flight;
 use App\Models\User;
@@ -42,6 +43,7 @@ class FlightPolicy
             && $user->hasFullFlightAccess()
             && FlightAccess::canView($user, $flight)
             && ! $flight->hasBeenAccepted()
+            && ! $flight->isAvsecFrozen()
             && $flight->pic_authorization_status !== 'declined';
     }
 
@@ -51,6 +53,7 @@ class FlightPolicy
     public function delete(User $user, Flight $flight): bool
     {
         return $user->hasFullFlightAccess() && ! $flight->hasBeenAccepted()
+            && ! $flight->isAvsecFrozen()
             && ! $flight->filingAuthorizations()->exists();
     }
 
@@ -76,6 +79,8 @@ class FlightPolicy
     public function accept(User $user, Flight $flight): bool
     {
         return $user->canReviewFlightPlans()
+            && (! AvsecVerificationService::requiredFor($flight)
+                || app(AvsecVerificationService::class)->validFor($flight))
             && $flight->status === FlightPlanStatus::Pending
             && ! $flight->hasBeenAccepted()
             && $flight->canSubmitToAtc()

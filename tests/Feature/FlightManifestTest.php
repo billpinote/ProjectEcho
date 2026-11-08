@@ -105,6 +105,7 @@ class FlightManifestTest extends TestCase
             $this->assertTrue($user->can('delete', $manifest));
         }
         $this->signFlightDocuments($flight);
+        $this->confirmFlightAvsec($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         foreach ([UserRole::Admin, UserRole::Artisan] as $role) {
             $user = User::factory()->create(['role' => $role]);
@@ -218,6 +219,7 @@ class FlightManifestTest extends TestCase
         $manifest = $this->completeManifest($flight);
         $atmo = $this->atmo();
         $this->signFlightDocuments($flight);
+        $this->confirmFlightAvsec($flight);
         $this->actingAs($atmo)->post(route('flights.accept', $flight))->assertSessionHasNoErrors();
         $this->assertSame(FlightPlanStatus::Accepted, $flight->fresh()->status);
         $this->assertSame($atmo->id, $flight->fresh()->accepted_by_user_id);
@@ -234,6 +236,7 @@ class FlightManifestTest extends TestCase
         $flight = Flight::factory()->create();
         $manifest = $this->completeManifest($flight);
         $this->signFlightDocuments($flight);
+        $this->confirmFlightAvsec($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $this->expectException(in_array($mutation, ['bulk_person', 'bulk_manifest', 'bulk_flight', 'bulk_delete'], true) ? QueryException::class : ValidationException::class);
         match ($mutation) {
@@ -262,6 +265,7 @@ class FlightManifestTest extends TestCase
         $flight = Flight::factory()->create();
         $manifest = $this->completeManifest($flight);
         $this->signFlightDocuments($flight);
+        $this->confirmFlightAvsec($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $flight->refresh()->update(['status' => FlightPlanStatus::Cancelled]);
         $this->assertTrue($flight->fresh()->hasBeenAccepted());
@@ -372,6 +376,7 @@ class FlightManifestTest extends TestCase
         $flight = Flight::factory()->create();
         $manifest = $this->completeManifest($flight);
         $this->signFlightDocuments($flight);
+        $this->confirmFlightAvsec($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $this->expectException(AuthorizationException::class);
         app(FlightManifestService::class)->save($flight, $manifest->creator, ['persons' => []]);

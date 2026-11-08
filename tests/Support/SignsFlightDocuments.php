@@ -3,7 +3,9 @@
 namespace Tests\Support;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
 use App\Models\PilotSignature;
@@ -12,6 +14,15 @@ use Illuminate\Support\Facades\Storage;
 
 trait SignsFlightDocuments
 {
+    protected function confirmFlightAvsec(Flight $flight): void
+    {
+        $officer = User::factory()->create(['role' => UserRole::Avsec, 'station' => 'RPUS']);
+        app(AvsecVerificationService::class)->confirm(
+            app(FlightPlanQrPayloadService::class)->buildPayload($flight->fresh()),
+            $officer, true,
+        );
+    }
+
     protected function setUpSignsFlightDocuments(): void
     {
         Storage::fake('local');

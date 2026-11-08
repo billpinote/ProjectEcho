@@ -3,6 +3,7 @@
 namespace App\Domain\FlightPlans\Support;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\FlightWorkflowService;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
 use Filament\Tables\Columns\TextColumn;
@@ -15,6 +16,10 @@ final class FlightStatusDisplay
     public const PIC_DECLINED = 'pic_declined';
 
     public const PENDING = 'pending';
+
+    public const AWAITING_AVSEC = 'awaiting_avsec';
+
+    public const PENDING_ATMO = 'pending_atmo';
 
     public const ACCEPTED = 'accepted';
 
@@ -62,7 +67,7 @@ final class FlightStatusDisplay
         }
 
         if ($flight->status === FlightPlanStatus::Pending) {
-            return self::PENDING;
+            return app(FlightWorkflowService::class)->pendingStage($flight);
         }
 
         if (filled($flight->time_touchdown)
@@ -142,6 +147,9 @@ final class FlightStatusDisplay
 
     public static function label(string $status, UserRole|string|null $viewerRole = null): string
     {
+        if (in_array($status, [self::AWAITING_AVSEC, self::PENDING_ATMO], true)) {
+            return $status === self::AWAITING_AVSEC ? 'Awaiting AVSEC' : 'Pending ATMO';
+        }
         $role = self::resolveViewerRole($viewerRole);
 
         if ($role === UserRole::Pilot) {
@@ -187,6 +195,8 @@ final class FlightStatusDisplay
     public static function color(string $status): string
     {
         return match ($status) {
+            self::AWAITING_AVSEC => 'warning',
+            self::PENDING_ATMO => 'gray',
             self::AWAITING_PIC => 'gray',
             self::PIC_DECLINED => 'danger',
             self::PENDING => 'gray',
@@ -205,6 +215,8 @@ final class FlightStatusDisplay
     public static function icon(string $status): string
     {
         return match ($status) {
+            self::AWAITING_AVSEC => 'heroicon-o-shield-check',
+            self::PENDING_ATMO => 'heroicon-o-clock',
             self::AWAITING_PIC => 'heroicon-o-user-circle',
             self::PIC_DECLINED => 'heroicon-o-exclamation-triangle',
             self::PENDING => 'heroicon-o-clock',
@@ -222,11 +234,17 @@ final class FlightStatusDisplay
 
     public static function isOutlined(string $status): bool
     {
-        return in_array($status, [self::AWAITING_PIC, self::PENDING, self::PIC_DECLINED], true);
+        return in_array($status, [self::AWAITING_PIC, self::PENDING, self::PENDING_ATMO, self::AWAITING_AVSEC, self::PIC_DECLINED], true);
     }
 
     public static function tooltip(string $status, UserRole|string|null $viewerRole = null): string
     {
+        if ($status === self::AWAITING_AVSEC) {
+            return 'PIC and manifest authorization complete; awaiting confirmation of offline PNP AVSEC procedures.';
+        }
+        if ($status === self::PENDING_ATMO) {
+            return 'Required authorizations and clearance verification complete; awaiting ATMO review.';
+        }
         $role = self::resolveViewerRole($viewerRole);
 
         if ($role === UserRole::Pilot) {

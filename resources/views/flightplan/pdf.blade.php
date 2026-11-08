@@ -514,7 +514,9 @@
 
     @if(isset($isPreview))
         @php
-            $previewStatus = $flight->status?->label() ?? 'Unknown';
+            $previewStatus = $flight->exists
+                ? \App\Domain\FlightPlans\Support\FlightStatusDisplay::badge($flight, auth()->user()?->role)['label']
+                : ($flight->status?->label() ?? 'Unknown');
             $previewStatusClass = match ($flight->status) {
                 \App\Domain\FlightPlans\Enums\FlightPlanStatus::Pending => 'pending',
                 \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted => 'accepted',
@@ -523,9 +525,6 @@
                 \App\Domain\FlightPlans\Enums\FlightPlanStatus::Completed => 'completed',
                 default => 'default',
             };
-            if ($flight->status === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Pending && ($showReviewActions ?? false)) {
-                $previewStatus = 'Pending ATMO Review';
-            }
             $reviewCompleted = session('review_status')
                 && in_array($flight->status, [
                     \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted,
@@ -1353,7 +1352,9 @@
                     <button class="echo-review-button echo-review-button-neutral echo-review-manifest-action" type="button" disabled aria-disabled="true">Review Flight Manifest — {{ $manifestReviewUnavailableReason ?? 'Manifest unavailable' }}</button>
                 @endif
                 <button class="echo-review-button echo-review-button-danger" type="button" data-open-review-modal="reject-flight-plan">Reject</button>
+                @if($canAcceptFlightPlan ?? false)
                 <button class="echo-review-button echo-review-button-primary" type="button" data-open-review-modal="accept-flight-plan">&#10003; Accept Flight Plan</button>
+                @endif
             </div>
         </div>
 
@@ -1374,6 +1375,7 @@
             </form>
         </div>
 
+        @if($canAcceptFlightPlan ?? false)
         <div class="echo-review-modal" id="accept-flight-plan" role="dialog" aria-modal="true" aria-labelledby="accept-flight-plan-title" hidden>
             <form class="echo-review-modal-card" method="POST" action="{{ $acceptActionUrl }}">
                 @csrf
@@ -1392,6 +1394,7 @@
                 </div>
             </form>
         </div>
+        @endif
         @endif
 
         <script>

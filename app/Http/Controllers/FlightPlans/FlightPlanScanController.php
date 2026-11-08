@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FlightPlans;
 
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrLookupService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\FlightPlanQrRenderer;
@@ -44,6 +45,12 @@ class FlightPlanScanController extends Controller
         $validated = $request->validated();
 
         $matchedFlight = $this->lookup->lookup((string) $validated['payload']);
+        if ($request->user()?->isAvsec()) {
+            $authoritative = app(AvsecVerificationService::class)->resolve((string) $validated['payload'], $request->user());
+            $matchedFlight = array_replace($matchedFlight, $authoritative->only([
+                'aircraft_identification', 'date_of_flight', 'departure_aerodrome', 'destination_aerodrome',
+            ]), ['flight' => $authoritative, 'preview' => null]);
+        }
         if ($request->user()?->role === UserRole::Atmo) {
             abort_unless(($matchedFlight['flight'] ?? null) instanceof Flight && $request->user()->can('view', $matchedFlight['flight']), 403);
         }
@@ -81,7 +88,7 @@ class FlightPlanScanController extends Controller
         $validated = $request->validated();
 
         $parsedPayload = $this->payloads->parsePayload((string) $validated['payload']);
-        if ($request->user()?->role === UserRole::Atmo) {
+        if (in_array($request->user()?->role, [UserRole::Atmo, UserRole::Avsec], true)) {
             $flight = Flight::find((int) ($parsedPayload['flight_id'] ?? 0));
             abort_unless($flight !== null && $request->user()->can('view', $flight), 403);
         }
@@ -133,7 +140,7 @@ class FlightPlanScanController extends Controller
         }
 
         if (! $flight) {
-            abort_if($request->user()?->role === UserRole::Atmo, 403);
+            abort_if(in_array($request->user()?->role, [UserRole::Atmo, UserRole::Avsec], true), 403);
             $flight = new Flight($this->normalizer->preparePreviewFlightAttributes($preview['snapshot']));
         }
 

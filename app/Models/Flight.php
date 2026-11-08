@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
+use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\Users\Enums\UserRole;
 use Carbon\CarbonInterface;
@@ -26,6 +28,23 @@ class Flight extends Model
         return $this->hasMany(FilingAuthorization::class);
     }
 
+    public function avsecVerification(): HasOne
+    {
+        return $this->hasOne(AvsecVerification::class);
+    }
+
+    public function isAvsecFrozen(): bool
+    {
+        return $this->exists && $this->avsecVerification()->exists();
+    }
+
+    public function assertAvsecEditable(): void
+    {
+        if ($this->isAvsecFrozen()) {
+            throw ValidationException::withMessages(['flight' => 'The AVSEC-verified submission is permanently frozen.']);
+        }
+    }
+
     public function save(array $options = []): bool
     {
         if (! $this->exists) {
@@ -33,7 +52,21 @@ class Flight extends Model
         }
 
         return app(FilingAuthorizationService::class)
-            ->mutate($this, fn (): bool => parent::save($options));
+            ->mutate($this, function () use ($options): bool {
+                if ($this->isDirty('status') && in_array($this->status, [FlightPlanStatus::Accepted, FlightPlanStatus::Active, FlightPlanStatus::Completed], true)
+                    && ! in_array($this->getOriginal('status'), [FlightPlanStatus::Accepted, FlightPlanStatus::Active, FlightPlanStatus::Completed], true)
+                    && AvsecVerificationService::requiredFor($this)
+                    && ! app(AvsecVerificationService::class)->validFor($this)) {
+                    throw ValidationException::withMessages(['avsec' => 'RPUS departures require current AVSEC confirmation before acceptance.']);
+                }
+                if ($this->isAvsecFrozen() && array_diff(array_keys($this->getDirty()), [
+                    ...FilingDocumentRegistry::OPERATIONAL_FIELDS, 'updated_at',
+                ]) !== []) {
+                    $this->assertAvsecEditable();
+                }
+
+                return parent::save($options);
+            });
     }
 
     private const OPERATIONS_TIMEZONE = 'Asia/Manila';
@@ -209,6 +242,7 @@ class Flight extends Model
             }
         });
         static::deleting(function (self $flight): void {
+            $flight->assertAvsecEditable();
             if ($flight->filingAuthorizations()->exists()) {
                 throw ValidationException::withMessages(['flight' => 'Filing authorization history must be preserved. Cancel this flight instead.']);
             }
@@ -624,6 +658,10 @@ class Flight extends Model
         }
         if ($packages->currentForDocument($this, 'passenger_cargo_manifest') === null) {
             return 'Manifest signature needed';
+        }
+
+        if (AvsecVerificationService::requiredFor($this) && ! $this->isAvsecFrozen()) {
+            return 'Pending AVSEC confirmation';
         }
 
         return 'Pending ATMO Acceptance';

@@ -97,6 +97,7 @@ class FlightManifestPageTest extends TestCase
         app(FlightManifestService::class)->save($flight, $flight->filedBy, $this->completeData($flight));
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
         $this->signFlightDocuments($flight);
+        $this->confirmFlightAvsec($flight);
         app(FlightPlanMutationService::class)->accept($flight, $atmo, 'AT');
         $this->actingAs($flight->filedBy)->get(EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot'))->assertOk()
             ->assertSeeText('Accepted filing')->assertDontSeeText('Save manifest')->assertDontSee('data-person-add', false);
@@ -156,7 +157,7 @@ class FlightManifestPageTest extends TestCase
     {
         $flight = Flight::factory()->create();
         app(FlightManifestService::class)->save($flight, $flight->filedBy, $this->completeData($flight));
-        $staff = User::factory()->create(['role' => UserRole::Avsec]);
+        $staff = User::factory()->create(['role' => UserRole::Avsec, 'station' => 'RPUS']);
         $this->actingAs($staff)->get(route('flights.manifest.edit', $flight))
             ->assertOk()->assertSeeText('Flight manifest')->assertDontSee('fi-sidebar', false);
     }
@@ -192,6 +193,7 @@ class FlightManifestPageTest extends TestCase
         $this->delete(route('flights.manifest.edit', $flight))->assertStatus(405);
         $this->assertSame($before, $manifest->fresh()->getAttributes());
         $this->assertSame($persons, $manifest->fresh()->persons->toArray());
+        $this->confirmFlightAvsec($flight);
         app(FlightPlanMutationService::class)->accept($flight, $atmo, 'AT');
         $this->get(route('flights.manifest.pdf', $flight))->assertOk();
         $this->put(route('flights.manifest.update', $flight), ['remarks' => 'Changed'])->assertForbidden();

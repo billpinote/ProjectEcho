@@ -476,6 +476,34 @@
                             Open Flight Plan
                         </a>
 
+                        @if($this->isAvsecVerificationPage())
+                            <div class="echo-workflow-step mt-4">
+                                <p>Server record #{{ $matchedFlight['id'] }} · Revision {{ $matchedFlight['revision'] }}</p>
+                                <p>PIC: {{ $matchedFlight['pic'] ?? 'Not authorized' }} · Aircraft: {{ $matchedFlight['aircraft'] }}</p>
+                                <p>Flight plan and manifest signatures: {{ $matchedFlight['authorized'] ? 'Current' : 'Required before confirmation' }}</p>
+                                @if($matchedFlight['manifest_url'])
+                                    <p><a href="{{ $matchedFlight['manifest_url'] }}" target="_blank" rel="noopener noreferrer">Review passenger / cargo manifest</a></p>
+                                @else
+                                    <p>Manifest missing</p>
+                                @endif
+                                <p>PNP AVSEC clearance procedures take place offline. Echo records this confirmation; it does not issue PNP approval, authenticate a physical signature, or authorize departure.</p>
+                                @unless($matchedFlight['verified'])
+                                    <label class="block mt-3">PNP reference number (optional)
+                                        <input type="text" wire:model="pnpReference" maxlength="255" class="echo-input w-full">
+                                    </label>
+                                    <label class="block mt-3">
+                                        <input type="checkbox" wire:model="clearanceConfirmed">
+                                        {{ \App\Domain\FlightPlans\Services\AvsecVerificationService::CONFIRMATION }}
+                                    </label>
+                                    <p>Confirmation permanently freezes this submission, including its manifest. Revised EOBT and permitted lifecycle updates remain available.</p>
+                                    <button type="button" wire:click="confirmClearance" wire:loading.attr="disabled" class="echo-button echo-button-primary mt-3">Confirm AVSEC procedures completed</button>
+                                @endunless
+                                @foreach(['avsec', 'confirmation', 'reference', 'manifest'] as $field)
+                                    @error($field)<p role="alert">{{ $message }}</p>@enderror
+                                @endforeach
+                            </div>
+                        @endif
+
                         @if($this->isPicAuthorizationPage())
                             @if($this->isPicAuthorizationPreparer())
                                 <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #718096; border-radius: 0.75rem; background: #edf2f7;">

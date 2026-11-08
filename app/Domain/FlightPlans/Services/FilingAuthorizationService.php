@@ -25,6 +25,7 @@ class FilingAuthorizationService
 
     public function request(Flight $flight, ?array $signedDocumentTypes = null): FilingAuthorization
     {
+        $flight->assertAvsecEditable();
         $documents = $this->documents->snapshots($flight);
         $package = new FilingAuthorization;
         $package->forceFill([
