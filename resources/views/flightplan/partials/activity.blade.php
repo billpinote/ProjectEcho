@@ -26,6 +26,7 @@
                         \App\Models\FlightPlanEvent::TYPE_PIC_DECLINED => 'PIC declined',
                         \App\Models\FlightPlanEvent::TYPE_SUBMITTED_TO_ATC => 'Submitted to ATMO',
                         \App\Models\FlightPlanEvent::TYPE_ATC_ACCEPTED => 'Accepted by ATMO',
+                        \App\Models\FlightPlanEvent::TYPE_AVSEC_VERIFIED => 'Offline PNP AVSEC procedures confirmed in Echo; submission frozen',
                         \App\Models\FlightPlanEvent::TYPE_ATC_REJECTED => 'Rejected by ATMO',
                         \App\Models\FlightPlanEvent::TYPE_DELAYED => 'Flight delayed',
                         \App\Models\FlightPlanEvent::TYPE_CANCELLED => 'Flight plan cancelled',

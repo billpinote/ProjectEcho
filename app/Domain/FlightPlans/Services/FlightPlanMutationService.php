@@ -5,6 +5,7 @@ namespace App\Domain\FlightPlans\Services;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Models\Flight;
 use App\Models\FlightPlanEvent;
 use App\Models\User;
@@ -39,6 +40,12 @@ class FlightPlanMutationService
     {
         return DB::transaction(function () use ($flight, $actor, $wiresign): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
+            if (! $actor->canReviewFlightPlans() || ! FlightAccess::canView($actor, $flight)) {
+                throw new AuthorizationException;
+            }
+            if (AvsecVerificationService::requiredFor($flight) && ! app(AvsecVerificationService::class)->validFor($flight)) {
+                throw ValidationException::withMessages(['avsec' => 'RPUS departures require current AVSEC confirmation before ATMO acceptance.']);
+            }
             if (! $actor->can('accept', $flight)) {
                 throw new AuthorizationException;
             }
@@ -49,7 +56,9 @@ class FlightPlanMutationService
                 throw ValidationException::withMessages(['flight' => 'This flight plan has expired.']);
             }
             app(FlightManifestService::class)->assertComplete($flight);
-            app(ManifestPdfService::class)->snapshot($flight);
+            if (! $flight->isAvsecFrozen()) {
+                app(ManifestPdfService::class)->snapshot($flight);
+            }
             $nowUtc = now('UTC');
             $flight->forceFill([
                 'status' => FlightPlanStatus::Accepted,

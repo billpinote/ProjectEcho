@@ -107,7 +107,7 @@ class FlightPlanController extends Controller
             ]);
         }
 
-        if (Auth::user()?->canReviewFlightPlans() && $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
+        if (Auth::user()?->can('accept', $flight) && $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
             $flight->markAsReviewed();
         }
 
@@ -130,6 +130,7 @@ class FlightPlanController extends Controller
             'backActionLabel' => 'Back to Dashboard',
             'backActionIsDashboard' => true,
             'acceptActionUrl' => route('flights.accept', $flight),
+            'canAcceptFlightPlan' => Auth::user()?->can('accept', $flight) ?? false,
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->browser->resolveAtcWiresign(),
             'picDeclineDetails' => $flight->pic_authorization_status === 'declined',

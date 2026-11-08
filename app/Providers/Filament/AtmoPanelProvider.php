@@ -9,6 +9,7 @@ use App\Filament\Panels\Atmo\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Panels\Atmo\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Panels\Atmo\Resources\AirborneFlights\AirborneFlightResource;
 use App\Filament\Panels\Atmo\Resources\AllFlightPlans\AllFlightResource;
+use App\Filament\Panels\Atmo\Resources\AwaitingAvsecFlights\AwaitingAvsecFlightResource;
 use App\Filament\Panels\Atmo\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Panels\Atmo\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Panels\Atmo\Resources\Flights\FlightResource;
@@ -41,6 +42,7 @@ class AtmoPanelProvider extends PanelProvider
                 ImportScanQr::class,
             ])
             ->resources([
+                AwaitingAvsecFlightResource::class,
                 FlightResource::class,
                 AcceptedFlightResource::class,
                 ActiveFlightResource::class,
@@ -76,6 +78,7 @@ class AtmoPanelProvider extends PanelProvider
                         ),
                     ], collapsible: true)
                     ->group('Flight Operations', [
+                        self::atmoResourceNavigationItem(AwaitingAvsecFlightResource::class, 'filament.atmo.resources.awaiting-avsec.*'),
                         self::atmoResourceNavigationItem(FlightResource::class, 'filament.atmo.resources.flights.*'),
                         self::atmoResourceNavigationItem(AcceptedFlightResource::class, 'filament.atmo.resources.accepted-flights.*'),
                         self::atmoResourceNavigationItem(ActiveFlightResource::class, 'filament.atmo.resources.active-flights.*'),

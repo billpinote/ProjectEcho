@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Auth\AuthenticationEvidence;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\ManifestPdfService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
@@ -361,6 +363,10 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $this->signature($pilot);
         $this->authorize($flight, $pilot, true);
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
+        $officer = User::factory()->create(['role' => UserRole::Avsec, 'station' => 'RPUS']);
+        app(AvsecVerificationService::class)->confirm(
+            app(FlightPlanQrPayloadService::class)->buildPayload($flight->fresh()), $officer, true,
+        );
         app(FlightPlanMutationService::class)->accept($flight, $atmo, 'TEST');
         $flight->refresh();
         $manifest->refresh();

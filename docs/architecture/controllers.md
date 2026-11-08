@@ -64,6 +64,7 @@ Flight-plan services live in `app/Domain/FlightPlans/Services`.
 | PicAuthorizationService | Enforce PIC eligibility and manage authorization handoffs and decisions |
 | FlightManifestService | Save manifests and enforce manifest requirements |
 | FilingAuthorizationService | Preserve filing review/decision evidence, signature versions, and material-change invalidation |
+| AvsecVerificationService | Verify current signed QR against the server filing, confirm offline PNP procedures for RPUS departures, and preserve permanent submission evidence |
 
 Shared data normalization belongs in
 `app/Domain/FlightPlans/Support/FlightPlanDataNormalizer`.
@@ -102,6 +103,18 @@ Acceptance and rejection use the shared mutation service.
 Controllers retain HTTP validation and responses. Services own the database changes and associated audit events.
 
 PIC authorization and ATC acceptance remain separate decisions.
+
+RPUS departures also require AVSEC confirmation before ATMO acceptance. The AVSEC
+panel reuses the flight-plan scanner to load the authoritative server record.
+Only active RPUS AVSEC officers may confirm that offline PNP clearance procedures
+are complete. Echo does not issue a PNP form or authenticate a physical signature.
+Confirmation permanently freezes the approved flight plan, manifest, ordered
+persons, cargo, authorization evidence, and approved PDF assets. Revised EOBT and
+existing operational lifecycle changes remain possible; rejection never unlocks
+the submission. The shared AVSEC register preserves records across shifts.
+Database guards cover bulk and quiet writes as well as model/service checks.
+The AVSEC migration supports SQLite and MySQL/MariaDB and fails closed on other
+database drivers. A future correction/revision workflow is outside this feature.
 
 PIC scanner actions obtain authenticated session evidence at the Filament entry
 point. `PicAuthorizationService` consumes that explicit evidence without depending
@@ -167,6 +180,7 @@ Use existing tests as starting points and inspect their assertions before relyin
 | Operator isolation | FlightOperatorIsolationTest |
 | Time storage | FlightTimeStorageTest |
 | Manifests | FlightManifestTest, FlightManifestPageTest |
+| AVSEC confirmation, freezing, shared register, and concurrency | AvsecVerificationTest, AvsecVerificationConcurrencyTest |
 
 Run affected tests after each logical extraction. Add coverage where moved behavior lacks meaningful tests.
 

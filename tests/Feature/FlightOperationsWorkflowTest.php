@@ -190,14 +190,14 @@ class FlightOperationsWorkflowTest extends TestCase
     public function test_qr_import_is_available_to_atmo_avsec_and_artisan_but_not_dispatch(): void
     {
         $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
-        $avsec = $this->user(UserRole::Avsec);
+        $avsec = $this->user(UserRole::Avsec, ['station' => 'RPUS']);
         $artisan = $this->user(UserRole::Artisan);
         $dispatch = $this->user(UserRole::Dispatch);
 
         $this->actingAs($atmo)->get('/atmo/import-scan-qr')->assertOk();
         $this->actingAs($avsec)->get('/avsec/import-scan-qr')->assertOk();
         $this->actingAs($artisan)->get('/atmo/import-scan-qr')->assertOk();
-        $this->actingAs($artisan)->get('/avsec/import-scan-qr')->assertOk();
+        $this->actingAs($artisan)->get('/avsec/import-scan-qr')->assertForbidden();
         $this->actingAs($dispatch)->get('/dispatch/import-scan-qr')->assertNotFound();
     }
 
@@ -251,6 +251,7 @@ class FlightOperationsWorkflowTest extends TestCase
             'time_start_up' => '08:10',
         ]);
         $this->completeManifestFor($activeFlight);
+        $this->confirmFlightAvsec($activeFlight);
         $activeFlight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
 
         $this->assertTrue(Flight::query()->active()->whereKey($activeFlight)->exists());
@@ -260,6 +261,7 @@ class FlightOperationsWorkflowTest extends TestCase
             'time_block_off' => '08:20',
         ]);
         $this->completeManifestFor($blockOffOnlyFlight);
+        $this->confirmFlightAvsec($blockOffOnlyFlight);
         $blockOffOnlyFlight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
 
         $this->assertTrue(Flight::query()->active()->whereKey($blockOffOnlyFlight)->exists());
@@ -286,6 +288,7 @@ class FlightOperationsWorkflowTest extends TestCase
 
         $acceptedFlight = $this->flight(['status' => FlightPlanStatus::Pending]);
         $this->completeManifestFor($acceptedFlight);
+        $this->confirmFlightAvsec($acceptedFlight);
 
         $this->actingAs($atmo)
             ->post(route('flights.accept', $acceptedFlight))
@@ -319,6 +322,7 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->completeManifestFor($flight);
         $this->completeManifestFor($otherFlight);
         $url = route('flights.manifest.pdf', $flight);
+        $this->confirmFlightAvsec($flight);
         $response = $this->actingAs($atmo)->get(route('flights.view', $flight))->assertOk();
         $this->assertTextContainsInOrder($response->getContent(), ['Close Review', 'Review Flight Manifest', 'Reject', 'Accept Flight Plan']);
         $document = new \DOMDocument;
@@ -387,6 +391,7 @@ class FlightOperationsWorkflowTest extends TestCase
         ]);
 
         $this->completeManifestFor($flight);
+        $this->confirmFlightAvsec($flight);
         $this->actingAs($atmo)
             ->post(route('flights.accept', $flight))
             ->assertRedirect(route('flights.view', $flight));

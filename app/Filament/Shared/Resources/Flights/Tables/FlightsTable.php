@@ -14,6 +14,7 @@ use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Filament\Shared\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Shared\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Shared\Resources\AirborneFlights\AirborneFlightResource;
+use App\Filament\Shared\Resources\AllFlightPlans\AllFlightResource;
 use App\Filament\Shared\Resources\CompletedFlights\CompletedFlightResource;
 use App\Filament\Shared\Resources\ExpiredFlights\ExpiredFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
@@ -49,7 +50,7 @@ use Livewire\Component as LivewireComponent;
 
 class FlightsTable
 {
-    public static function configure(Table $table, ?string $resourceClass = null): Table
+    public static function configure(Table $table, ?string $resourceClass = null, bool $readOnly = false): Table
     {
         $operationalFlightResources = [
             AcceptedFlightResource::class,
@@ -270,7 +271,7 @@ class FlightsTable
                 ->toggleable(isToggledHiddenByDefault: true),
         ];
 
-        if (in_array($resourceClass, [
+        if (self::matchesResource($resourceClass, AllFlightResource::class) || in_array($resourceClass, [
             MyFlightPlansResource::class,
             MyCurrentFlightResource::class,
             MyCompletedFlightResource::class,
@@ -1013,7 +1014,7 @@ class FlightsTable
                     ->filtersResetActionPosition(FiltersResetActionPosition::Footer)
                     ->hiddenFilterIndicators()
             )
-            ->recordActions($isOperationalFlightTable ? [] : self::recordActions($resourceClass));
+            ->recordActions($readOnly || $isOperationalFlightTable ? [] : self::recordActions($resourceClass));
     }
 
     /**

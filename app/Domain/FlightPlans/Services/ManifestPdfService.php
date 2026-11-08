@@ -29,7 +29,7 @@ class ManifestPdfService
 
     public function forFlight(Flight $flight, FlightManifest $manifest): string
     {
-        if ($flight->hasBeenAccepted()) {
+        if ($flight->hasBeenAccepted() || $flight->isAvsecFrozen()) {
             abort_if($manifest->accepted_pdf_content === null, 409, 'This legacy accepted filing has no preserved PDF. It cannot be regenerated as an original.');
             $bytes = base64_decode(Crypt::decryptString($manifest->accepted_pdf_content), true);
             abort_unless(is_string($bytes) && hash_equals($manifest->accepted_pdf_sha256, hash('sha256', $bytes)), 500, 'Preserved PDF integrity check failed.');

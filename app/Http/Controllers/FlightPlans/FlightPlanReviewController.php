@@ -32,7 +32,9 @@ class FlightPlanReviewController extends Controller
 
         $flight = $this->mutations->accept($flight, Auth::user(), $this->browser->resolveAtcWiresign());
 
-        $this->pdfs->regenerate($flight);
+        if (! $flight->isAvsecFrozen()) {
+            $this->pdfs->regenerate($flight);
+        }
 
         return redirect()
             ->route('flights.view', $flight)

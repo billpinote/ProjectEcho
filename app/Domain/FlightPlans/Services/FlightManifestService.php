@@ -81,9 +81,9 @@ class FlightManifestService
         });
     }
 
-    public function assertComplete(Flight $flight): void
+    public function assertComplete(Flight $flight, bool $loaded = false): void
     {
-        $manifest = $flight->manifest()->with('persons')->first();
+        $manifest = $loaded ? $flight->manifest : $flight->manifest()->with('persons')->first();
         if ($manifest === null) {
             throw ValidationException::withMessages(['manifest' => 'Prepare and complete the linked flight manifest before ATMO acceptance.']);
         }
@@ -113,7 +113,10 @@ class FlightManifestService
             || $manifest->persons->where('classification', 'pic')->count() !== 1) {
             throw ValidationException::withMessages(['manifest' => 'List the current flight-plan PIC once, as the first manifest person.']);
         }
-        if (! $this->comparison($manifest)['matches']) {
+        $comparison = $loaded
+            ? $this->data->comparePersons($manifest->persons->count(), $flight->persons_on_board)
+            : $this->comparison($manifest);
+        if (! $comparison['matches']) {
             throw ValidationException::withMessages(['manifest' => 'The manifest person count must match the flight plan persons on board. Review both documents; neither count was changed.']);
         }
         if ((float) $manifest->total_cargo_weight > 0 && (blank($manifest->cargo_type) || blank($manifest->cargo_quantity))) {

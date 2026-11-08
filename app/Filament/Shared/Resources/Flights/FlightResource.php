@@ -2,6 +2,7 @@
 
 namespace App\Filament\Shared\Resources\Flights;
 
+use App\Domain\FlightPlans\Services\FlightWorkflowService;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Shared\Resources\Flights\Pages\EditFlight;
@@ -80,7 +81,8 @@ class FlightResource extends Resource
 
     protected static function getFlightPlanBaseQuery(): Builder
     {
-        return parent::getEloquentQuery()->visibleTo(Auth::user());
+        return app(FlightWorkflowService::class)
+            ->withStatusContext(parent::getEloquentQuery()->visibleTo(Auth::user()));
     }
 
     protected static function hasStatusColumn(): bool

@@ -67,7 +67,7 @@ class EditFlightManifest extends Page
 
                 return auth()->user()?->isPilot() && (int) $flight->pilot_in_command_user_id === (int) auth()->id()
                     && ($type !== 'flight_plan' || (int) $flight->prepared_by_user_id === (int) auth()->id())
-                    && ! $flight->hasBeenAccepted() && ! $flight->isPicAuthorizationDeclined()
+                    && ! $flight->hasBeenAccepted() && ! $flight->isAvsecFrozen() && ! $flight->isPicAuthorizationDeclined()
                     && ($type !== 'passenger_cargo_manifest' || $flight->manifest()->exists());
             })
             ->mountUsing(function () use ($type): void {

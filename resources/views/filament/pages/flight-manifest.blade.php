@@ -1,6 +1,6 @@
 <x-filament-panels::page>
     @vite('resources/js/app.js')
-    @if (auth()->user()?->isPilot())
+    @if (auth()->user()?->isPilot() && ! $flight->isAvsecFrozen())
     <div class="flex flex-wrap gap-4">
         {{ $this->signFlightPlanAction }}
         {{ $this->signManifestAction }}

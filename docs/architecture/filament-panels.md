@@ -38,6 +38,15 @@ Artisan should primarily contain technical and system-maintenance surfaces such 
 
 ## Shared Code
 
+The ATMO Flight Operations navigation places the read-only Awaiting AVSEC queue
+immediately before Pending Flight Plans. The former contains eligible signed
+RPUS departures without AVSEC confirmation; Pending contains filings ready for
+ATMO review, including valid AVSEC evidence where required. Both use
+`FlightWorkflowService` for mutually exclusive membership. Shared
+`FlightStatusDisplay` badges distinguish Awaiting AVSEC from Pending ATMO without
+changing persisted lifecycle states. Workflow relationships are loaded in batches
+for list presentation; mutation services continue to revalidate current records.
+
 Shared Filament code belongs under `app/Filament/Shared`.
 
 Examples:

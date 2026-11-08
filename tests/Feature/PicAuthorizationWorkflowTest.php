@@ -590,6 +590,7 @@ class PicAuthorizationWorkflowTest extends TestCase
     public function test_avsec_cannot_view_flight_before_pic_authorization(): void
     {
         $avsec = $this->user(UserRole::Avsec);
+        $avsec->forceFill(['station' => 'RPUS'])->save();
         $flight = $this->awaitingFlight($avsec);
 
         $this->actingAs($avsec)

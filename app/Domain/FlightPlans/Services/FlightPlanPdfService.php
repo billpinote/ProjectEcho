@@ -6,6 +6,7 @@ use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Models\Flight;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -14,6 +15,18 @@ class FlightPlanPdfService
     public function __construct(private FlightPlanQrRenderer $qrRenderer) {}
 
     public function regenerate(Flight $flight): string
+    {
+        return DB::transaction(function () use ($flight): string {
+            if ($flight->exists) {
+                $flight = Flight::query()->lockForUpdate()->findOrFail($flight->id);
+            }
+            $flight->assertAvsecEditable();
+
+            return $this->regenerateEditable($flight);
+        });
+    }
+
+    private function regenerateEditable(Flight $flight): string
     {
         $this->deleteExisting($flight);
 
@@ -26,10 +39,10 @@ class FlightPlanPdfService
     }
 
     /** @return Collection<int, string> */
-    public function storedPaths(Flight $flight): Collection
+    public function storedPaths(Flight $flight, bool $loaded = false): Collection
     {
-        $private = collect(Storage::disk('local')->files($this->privateDirectory($flight)))->sort()->values();
-        if ($private->isNotEmpty() || $flight->filingAuthorizations()->exists()) {
+        $private = collect(Storage::disk('local')->files($this->privateDirectory($flight, $loaded)))->sort()->values();
+        if ($private->isNotEmpty() || ($loaded ? $flight->filingAuthorizations->isNotEmpty() : $flight->filingAuthorizations()->exists())) {
             return $private;
         }
         $baseName = $this->baseName($flight);
@@ -48,6 +61,17 @@ class FlightPlanPdfService
 
     public function deleteExisting(Flight $flight): void
     {
+        DB::transaction(function () use ($flight): void {
+            if ($flight->exists) {
+                $flight = Flight::query()->lockForUpdate()->findOrFail($flight->id);
+            }
+            $this->deleteEditable($flight);
+        });
+    }
+
+    private function deleteEditable(Flight $flight): void
+    {
+        $flight->assertAvsecEditable();
         $paths = $this->storedPaths($flight);
 
         if ($paths->isNotEmpty()) {
@@ -140,12 +164,12 @@ class FlightPlanPdfService
         return str_starts_with($path, 'filings/') ? 'local' : 'public';
     }
 
-    private function privateDirectory(Flight $flight): string
+    private function privateDirectory(Flight $flight, bool $loaded = false): string
     {
         $fingerprint = FilingDocumentRegistry::fingerprint(
-            app(FilingDocumentRegistry::class)->snapshots($flight),
+            app(FilingDocumentRegistry::class)->snapshots($flight, ! $loaded),
         );
-        $package = $flight->filingAuthorizations()->latest('id')->value('id') ?? 'unsigned';
+        $package = ($loaded ? $flight->filingAuthorizations->max('id') : $flight->filingAuthorizations()->latest('id')->value('id')) ?? 'unsigned';
 
         return 'filings/'.$flight->getKey().'/'.$package.'-'.$fingerprint;
     }

@@ -28,7 +28,11 @@
         </div>
     @endif
     @if(!$editable)
+        @if($flight->isAvsecFrozen())
+            <p class="rounded-lg border border-echo-border bg-echo-card p-4 text-sm">{{ $flight->hasBeenAccepted() ? 'Accepted filing. ' : '' }}AVSEC-verified submission — this flight plan and manifest are permanently frozen. Corrections require a separately authorized revision workflow.</p>
+        @else
         <p class="rounded-lg border border-echo-border bg-echo-card p-4 text-sm">{{ $flight->hasBeenAccepted() ? 'Accepted filing — this manifest is read-only. Create a new flight plan and manifest if changes are needed.' : 'This manifest is available for viewing only.' }}</p>
+        @endif
     @endif
     <section class="rounded-xl border border-echo-border bg-echo-card p-5 sm:p-6">
         <h2 class="text-lg font-semibold">Linked flight plan</h2>

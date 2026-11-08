@@ -22,6 +22,7 @@ class FlightManifestPolicy
             && $user->canCreateFlightPlans()
             && FlightAccess::canView($user, $flight)
             && ! $flight->hasBeenAccepted()
+            && ! $flight->isAvsecFrozen()
             && ! $flight->isPicAuthorizationDeclined()
             && ! in_array($flight->status, [FlightPlanStatus::Cancelled, FlightPlanStatus::Rejected], true)
             && ! $flight->isPendingExpired();

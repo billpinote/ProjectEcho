@@ -229,7 +229,7 @@ class ManifestPdfTest extends TestCase
 
     public function test_acceptance_captures_snapshot_and_later_download_never_renders_again(): void
     {
-        $flight = $this->completeFlight();
+        $flight = $this->completeFlight(['departure_aerodrome' => 'RPLL']);
         $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $flight->refresh();
@@ -248,7 +248,7 @@ class ManifestPdfTest extends TestCase
 
     public function test_failed_render_rolls_back_acceptance(): void
     {
-        $flight = $this->completeFlight();
+        $flight = $this->completeFlight(['departure_aerodrome' => 'RPLL']);
         $this->signFlightDocuments($flight);
         $this->partialMock(ManifestPdfService::class, fn ($mock) => $mock->shouldReceive('render')->andThrow(new \RuntimeException('PDF unavailable')));
         try {
@@ -265,7 +265,7 @@ class ManifestPdfTest extends TestCase
 
     public function test_accepted_snapshot_cannot_be_overwritten(): void
     {
-        $flight = $this->completeFlight();
+        $flight = $this->completeFlight(['departure_aerodrome' => 'RPLL']);
         $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $this->expectException(QueryException::class);
@@ -274,7 +274,7 @@ class ManifestPdfTest extends TestCase
 
     public function test_failure_after_snapshot_creation_rolls_back_pdf_and_acceptance_together(): void
     {
-        $flight = $this->completeFlight();
+        $flight = $this->completeFlight(['departure_aerodrome' => 'RPLL']);
         DB::unprepared("CREATE TRIGGER fail_acceptance_event BEFORE INSERT ON flight_plan_events BEGIN SELECT RAISE(ABORT, 'Simulated acceptance event failure'); END");
         try {
             $this->signFlightDocuments($flight);
@@ -292,7 +292,7 @@ class ManifestPdfTest extends TestCase
 
     public function test_legacy_accepted_filing_is_not_silently_regenerated(): void
     {
-        $flight = $this->completeFlight();
+        $flight = $this->completeFlight(['departure_aerodrome' => 'RPLL']);
         $flight->forceFill(['status' => FlightPlanStatus::Accepted])->save();
         $this->actingAs($flight->filedBy)->get(route('flights.manifest.pdf', $flight))->assertStatus(409);
     }
@@ -315,9 +315,9 @@ class ManifestPdfTest extends TestCase
         $this->assertDatabaseCount('flights', 0);
     }
 
-    private function completeFlight(): Flight
+    private function completeFlight(array $attributes = []): Flight
     {
-        $flight = Flight::factory()->create();
+        $flight = Flight::factory()->create($attributes);
         app(FlightManifestService::class)->save($flight, $flight->filedBy, [
             'aircraft_owner_name' => 'Owner', 'aircraft_owner_contact_number' => '123',
             'home_base_hangar' => 'RPUS', 'coa_expiry_date' => '2027-12-31', 'total_cargo_weight' => 0,

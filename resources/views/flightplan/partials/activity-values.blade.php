@@ -28,6 +28,9 @@
             $recorded = $recorded['manifest_snapshot'] ?? $recorded;
             $showPrevious = $type === FlightPlanEvent::TYPE_MANIFEST_UPDATED;
         }
+    } elseif ($type === FlightPlanEvent::TYPE_AVSEC_VERIFIED) {
+        $fields = ['verification_id', 'flight_revision', 'content_sha256', 'confirmation', 'pnp_reference_number', 'station'];
+        $heading = 'AVSEC confirmation evidence';
     } elseif (in_array($type, [FlightPlanEvent::TYPE_PIC_AUTHORIZED, FlightPlanEvent::TYPE_PIC_DECLINED, 'filing_authorization_invalidated'], true)) {
         $fields = array_intersect(['revision_number', 'authorization_method', 'flight_plan_changed', 'manifest_changed'], array_keys($recorded));
         $heading = 'Authorization details';
