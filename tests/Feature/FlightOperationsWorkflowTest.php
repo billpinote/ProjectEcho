@@ -25,7 +25,7 @@ use Tests\TestCase;
 
 class FlightOperationsWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_operational_panel_routes_are_registered(): void
     {
@@ -247,16 +247,20 @@ class FlightOperationsWorkflowTest extends TestCase
             ->assertDontSeeText('TAKE OFF TIME');
 
         $activeFlight = $this->flight([
-            'status' => FlightPlanStatus::Accepted,
+            'status' => FlightPlanStatus::Pending,
             'time_start_up' => '08:10',
         ]);
+        $this->completeManifestFor($activeFlight);
+        $activeFlight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
 
         $this->assertTrue(Flight::query()->active()->whereKey($activeFlight)->exists());
 
         $blockOffOnlyFlight = $this->flight([
-            'status' => FlightPlanStatus::Accepted,
+            'status' => FlightPlanStatus::Pending,
             'time_block_off' => '08:20',
         ]);
+        $this->completeManifestFor($blockOffOnlyFlight);
+        $blockOffOnlyFlight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
 
         $this->assertTrue(Flight::query()->active()->whereKey($blockOffOnlyFlight)->exists());
 
@@ -294,6 +298,7 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->assertSame('AT', $acceptedFlight->accepted_by_wiresign);
 
         $rejectedFlight = $this->flight(['status' => FlightPlanStatus::Pending]);
+        $this->completeManifestFor($rejectedFlight);
 
         $this->actingAs($atmo)
             ->post(route('flights.reject', $rejectedFlight), ['rejection_reason' => 'Incomplete route'])
@@ -337,18 +342,13 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->actingAs($this->user(UserRole::Atmo, ['station' => 'RPLL']))->get($url)->assertForbidden();
     }
 
-    public function test_atmo_preview_disables_manifest_review_when_missing_and_acceptance_still_fails(): void
+    public function test_atmo_preview_and_acceptance_are_denied_when_manifest_is_missing(): void
     {
         $flight = $this->flight();
         $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
-        $response = $this->actingAs($atmo)->get(route('flights.view', $flight))->assertOk()
-            ->assertSeeText('Review Flight Manifest — Manifest missing')
-            ->assertDontSee(route('flights.manifest.pdf', $flight), false);
-        $document = new \DOMDocument;
-        @$document->loadHTML($response->getContent());
-        $this->assertSame(1, (new \DOMXPath($document))->query('//button[contains(@class, "echo-review-manifest-action") and @disabled and @aria-disabled="true"]')->length);
+        $this->actingAs($atmo)->get(route('flights.view', $flight))->assertForbidden();
         $this->get(route('flights.manifest.pdf', $flight))->assertNotFound();
-        $this->from(route('flights.view', $flight))->post(route('flights.accept', $flight))->assertSessionHasErrors('manifest');
+        $this->post(route('flights.accept', $flight))->assertForbidden();
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
         $this->assertDatabaseCount('flight_manifests', 0);
     }
@@ -460,6 +460,7 @@ class FlightOperationsWorkflowTest extends TestCase
             'sequence_number' => 1, 'full_name' => 'Test Pilot',
             'nationality' => 'Filipino', 'classification' => 'pic',
         ]);
+        $this->signFlightDocuments($flight);
     }
 
     /**

@@ -28,9 +28,17 @@ class PilotFlightPlanCredentials
      *     license_valid: bool
      * }
      */
-    public static function forUser(User $user, mixed $dateOfFlight = null): array
+    public static function forUser(User $user, mixed $dateOfFlight = null, bool $lockForUpdate = false): array
     {
-        $profile = $user->pilotProfile()->with('qualifications')->first();
+        $query = $user->pilotProfile();
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+        $profile = $query->with(['qualifications' => function ($query) use ($lockForUpdate): void {
+            if ($lockForUpdate) {
+                $query->lockForUpdate();
+            }
+        }])->first();
         $effectiveDate = self::effectiveDate($dateOfFlight);
         $licenseExpiry = $profile?->license_expiry_date;
 
@@ -53,9 +61,9 @@ class PilotFlightPlanCredentials
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    public static function applySnapshot(array $data, User $user): array
+    public static function applySnapshot(array $data, User $user, bool $lockForUpdate = false): array
     {
-        $credentials = self::forUser($user, $data['date_of_flight'] ?? null);
+        $credentials = self::forUser($user, $data['date_of_flight'] ?? null, $lockForUpdate);
 
         $data['user_id'] = $user->id;
         $data['pilot_id'] = $user->id;
@@ -71,9 +79,9 @@ class PilotFlightPlanCredentials
     /**
      * @return array<string, string>
      */
-    public static function validationMessages(User $user, mixed $dateOfFlight = null): array
+    public static function validationMessages(User $user, mixed $dateOfFlight = null, bool $lockForUpdate = false): array
     {
-        $credentials = self::forUser($user, $dateOfFlight);
+        $credentials = self::forUser($user, $dateOfFlight, $lockForUpdate);
         $messages = [];
 
         if (! $credentials['profile_exists']) {

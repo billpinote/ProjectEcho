@@ -23,7 +23,7 @@ class FlightPlanQrController extends Controller
     {
         $this->browser->ensureFlightAssetAccess($request, $flight);
 
-        $storedPdfPath = $this->pdfs->resolveRequestedPath($request->query('file'))
+        $storedPdfPath = $this->pdfs->resolveRequestedPath($request->query('file'), $flight)
             ?? $this->pdfs->storedPaths($flight)->first()
             ?? $this->pdfs->regenerate($flight);
 

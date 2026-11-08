@@ -4,6 +4,8 @@ namespace App\Domain\FlightPlans\Support;
 
 class ManifestPdfLayout
 {
+    public const SIGNATURE = [49, 680, 322, 28];
+
     public const WRAPPED_CREDENTIALS = [382, 697, 194, 29];
 
     /** Native PDF points measured from the top left of the 612 x 792 Letter page. */

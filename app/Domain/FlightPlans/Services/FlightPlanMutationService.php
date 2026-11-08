@@ -4,6 +4,7 @@ namespace App\Domain\FlightPlans\Services;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Models\Flight;
 use App\Models\FlightPlanEvent;
 use App\Models\User;
@@ -41,6 +42,9 @@ class FlightPlanMutationService
             if (! $actor->can('accept', $flight)) {
                 throw new AuthorizationException;
             }
+            if (! $flight->canSubmitToAtc()) {
+                throw ValidationException::withMessages(['flight' => 'Both current flight documents must have valid PIC signatures before ATMO acceptance.']);
+            }
             if ($flight->isPendingExpired()) {
                 throw ValidationException::withMessages(['flight' => 'This flight plan has expired.']);
             }
@@ -67,19 +71,21 @@ class FlightPlanMutationService
         });
     }
 
-    public function recordSubmission(Flight $flight, ?User $actor = null): void
+    public function recordSubmission(Flight $flight, ?User $actor = null, array $submissionMetadata = []): void
     {
         if ($flight->events()->where('event_type', FlightPlanEvent::TYPE_CREATED)->exists()) {
             return;
         }
 
-        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, $actor, null, ['status' => $flight->status?->value ?? $flight->status, ...$flight->only([
-            'aircraft_identification', 'type_of_aircraft', 'date_of_flight', 'departure_aerodrome',
-            'destination_aerodrome', 'proposed_time', 'flight_rules', 'route', 'level', 'cruising_speed',
-            'persons_on_board', 'pilot_in_command', 'pilot_license_no', 'pilot_ratings', 'license_expiry_date',
-        ])]);
+        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_CREATED, $actor, null, [
+            ...$flight->only(array_diff(app(FilingDocumentRegistry::class)->materialFlightFields(), ['filed_by_signature'])),
+            'status' => $flight->status?->value,
+            'revision_number' => $flight->revision_number ?? 1,
+            'revision_of_id' => $flight->revision_of_id,
+            ...$submissionMetadata,
+        ]);
 
-        FlightPlanEvent::record($flight, $flight->requiresPicAuthorization()
+        FlightPlanEvent::record($flight, ($flight->status === FlightPlanStatus::AwaitingPic || $flight->requiresPicAuthorization())
             ? FlightPlanEvent::TYPE_SUBMITTED_FOR_PIC_AUTHORIZATION
             : FlightPlanEvent::TYPE_SUBMITTED_TO_ATC, $actor, null, [
                 'status' => $flight->status?->value ?? $flight->status,

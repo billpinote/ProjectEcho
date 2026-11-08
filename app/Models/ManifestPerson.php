@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use Database\Factories\ManifestPersonFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,18 @@ use Illuminate\Validation\ValidationException;
 
 class ManifestPerson extends Model
 {
+    public function save(array $options = []): bool
+    {
+        return app(FilingAuthorizationService::class)
+            ->mutate($this->flightManifest->flight, fn (): bool => parent::save($options));
+    }
+
+    public function delete(): ?bool
+    {
+        return app(FilingAuthorizationService::class)
+            ->mutate($this->flightManifest->flight, fn (): ?bool => parent::delete());
+    }
+
     /** @use HasFactory<ManifestPersonFactory> */
     use HasFactory;
 

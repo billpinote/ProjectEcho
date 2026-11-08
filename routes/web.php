@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FlightManifestController;
+use App\Http\Controllers\FlightPlans\FilingAuthorizationController;
 use App\Http\Controllers\FlightPlans\FlightPlanController;
 use App\Http\Controllers\FlightPlans\FlightPlanPdfController;
 use App\Http\Controllers\FlightPlans\FlightPlanPreviewController;
@@ -18,6 +19,14 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::view('/', 'access-gateway')->name('gateway');
+Route::get('/flights/{flight}/filing-authorization', [FilingAuthorizationController::class, 'reviewSelf'])
+    ->middleware('auth')->name('filing.review-self');
+Route::post('/filing-authorization/{token}', [FilingAuthorizationController::class, 'authorizeSelf'])
+    ->middleware(['auth', 'throttle:20,1'])->name('filing.authorize-self');
+Route::get('/filing-authorizations/{package}/documents/{type}', [FilingAuthorizationController::class, 'document'])
+    ->middleware(['auth', 'throttle:30,1'])->name('filing.document');
+Route::get('/flights/{flight}/filing-authorizations', [FilingAuthorizationController::class, 'history'])
+    ->middleware('auth')->name('filing.history');
 Route::post('/pilot/signatures/prepare', [PilotSignatureController::class, 'prepare'])
     ->middleware(['auth', 'throttle:20,1'])->name('pilot-signatures.prepare');
 Route::get('/pilot/signatures/{signature}', [PilotSignatureController::class, 'show'])

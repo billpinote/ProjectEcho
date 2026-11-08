@@ -2,30 +2,170 @@
 
 namespace Tests\Feature;
 
+use App\Auth\AuthenticationEvidence;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\FlightPlanPdfService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
-use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
 use App\Filament\Shared\Pages\ImportScanQr;
+use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Models\Flight;
+use App\Models\FlightManifest;
 use App\Models\FlightPlanEvent;
 use App\Models\Operator;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
-use Livewire\Livewire;
 
 class PicAuthorizationWorkflowTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
+
+    public function test_browser_approval_records_session_evidence_without_fresh_verification(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        Livewire::actingAs($pilot)->test(ScanAuthorizationQr::class)
+            ->set('picAuthorizationHandoffToken', $token)
+            ->call('authorizeAsPic')->assertHasNoErrors();
+
+        $event = $flight->events()->where('event_type', FlightPlanEvent::TYPE_PIC_AUTHORIZED)->sole();
+        $this->assertSame($pilot->id, $event->actor_user_id);
+        $this->assertSame([
+            'user_id' => $pilot->id, 'method' => 'password_session', 'freshly_verified' => false,
+        ], $event->new_values['authentication']);
+        $this->assertSame($flight->refresh()->revision_number, $event->new_values['revision_number']);
+        $this->assertSame('QR', $flight->pic_authorization_method);
+        $this->assertNotNull($event->created_at);
+    }
+
+    public function test_browser_decline_records_session_evidence_and_preserves_reason(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+        $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
+
+        Livewire::actingAs($pilot)->test(ScanAuthorizationQr::class)
+            ->set('picAuthorizationHandoffToken', $token)
+            ->call('declineAuthorization', 'Details need correction.')->assertHasNoErrors();
+
+        $event = $flight->events()->where('event_type', FlightPlanEvent::TYPE_PIC_DECLINED)->sole();
+        $this->assertSame('password_session', $event->new_values['authentication']['method']);
+        $this->assertFalse($event->new_values['authentication']['freshly_verified']);
+        $this->assertSame($pilot->id, $event->new_values['authentication']['user_id']);
+        $this->assertSame('Details need correction.', $event->reason);
+        $this->assertSame('declined', $flight->refresh()->pic_authorization_status);
+    }
+
+    public function test_session_evidence_cannot_be_used_to_impersonate_another_pic(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $other = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($other);
+        $this->actingAs($pilot);
+        $evidence = AuthenticationEvidence::fromSession(Auth::guard('web'));
+        $service = app(PicAuthorizationService::class);
+        $token = $service->createAuthorizationHandoff($flight);
+
+        foreach (['approve', 'decline'] as $decision) {
+            try {
+                if ($decision === 'approve') {
+                    $service->authorizeFromHandoff($token, $other, $evidence);
+                } else {
+                    $service->declineFromHandoff($token, $other, 'Incorrect.', $evidence);
+                }
+                $this->fail('Evidence for another actor was accepted.');
+            } catch (AuthorizationException) {
+                $this->assertNull($flight->refresh()->pic_authorization_status);
+                $this->assertNotNull($service->resolveAuthorizationHandoff($token));
+                $this->assertSame(0, $flight->events()->whereIn('event_type', [
+                    FlightPlanEvent::TYPE_PIC_AUTHORIZED, FlightPlanEvent::TYPE_PIC_DECLINED,
+                ])->count());
+            }
+        }
+    }
+
+    public function test_trusted_legacy_calls_do_not_invent_authentication_evidence(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+        app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $pilot);
+
+        $event = $flight->events()->where('event_type', FlightPlanEvent::TYPE_PIC_AUTHORIZED)->sole();
+        $this->assertArrayNotHasKey('authentication', $event->new_values);
+        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
+    }
+
+    public function test_payload_entry_points_forward_session_evidence(): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $this->actingAs($pilot);
+        $evidence = AuthenticationEvidence::fromSession(Auth::guard('web'));
+        $service = app(PicAuthorizationService::class);
+        $approved = $this->awaitingFlight($pilot);
+        $declined = $this->awaitingFlight($pilot);
+
+        $service->authorizeFromPayload($this->payload($approved), $pilot, $evidence);
+        $service->declineFromPayload($this->payload($declined), $pilot, 'Incorrect.', $evidence);
+
+        foreach ([[$approved, FlightPlanEvent::TYPE_PIC_AUTHORIZED], [$declined, FlightPlanEvent::TYPE_PIC_DECLINED]] as [$flight, $type]) {
+            $event = $flight->events()->where('event_type', $type)->sole();
+            $this->assertSame($evidence->auditValues(), $event->new_values['authentication']);
+        }
+    }
+
+    #[DataProvider('picDecisions')]
+    public function test_audit_failure_rolls_back_the_pic_decision_and_preserves_handoff(string $decision): void
+    {
+        $pilot = $this->user(UserRole::Pilot, PilotLicenseType::CommercialPilot->value);
+        $flight = $this->awaitingFlight($pilot);
+        $this->actingAs($pilot);
+        $evidence = AuthenticationEvidence::fromSession(Auth::guard('web'));
+        $service = app(PicAuthorizationService::class);
+        $token = $service->createAuthorizationHandoff($flight);
+        FlightPlanEvent::creating(function (FlightPlanEvent $event): void {
+            if (in_array($event->event_type, [FlightPlanEvent::TYPE_PIC_AUTHORIZED, FlightPlanEvent::TYPE_PIC_DECLINED], true)) {
+                throw new \RuntimeException('Audit unavailable.');
+            }
+        });
+
+        try {
+            if ($decision === 'approve') {
+                $service->authorizeFromHandoff($token, $pilot, $evidence);
+            } else {
+                $service->declineFromHandoff($token, $pilot, 'Incorrect.', $evidence);
+            }
+            $this->fail('A decision was committed without its audit evidence.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Audit unavailable.', $exception->getMessage());
+            $this->assertNull($flight->refresh()->pic_authorization_status);
+            $this->assertNull($flight->pic_authorized_at);
+            $this->assertNull($flight->pic_authorization_declined_at);
+            $this->assertNotNull($service->resolveAuthorizationHandoff($token));
+            $this->assertSame(0, $flight->events()->count());
+        } finally {
+            FlightPlanEvent::flushEventListeners();
+        }
+    }
+
+    /** @return array<string, array{string}> */
+    public static function picDecisions(): array
+    {
+        return ['approve' => ['approve'], 'decline' => ['decline']];
+    }
 
     #[DataProvider('eligibleLicenseTypes')]
     public function test_verified_ppl_cpl_and_atpl_holders_can_authorize(string $licenseType): void
@@ -39,8 +179,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->assertSame($authorizer->id, $authorized->pic_authorized_by_user_id);
         $this->assertSame('QR', $authorized->pic_authorization_method);
         $this->assertTrue($authorized->isPicAuthorizationCurrent());
-        $this->assertTrue($authorized->canSubmitToAtc());
-        $this->assertSame(FlightPlanStatus::Pending, $authorized->status);
+        $this->assertFalse($authorized->canSubmitToAtc());
+        $this->assertSame(FlightPlanStatus::AwaitingPic, $authorized->status);
     }
 
     #[DataProvider('eligibleLicenseTypes')]
@@ -56,7 +196,7 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->assertFalse(FlightAccess::canView($authorizer, $flight));
         $this->assertTrue(FlightAccess::canAccessPicAuthorization($authorizer, $flight));
-        $this->assertTrue(app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer)->canSubmitToAtc());
+        $this->assertFalse(app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $authorizer)->canSubmitToAtc());
     }
 
     public function test_same_operator_pilot_loads_another_pilots_qr_through_the_scanner(): void
@@ -208,7 +348,7 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
-        $this->assertSame(FlightPlanStatus::Pending, $flight->status);
+        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
     }
 
     public function test_pic_authorization_regenerates_the_official_pdf_with_uppercase_credentials(): void
@@ -218,9 +358,9 @@ class PicAuthorizationWorkflowTest extends TestCase
         $pilot->forceFill(['first_name' => 'Jesse', 'last_name' => 'James'])->save();
         $pilot->refresh();
         $flight = $this->awaitingFlight($pilot);
-        $pdfService = app(\App\Domain\FlightPlans\Services\FlightPlanPdfService::class);
+        $pdfService = app(FlightPlanPdfService::class);
         $path = $pdfService->regenerate($flight);
-        $before = Storage::disk('public')->get($path);
+        $before = Storage::disk('local')->get($path);
         $token = app(PicAuthorizationService::class)->createAuthorizationHandoff($flight);
 
         app(PicAuthorizationService::class)->authorizeFromHandoff($token, $pilot);
@@ -228,8 +368,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $flight->refresh();
         $expectedPilotName = strtoupper($pilot->fullName());
         $this->assertSame($expectedPilotName, $flight->pilot_in_command);
-        $this->assertNotSame($before, Storage::disk('public')->get($path));
-        $this->assertCount(1, Storage::disk('public')->allFiles('flight-plans'));
+        $this->assertNotSame($before, Storage::disk('local')->get($pdfService->storedPaths($flight)->first()));
+        $this->assertEmpty(Storage::disk('public')->allFiles('flight-plans'));
         $this->actingAs($pilot)
             ->get(route('flights.view', $flight))
             ->assertSee($expectedPilotName, false);
@@ -421,10 +561,13 @@ class PicAuthorizationWorkflowTest extends TestCase
             'prepared_by_user_id' => $atmo->id,
             'pilot_in_command_user_id' => $atmo->id,
         ]);
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
 
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
             ->assertOk()
+            ->assertSee('ATMO · ECHO')
             ->assertSee('Close Review')
             ->assertSee('data-close-review-tab', false)
             ->assertSee('echo-review-toolbar', false)
@@ -441,12 +584,7 @@ class PicAuthorizationWorkflowTest extends TestCase
 
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
-            ->assertOk()
-            ->assertSeeText('PIC Authorization Pending')
-            ->assertSeeText('This flight plan is not yet available for operational review. PIC authorization must be completed first.')
-            ->assertSeeText('Close')
-            ->assertDontSee('FLIGHT PLAN', false)
-            ->assertDontSeeText('PIC-001');
+            ->assertForbidden();
     }
 
     public function test_avsec_cannot_view_flight_before_pic_authorization(): void
@@ -472,6 +610,8 @@ class PicAuthorizationWorkflowTest extends TestCase
         $flight = $this->awaitingFlight($pic);
 
         app(PicAuthorizationService::class)->authorizeFromPayload($this->payload($flight), $pic);
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
 
         $this->actingAs($atmo)
             ->get(route('flights.view', $flight))
@@ -479,12 +619,10 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertSee('FLIGHT PLAN', false)
             ->assertDontSeeText('PIC Authorization Pending');
 
-        $flight->incrementRevisionNumber();
+        $flight->update(['route' => 'CHANGED']);
 
         $this->get(route('flights.view', $flight))
-            ->assertOk()
-            ->assertSeeText('PIC Authorization Pending')
-            ->assertDontSee('FLIGHT PLAN', false);
+            ->assertForbidden();
     }
 
     public function test_pilot_saved_flight_preview_can_close_without_dashboard_navigation(): void
@@ -500,7 +638,10 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('Close Preview')
             ->assertSee('data-close-review-tab', false)
-            ->assertDontSee('/pilot', false);
+            ->assertDontSee('/pilot', false)
+            ->assertSee('<p class="echo-review-eyebrow">PILOT · ECHO</p>', false)
+            ->assertDontSee('ATMO · ECHO')
+            ->assertDontSee('Review filing and authorize signature application');
     }
 
     public function test_dispatch_saved_flight_preview_can_close_without_dashboard_navigation(): void

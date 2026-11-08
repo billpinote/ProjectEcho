@@ -11,6 +11,7 @@ use App\Filament\Panels\Dispatch\Resources\ActiveFlights\ActiveFlightResource;
 use App\Filament\Panels\Dispatch\Resources\LandedFlights\Pages\ListLandedFlights;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Models\Flight;
+use App\Models\FlightManifest;
 use App\Models\Operator;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,7 +22,7 @@ use Tests\TestCase;
 
 class FlightOperatorIsolationTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_leading_edge_dispatch_can_see_and_update_leading_edge_flights_only(): void
     {
@@ -156,7 +157,10 @@ class FlightOperatorIsolationTest extends TestCase
     public function test_authorized_atmo_admin_and_artisan_can_view_and_operate_but_not_edit_accepted_filings(): void
     {
         [, $alpha] = $this->operators();
-        $flight = $this->flight($alpha, ['status' => FlightPlanStatus::Accepted]);
+        $flight = $this->flight($alpha, ['status' => FlightPlanStatus::Pending]);
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
+        $flight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
 
         foreach ([
             [UserRole::Atmo, ['station' => 'RPUS']],

@@ -40,6 +40,7 @@ class FlightPolicy
     {
         return $user->is_active
             && $user->hasFullFlightAccess()
+            && FlightAccess::canView($user, $flight)
             && ! $flight->hasBeenAccepted()
             && $flight->pic_authorization_status !== 'declined';
     }
@@ -49,7 +50,8 @@ class FlightPolicy
      */
     public function delete(User $user, Flight $flight): bool
     {
-        return $user->hasFullFlightAccess() && ! $flight->hasBeenAccepted();
+        return $user->hasFullFlightAccess() && ! $flight->hasBeenAccepted()
+            && ! $flight->filingAuthorizations()->exists();
     }
 
     /**

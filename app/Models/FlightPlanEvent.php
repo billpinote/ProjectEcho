@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 class FlightPlanEvent extends Model
 {
@@ -67,11 +68,18 @@ class FlightPlanEvent extends Model
         'created_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new LogicException('Flight plan events are immutable.'));
+        static::deleting(fn () => throw new LogicException('Flight plan events are immutable.'));
+    }
+
     /**
      * @param  array<string, mixed>  $before
      * @param  array<string, mixed>  $after
+     * @param  array<string, mixed>|null  $snapshot
      */
-    public static function recordChanges(Flight $flight, string $type, ?User $actor, array $before, array $after): void
+    public static function recordChanges(Flight $flight, string $type, ?User $actor, array $before, array $after, ?array $snapshot = null): void
     {
         $new = [];
         $old = [];
@@ -82,6 +90,9 @@ class FlightPlanEvent extends Model
             }
         }
         if ($new !== [] || $type === self::TYPE_MANIFEST_CREATED) {
+            if ($snapshot !== null) {
+                $new['manifest_snapshot'] = $snapshot;
+            }
             self::record($flight, $type, $actor, $old, $new);
         }
     }
@@ -91,6 +102,7 @@ class FlightPlanEvent extends Model
         $newValues ??= [];
 
         if ($actor !== null) {
+            $newValues['actor_account_id'] ??= $actor->getKey();
             $newValues['actor_name'] ??= $actor->name;
             $newValues['actor_role'] ??= $actor->role?->value ?? $actor->role;
         }

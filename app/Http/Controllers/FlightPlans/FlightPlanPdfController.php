@@ -25,11 +25,11 @@ class FlightPlanPdfController extends Controller
     {
         $this->browser->ensureFlightAssetAccess($request, $flight);
 
-        $storedPdfPath = $this->pdfs->resolveRequestedPath($request->query('file'))
+        $storedPdfPath = $this->pdfs->resolveRequestedPath($request->query('file'), $flight)
             ?? $this->pdfs->storedPaths($flight)->first()
             ?? $this->pdfs->regenerate($flight);
 
-        return Storage::disk('public')->download($storedPdfPath);
+        return Storage::disk($this->pdfs->diskFor($storedPdfPath))->download($storedPdfPath);
     }
 
     public function generatePdfOnly(Request $request): Response|RedirectResponse

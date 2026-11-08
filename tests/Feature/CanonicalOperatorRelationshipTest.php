@@ -10,7 +10,9 @@ use App\Filament\Panels\Admin\Resources\Users\Pages\CreateUser;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Models\Flight;
 use App\Models\Operator;
+use App\Models\PilotSignature;
 use App\Models\User;
+use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -108,6 +110,9 @@ class CanonicalOperatorRelationshipTest extends TestCase
             'last_name' => 'Pilot',
             'operator_id' => $operator->id,
         ]);
+        Storage::fake('local');
+        $signature = PilotSignature::factory()->create(['user_id' => $pilot->id]);
+        app(ProfileUpdateRequestService::class)->approve($signature->request, $this->user(UserRole::Admin));
         $pilot->pilotProfile()->create([
             'license_type' => PilotLicenseType::CommercialPilot,
             'license_number' => 'LIC-123',
@@ -126,6 +131,7 @@ class CanonicalOperatorRelationshipTest extends TestCase
                 'other_information' => 'DOF/'.now('Asia/Manila')->addDay()->format('Ymd').' OPR/FAKE',
             ]))
             ->call('create')
+            ->callMountedAction()
             ->assertHasNoFormErrors();
 
         $flight = Flight::latest('id')->firstOrFail();

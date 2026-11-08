@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\FlightPlans;
 
+use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\FlightPlanQrRenderer;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
@@ -28,7 +29,10 @@ class PicAuthorizationPreviewController extends Controller
 
         $flight = $this->authorizations->resolveAuthorizationHandoff($token);
         abort_unless($flight !== null, 403);
-        abort_unless(FlightAccess::canAccessPicAuthorization(Auth::user(), $flight), 403);
+        $selfPrepared = (int) $flight->prepared_by_user_id === (int) Auth::id()
+            && (int) $flight->pilot_in_command_user_id === (int) Auth::id()
+            && Auth::user()->isPilot() && FlightAccess::canView(Auth::user(), $flight);
+        abort_unless($selfPrepared || FlightAccess::canAccessPicAuthorization(Auth::user(), $flight), 403);
 
         try {
             $this->authorizations->guardEligiblePic(Auth::user());
@@ -40,9 +44,14 @@ class PicAuthorizationPreviewController extends Controller
         }
 
         $payload = $this->payloads->buildPayload($flight);
+        $package = app(FilingAuthorizationService::class)->assertReviewedPackageCurrent($flight);
 
         return view('flightplan.pdf', [
             'flight' => $flight,
+            'filingPackage' => $package,
+            'filingToken' => $token,
+            'selfFilingAuthorization' => (int) $flight->prepared_by_user_id === (int) Auth::id()
+                && (int) $flight->pilot_in_command_user_id === (int) Auth::id(),
             'qrCodeBase64' => $payload !== null ? $this->qrRenderer->generateQrCodeBase64FromPayload($payload) : null,
             'isPreview' => true,
             'showPreviewActions' => false,

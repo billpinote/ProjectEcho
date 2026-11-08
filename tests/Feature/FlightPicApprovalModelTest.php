@@ -13,7 +13,7 @@ class FlightPicApprovalModelTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_self_prepared_self_pic_flight_does_not_require_separate_authorization(): void
+    public function test_self_preparer_context_does_not_replace_signed_document_evidence(): void
     {
         $pilot = $this->user(UserRole::Pilot);
         $flight = $this->flight([
@@ -22,7 +22,7 @@ class FlightPicApprovalModelTest extends TestCase
         ]);
 
         $this->assertFalse($flight->requiresPicAuthorization());
-        $this->assertTrue($flight->canSubmitToAtc());
+        $this->assertFalse($flight->canSubmitToAtc());
     }
 
     public function test_spl_or_other_user_preparing_for_another_pic_requires_authorization(): void
@@ -52,7 +52,7 @@ class FlightPicApprovalModelTest extends TestCase
         $this->assertFalse($flight->canSubmitToAtc());
     }
 
-    public function test_current_pic_authorization_allows_submission_to_atc(): void
+    public function test_legacy_pic_authorization_without_document_signatures_does_not_allow_atmo_submission(): void
     {
         $dispatch = $this->user(UserRole::Dispatch);
         $pic = $this->user(UserRole::Pilot);
@@ -68,7 +68,7 @@ class FlightPicApprovalModelTest extends TestCase
 
         $this->assertTrue($flight->isPicAuthorized());
         $this->assertTrue($flight->isPicAuthorizationCurrent());
-        $this->assertTrue($flight->canSubmitToAtc());
+        $this->assertFalse($flight->canSubmitToAtc());
     }
 
     public function test_revision_mismatch_makes_pic_authorization_stale(): void
@@ -133,7 +133,7 @@ class FlightPicApprovalModelTest extends TestCase
         $this->assertSame(2, $flight->refresh()->revision_number);
     }
 
-    public function test_existing_legacy_flight_records_remain_usable(): void
+    public function test_legacy_flight_snapshots_are_preserved_without_implying_atmo_readiness(): void
     {
         $flight = $this->flight([
             'prepared_by_user_id' => null,
@@ -143,7 +143,7 @@ class FlightPicApprovalModelTest extends TestCase
         ]);
 
         $this->assertFalse($flight->requiresPicAuthorization());
-        $this->assertTrue($flight->canSubmitToAtc());
+        $this->assertFalse($flight->canSubmitToAtc());
         $this->assertSame('LEGACY PIC', $flight->pilot_in_command);
     }
 

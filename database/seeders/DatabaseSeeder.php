@@ -11,17 +11,18 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (config('echo-demo.enabled')) {
+            $this->call(EchoDemoSeeder::class);
+        }
+
+        // Legacy demo account seeders remain available explicitly; the opt-in
+        // EchoDemoSeeder is the single demo account entrypoint for this pipeline.
         $this->call([
             OperatorSeeder::class,
-            AdminUserSeeder::class,
             AtsUserSeeder::class,
             BillPinoteSeeder::class,
             ChuckLuatSeeder::class,
             JhovelPinoteSeeder::class,
-            DemoUsersSeeder::class,
-            PilotProfileSeeder::class,
-            StudentPilotSeeder::class,
-            OperatorStaffSeeder::class,
             AtcProfileSeeder::class,
             AvsecProfileSeeder::class,
             DispatchProfileSeeder::class,

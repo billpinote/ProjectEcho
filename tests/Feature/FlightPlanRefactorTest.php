@@ -10,6 +10,7 @@ use App\Domain\Users\Enums\UserRole;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Http\Requests\StoreFlightPlanRequest;
 use App\Models\Flight;
+use App\Models\FlightManifest;
 use App\Models\FlightPlanEvent;
 use App\Models\Operator;
 use App\Models\User;
@@ -20,7 +21,7 @@ use Tests\TestCase;
 
 class FlightPlanRefactorTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_public_and_filament_dof_precedence_remains_distinct(): void
     {
@@ -72,19 +73,28 @@ class FlightPlanRefactorTest extends TestCase
     public function test_public_pdf_download_requires_a_session_grant_and_keeps_exact_file_selection(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
         $flight = Flight::factory()->create();
+        $pdfs = app(FlightPlanPdfService::class);
+        $path = $pdfs->regenerate($flight);
+        Storage::disk('local')->put($path, '%PDF-owned');
         Storage::disk('public')->put('flight-plans/20260101/exact.pdf', '%PDF-test');
-        $url = route('flights.pdf.download', ['flight' => $flight, 'file' => 'exact.pdf']);
+        $url = route('flights.pdf.download', ['flight' => $flight, 'file' => basename($path)]);
         $this->get($url)->assertForbidden();
         $this->withSession(['public_flight_access' => [(string) $flight->id]])->get($url)
-            ->assertOk()->assertDownload('exact.pdf');
-        $this->assertSame('flight-plans/20260101/exact.pdf', app(FlightPlanPdfService::class)->resolveRequestedPath('../exact.pdf'));
+            ->assertOk()->assertDownload(basename($path))->assertStreamedContent('%PDF-owned');
+        $this->assertSame($path, $pdfs->resolveRequestedPath('../'.basename($path), $flight));
+        $this->assertNull($pdfs->resolveRequestedPath('../exact.pdf', $flight));
+        $this->get(route('flights.pdf.download', ['flight' => $flight, 'file' => 'exact.pdf']))
+            ->assertDownload(basename($path))->assertStreamedContent('%PDF-owned');
     }
 
     public function test_rejection_validation_does_not_persist_and_success_records_the_event(): void
     {
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'is_active' => true, 'wiresign' => 'AT', 'station' => 'RPUS']);
         $flight = Flight::factory()->create();
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
         $this->actingAs($atmo)->post(route('flights.reject', $flight), ['rejection_reason' => ''])
             ->assertSessionHasErrors('rejection_reason');
         $this->assertSame(FlightPlanStatus::Pending, $flight->refresh()->status);
@@ -111,9 +121,12 @@ class FlightPlanRefactorTest extends TestCase
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'is_active' => true, 'station' => 'RPUS']);
         $date = now('UTC')->addDay()->toDateString();
         $flight = Flight::factory()->create([
-            'status' => FlightPlanStatus::Accepted, 'received_facility' => 'RPUS',
+            'status' => FlightPlanStatus::Pending, 'received_facility' => 'RPUS',
             'date_of_flight' => $date, 'time_airborne' => '12:30',
         ]);
+        FlightManifest::factory()->for($flight)->create();
+        $this->signFlightDocuments($flight);
+        $flight->forceFill(['status' => FlightPlanStatus::Accepted])->saveQuietly();
         Flight::factory()->create([
             'status' => FlightPlanStatus::Accepted, 'received_facility' => 'RPUS',
             'date_of_flight' => now('UTC')->addDays(2)->toDateString(), 'time_airborne' => '12:30',

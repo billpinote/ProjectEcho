@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
+use App\Domain\FlightPlans\Services\FlightPlanPdfService;
 use App\Domain\FlightPlans\Support\FlightManifestData;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
@@ -26,7 +27,7 @@ use Tests\TestCase;
 
 class FlightManifestTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, \Tests\Support\SignsFlightDocuments;
 
     public function test_manifest_relationships_defaults_and_repeated_saves_do_not_duplicate_pic(): void
     {
@@ -57,6 +58,9 @@ class FlightManifestTest extends TestCase
             ]]);
         }
         $before = $manifest?->fresh()->getAttributes();
+        if ($manifest !== null) {
+            $this->signFlightDocuments($flight);
+        }
         $persons = $manifest?->persons->toArray();
         $service = app(FlightManifestService::class);
         $this->assertFalse($atmo->can('create', [FlightManifest::class, $flight]));
@@ -100,6 +104,7 @@ class FlightManifestTest extends TestCase
             $this->assertTrue($user->can('update', $manifest));
             $this->assertTrue($user->can('delete', $manifest));
         }
+        $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         foreach ([UserRole::Admin, UserRole::Artisan] as $role) {
             $user = User::factory()->create(['role' => $role]);
@@ -194,11 +199,11 @@ class FlightManifestTest extends TestCase
         $eventsBefore = $flight->events()->count();
         $this->actingAs($this->atmo())->from(route('flights.view', $flight))
             ->post(route('flights.accept', $flight))
-            ->assertRedirect(route('flights.view', $flight))->assertSessionHasErrors('manifest');
+            ->assertForbidden();
         $this->assertSame($before, $flight->fresh()->getAttributes());
         $this->assertSame($eventsBefore, $flight->events()->count());
         $this->assertSame([], Storage::disk('public')->allFiles());
-        $this->get(route('flights.view', $flight))->assertSee('role="alert"', false);
+        $this->get(route('flights.view', $flight))->assertForbidden();
     }
 
     public static function incompleteManifests(): array
@@ -212,13 +217,15 @@ class FlightManifestTest extends TestCase
         $flight = Flight::factory()->create();
         $manifest = $this->completeManifest($flight);
         $atmo = $this->atmo();
+        $this->signFlightDocuments($flight);
         $this->actingAs($atmo)->post(route('flights.accept', $flight))->assertSessionHasNoErrors();
         $this->assertSame(FlightPlanStatus::Accepted, $flight->fresh()->status);
         $this->assertSame($atmo->id, $flight->fresh()->accepted_by_user_id);
         $this->assertSame(1, $flight->events()->where('event_type', FlightPlanEvent::TYPE_ATC_ACCEPTED)->count());
         $this->assertTrue(app(FlightManifestService::class)->view($flight, $flight->filedBy)->is($manifest));
         $this->assertFalse($flight->filedBy->can('update', $manifest->fresh()));
-        $this->assertNotEmpty(Storage::disk('public')->allFiles());
+        $this->assertNotEmpty(app(FlightPlanPdfService::class)->storedPaths($flight->fresh()));
+        $this->assertEmpty(Storage::disk('public')->allFiles());
     }
 
     #[DataProvider('lockedMutations')]
@@ -226,6 +233,7 @@ class FlightManifestTest extends TestCase
     {
         $flight = Flight::factory()->create();
         $manifest = $this->completeManifest($flight);
+        $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $this->expectException(in_array($mutation, ['bulk_person', 'bulk_manifest', 'bulk_flight', 'bulk_delete'], true) ? QueryException::class : ValidationException::class);
         match ($mutation) {
@@ -253,6 +261,7 @@ class FlightManifestTest extends TestCase
     {
         $flight = Flight::factory()->create();
         $manifest = $this->completeManifest($flight);
+        $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $flight->refresh()->update(['status' => FlightPlanStatus::Cancelled]);
         $this->assertTrue($flight->fresh()->hasBeenAccepted());
@@ -362,6 +371,7 @@ class FlightManifestTest extends TestCase
     {
         $flight = Flight::factory()->create();
         $manifest = $this->completeManifest($flight);
+        $this->signFlightDocuments($flight);
         app(FlightPlanMutationService::class)->accept($flight, $this->atmo(), 'AT');
         $this->expectException(AuthorizationException::class);
         app(FlightManifestService::class)->save($flight, $manifest->creator, ['persons' => []]);

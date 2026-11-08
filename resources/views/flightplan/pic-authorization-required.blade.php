@@ -17,9 +17,15 @@
             <h1 id="pic-authorization-required-heading">{{ $noticeHeading ?? 'PIC Authorization Required' }}</h1>
             <p>{{ $noticeMessage ?? 'This flight plan can only be reviewed and acted on by a verified PPL, CPL, or ATPL holder authorized to act as PIC.' }}</p>
             <div class="signed-out-actions">
+                @if($selfFilingReviewUrl ?? null)
+                    <a href="{{ $selfFilingReviewUrl }}">Review and authorize this filing</a>
+                @endif
                 <button id="close-preview-tab" class="primary-link" type="button" style="border: 0; cursor: pointer; font: inherit;">Close</button>
             </div>
             <p id="close-preview-fallback" role="status" hidden style="margin-top: 1rem;">This tab could not be closed automatically. You can close it from your browser.</p>
+            @isset($activityEvents)
+                @include('flightplan.partials.activity')
+            @endisset
         </section>
     </main>
     <script>

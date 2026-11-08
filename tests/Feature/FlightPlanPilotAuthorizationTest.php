@@ -7,24 +7,27 @@ use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
-use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\Pages\ListMyArchivedFlights;
-use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\Pages\ListMyCompletedFlights;
-use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\Pages\ListMyCurrentFlights;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\Pages\ListMyArchivedFlights;
 use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\Pages\ListMyCompletedFlights;
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
+use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\Pages\ListMyCurrentFlights;
 use App\Filament\Shared\Resources\AcceptedFlights\AcceptedFlightResource;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Filament\Shared\Resources\Flights\Pages\EditFlight;
 use App\Models\Flight;
 use App\Models\FlightPlanEvent;
+use App\Models\PilotSignature;
 use App\Models\User;
+use App\Services\ProfileUpdates\ProfileUpdateRequestService;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -52,6 +55,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             'first_name' => 'Test',
             'last_name' => 'Pilot',
         ]);
+        $this->approveSignature($pilot);
 
         $pilot->pilotProfile()->create([
             'license_type' => PilotLicenseType::CommercialPilot,
@@ -65,6 +69,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             ->test(CreateFlight::class)
             ->fillForm($this->validFlightPlanFormData())
             ->call('create')
+            ->callMountedAction()
             ->assertHasNoFormErrors()
             ->assertRedirect(route('filament.pilot.resources.my-current-flights.index'));
 
@@ -72,7 +77,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             'aircraft_identification' => 'N12345',
             'filed_by_user_id' => $pilot->id,
             'pilot_id' => $pilot->id,
-            'status' => FlightPlanStatus::Pending,
+            'status' => FlightPlanStatus::AwaitingPic,
         ]);
     }
 
@@ -130,6 +135,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             'last_name' => 'Pilot',
             'suffix' => null,
         ]);
+        $this->approveSignature($pilot);
         $licenseExpiryDate = now('Asia/Manila')->addYear()->toDateString();
         $profile = $pilot->pilotProfile()->create([
             'license_type' => PilotLicenseType::CommercialPilot,
@@ -151,6 +157,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
                 'license_expiry_date' => now('Asia/Manila')->addYears(10)->toDateString(),
             ]))
             ->call('create')
+            ->callMountedAction()
             ->assertHasNoFormErrors();
 
         $flight = Flight::latest('id')->firstOrFail();
@@ -182,6 +189,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
     public function test_stored_flight_keeps_original_credential_snapshot_after_profile_changes(): void
     {
         $pilot = $this->user(UserRole::Pilot);
+        $this->approveSignature($pilot);
         $profile = $pilot->pilotProfile()->create([
             'license_type' => PilotLicenseType::CommercialPilot,
             'license_number' => '123456',
@@ -196,6 +204,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             ->test(CreateFlight::class)
             ->fillForm($this->validFlightPlanFormData())
             ->call('create')
+            ->callMountedAction()
             ->assertHasNoFormErrors();
 
         $flight = Flight::latest('id')->firstOrFail();
@@ -545,7 +554,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             'revised_eobt' => '10:30',
         ]);
 
-        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        $this->expectException(ValidationException::class);
         app(FlightPlanMutationService::class)->delay($flight, $pilot, '1030');
     }
 
@@ -712,6 +721,13 @@ class FlightPlanPilotAuthorizationTest extends TestCase
             'is_active' => true,
             ...$attributes,
         ]);
+    }
+
+    private function approveSignature(User $pilot): void
+    {
+        Storage::fake('local');
+        $signature = PilotSignature::factory()->create(['user_id' => $pilot->id]);
+        app(ProfileUpdateRequestService::class)->approve($signature->request, $this->user(UserRole::Admin));
     }
 
     /**

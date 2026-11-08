@@ -2,6 +2,7 @@
 
 namespace App\Domain\FlightPlans\Services;
 
+use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Models\Flight;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
@@ -18,15 +19,8 @@ class FlightPlanPdfService
 
         $folderName = now('UTC')->format('Ymd');
         $fileName = $this->uniqueFileName($flight, $folderName);
-        $storagePath = 'flight-plans/'.$folderName.'/'.$fileName;
-        $qrCodeBase64 = $this->qrRenderer->generateFlightPlanQrCodeBase64($flight);
-
-        $pdf = Pdf::loadView('flightplan.pdf', [
-            'flight' => $flight,
-            'qrCodeBase64' => $qrCodeBase64,
-        ])->setPaper('a4', 'portrait');
-
-        Storage::disk('public')->put($storagePath, $pdf->output());
+        $storagePath = $this->privateDirectory($flight).'/'.$fileName;
+        Storage::disk('local')->put($storagePath, $this->renderSnapshot($flight, app(FilingAuthorizationService::class)->signatureBytes($flight)), ['visibility' => 'private']);
 
         return $storagePath;
     }
@@ -34,6 +28,10 @@ class FlightPlanPdfService
     /** @return Collection<int, string> */
     public function storedPaths(Flight $flight): Collection
     {
+        $private = collect(Storage::disk('local')->files($this->privateDirectory($flight)))->sort()->values();
+        if ($private->isNotEmpty() || $flight->filingAuthorizations()->exists()) {
+            return $private;
+        }
         $baseName = $this->baseName($flight);
 
         if ($baseName === '') {
@@ -53,7 +51,9 @@ class FlightPlanPdfService
         $paths = $this->storedPaths($flight);
 
         if ($paths->isNotEmpty()) {
-            Storage::disk('public')->delete($paths->all());
+            foreach ($paths as $path) {
+                Storage::disk($this->diskFor($path))->delete($path);
+            }
         }
     }
 
@@ -88,7 +88,7 @@ class FlightPlanPdfService
         return $aircraftIdentification.$dateOfFlight.$proposedTime;
     }
 
-    public function resolveRequestedPath(mixed $requestedFile): ?string
+    public function resolveRequestedPath(mixed $requestedFile, Flight $flight): ?string
     {
 
         if (! is_string($requestedFile) || $requestedFile === '') {
@@ -97,7 +97,7 @@ class FlightPlanPdfService
 
         $safeFileName = basename($requestedFile);
 
-        return collect(Storage::disk('public')->allFiles('flight-plans'))
+        return $this->storedPaths($flight)
             ->first(function (string $path) use ($safeFileName) {
                 return basename($path) === $safeFileName;
             });
@@ -120,8 +120,33 @@ class FlightPlanPdfService
             'flight' => $flight,
             'qrCodeBase64' => null,
             'isPdfOnly' => true,
+            'pilotSignatureDataUrl' => null,
         ])->setPaper('a4', 'portrait');
 
         return $pdf->output();
+    }
+
+    public function renderSnapshot(Flight $flight, ?string $signatureBytes = null, bool $includeQr = true): string
+    {
+        return Pdf::loadView('flightplan.pdf', [
+            'flight' => $flight,
+            'qrCodeBase64' => $includeQr ? $this->qrRenderer->generateFlightPlanQrCodeBase64($flight) : null,
+            'pilotSignatureDataUrl' => $signatureBytes === null ? null : 'data:image/png;base64,'.base64_encode($signatureBytes),
+        ])->setPaper('a4', 'portrait')->output();
+    }
+
+    public function diskFor(string $path): string
+    {
+        return str_starts_with($path, 'filings/') ? 'local' : 'public';
+    }
+
+    private function privateDirectory(Flight $flight): string
+    {
+        $fingerprint = FilingDocumentRegistry::fingerprint(
+            app(FilingDocumentRegistry::class)->snapshots($flight),
+        );
+        $package = $flight->filingAuthorizations()->latest('id')->value('id') ?? 'unsigned';
+
+        return 'filings/'.$flight->getKey().'/'.$package.'-'.$fingerprint;
     }
 }
