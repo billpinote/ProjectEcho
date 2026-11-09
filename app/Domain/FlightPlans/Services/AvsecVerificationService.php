@@ -62,14 +62,14 @@ class AvsecVerificationService
         return $flight;
     }
 
-    public function confirm(string $payload, User $actor, bool $confirmed, ?string $reference = null): AvsecVerification
+    public function confirm(string $payload, User $actor, bool $confirmed, ?string $reference = null, ?string $reviewedFingerprint = null): AvsecVerification
     {
         Validator::make(['confirmation' => $confirmed, 'reference' => $reference], [
             'confirmation' => ['accepted'], 'reference' => ['nullable', 'string', 'max:255'],
         ])->validate();
 
         try {
-            return DB::transaction(function () use ($payload, $actor, $reference): AvsecVerification {
+            return DB::transaction(function () use ($payload, $actor, $reference, $reviewedFingerprint): AvsecVerification {
                 $flight = $this->resolve($payload, $actor);
                 if ($flight->avsecVerification()->exists()) {
                     throw ValidationException::withMessages(['avsec' => 'This flight already has a permanent AVSEC confirmation.']);
@@ -77,6 +77,12 @@ class AvsecVerificationService
                 if ($flight->status !== FlightPlanStatus::Pending || $flight->hasBeenAccepted() || $flight->isPendingExpired()
                     || ! $flight->isPicAuthorizationCurrent() || ! $this->authorizations->isReadyForAtmo($flight)) {
                     throw ValidationException::withMessages(['avsec' => 'A current PIC-authorized flight plan and complete, signed manifest are required before AVSEC confirmation.']);
+                }
+                if ($flight->pic_authorization_archived_at !== null) {
+                    throw ValidationException::withMessages(['avsec' => 'Archived filings cannot be confirmed.']);
+                }
+                if ($reviewedFingerprint !== null && ! hash_equals($reviewedFingerprint, $this->reviewFingerprint($flight))) {
+                    throw ValidationException::withMessages(['avsec' => 'The reviewed documents have changed. Reload and review the current flight plan and manifest.']);
                 }
                 app(FlightManifestService::class)->assertComplete($flight);
                 $pdfs = app(FlightPlanPdfService::class);
@@ -108,6 +114,11 @@ class AvsecVerificationService
 
             throw ValidationException::withMessages(['avsec' => 'The filing is being changed or confirmed by another request. Reload the current record before retrying.']);
         }
+    }
+
+    public function reviewFingerprint(Flight $flight): string
+    {
+        return FilingDocumentRegistry::fingerprint($this->approvedContent($flight));
     }
 
     public function validFor(Flight $flight, bool $loaded = false): bool

@@ -124,6 +124,20 @@ final class FlightStatusDisplay
         ];
     }
 
+    /** @return array{key: string, label: string, color: string, icon: string, outlined: bool, tooltip: string} */
+    public static function avsecBadge(Flight $flight, bool $verified): array
+    {
+        if (! $verified || $flight->status === FlightPlanStatus::Rejected) {
+            return self::badge($flight, UserRole::Avsec);
+        }
+
+        return [
+            'key' => 'cleared', 'label' => 'Cleared', 'color' => 'success',
+            'icon' => 'heroicon-o-check-circle', 'outlined' => false,
+            'tooltip' => 'AVSEC clearance recorded in Echo.',
+        ];
+    }
+
     public static function tableColumn(
         UserRole|string|null $viewerRole = null,
         string $name = 'status_presentation',

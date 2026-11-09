@@ -218,7 +218,7 @@ class AvsecVerificationTest extends TestCase
         $this->actingAs($this->officer())->get(AvsecVerificationResource::getUrl('view', ['record' => $record], panel: 'avsec'))
             ->assertOk()->assertSee('PNP-123')->assertSee('Confirmed (Asia/Manila)');
         Livewire::actingAs($this->officer())->test(ImportScanQr::class)->set('payload', $this->payload($flight))->call('submit')
-            ->assertSet('matchedFlight.verified', true)->assertSee('AVSEC confirmed');
+            ->assertSet('matchedFlight.verified', true)->assertSet('matchedFlight.status_color', 'danger')->assertSee('Rejected');
         $this->actingAs($this->officer(['station' => 'RPLL']))->get('/avsec/avsec-verifications')->assertForbidden();
     }
 

@@ -437,9 +437,13 @@
                             </div>
 
                             <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                <span class="echo-status-badge {{ $statusBadgeClass }}">
-                                    {{ $matchedFlight['status_label'] }}
-                                </span>
+                                @if($this->isAvsecVerificationPage())
+                                    <x-filament::badge :color="$matchedFlight['status_color']">{{ $matchedFlight['status_label'] }}</x-filament::badge>
+                                @else
+                                    <span class="echo-status-badge {{ $statusBadgeClass }}">
+                                        {{ $matchedFlight['status_label'] }}
+                                    </span>
+                                @endif
                                 <button type="button" wire:click="startOver" class="echo-button echo-button-secondary" style="padding: 0.55rem 0.75rem;">
                                     <x-filament::icon icon="heroicon-o-arrow-path" class="fi-size-4" />
                                     <span>Start Over</span>
@@ -481,6 +485,20 @@
                                 <p>Server record #{{ $matchedFlight['id'] }} · Revision {{ $matchedFlight['revision'] }}</p>
                                 <p>PIC: {{ $matchedFlight['pic'] ?? 'Not authorized' }} · Aircraft: {{ $matchedFlight['aircraft'] }}</p>
                                 <p>Flight plan and manifest signatures: {{ $matchedFlight['authorized'] ? 'Current' : 'Required before confirmation' }}</p>
+                                <p>Departure (Asia/Manila): {{ $matchedFlight['local_departure'] }}</p>
+                                <p>Flight plan authorization: {{ $matchedFlight['flight_authorized'] ? 'Current' : 'Required' }}</p>
+                                <p>Manifest authorization: {{ $matchedFlight['manifest_authorized'] ? 'Current' : 'Required' }}</p>
+                                <ul class="mt-3 space-y-1">
+                                    @foreach($matchedFlight['persons'] as $person)
+                                        <li>{{ $person['full_name'] }} · {{ $person['nationality'] }} · {{ $person['classification'] }}</li>
+                                    @endforeach
+                                </ul>
+                                @if($matchedFlight['cargo'])
+                                    <p>Cargo: {{ $matchedFlight['cargo']['cargo_type'] ?? 'None declared' }} · Quantity: {{ $matchedFlight['cargo']['cargo_quantity'] ?? '—' }} · Weight: {{ $matchedFlight['cargo']['total_cargo_weight'] ?? '0' }} kg</p>
+                                @endif
+                                @if($matchedFlight['verified'])
+                                    <p>Verified in Echo by {{ $matchedFlight['verifier'] }} · {{ $matchedFlight['verified_at'] }} (Asia/Manila)</p>
+                                @endif
                                 @if($matchedFlight['manifest_url'])
                                     <p><a href="{{ $matchedFlight['manifest_url'] }}" target="_blank" rel="noopener noreferrer">Review passenger / cargo manifest</a></p>
                                 @else
@@ -492,10 +510,11 @@
                                         <input type="text" wire:model="pnpReference" maxlength="255" class="echo-input w-full">
                                     </label>
                                     <label class="block mt-3">
+                                        <strong class="block">Confirm {{ $matchedFlight['aircraft_identification'] }} · {{ $matchedFlight['local_departure'] }} (Asia/Manila) · {{ $matchedFlight['departure_aerodrome'] }} to {{ $matchedFlight['destination_aerodrome'] }}</strong>
                                         <input type="checkbox" wire:model="clearanceConfirmed">
                                         {{ \App\Domain\FlightPlans\Services\AvsecVerificationService::CONFIRMATION }}
                                     </label>
-                                    <p>Confirmation permanently freezes this submission, including its manifest. Revised EOBT and permitted lifecycle updates remain available.</p>
+                                    <p>Confirmation permanently protects this submission, including its manifest, from document changes. Revised EOBT and permitted lifecycle updates remain available.</p>
                                     <button type="button" wire:click="confirmClearance" wire:loading.attr="disabled" class="echo-button echo-button-primary mt-3">Confirm AVSEC procedures completed</button>
                                 @endunless
                                 @foreach(['avsec', 'confirmation', 'reference', 'manifest'] as $field)
@@ -637,7 +656,9 @@
         window.initImportScanQrPage?.();
         window.setTimeout(() => window.initImportScanQrPage?.(), 250);
         scrollToPayloadError();
+        @unless($this->isAvsecVerificationPage() && request()->has('flight'))
         scrollToMatchedFlight();
+        @endunless
 
         document.addEventListener('livewire:updated', () => {
             if (!scrollToPayloadError()) {

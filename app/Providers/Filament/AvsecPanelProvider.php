@@ -2,11 +2,13 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Panels\Avsec\Pages\Dashboard;
 use App\Filament\Panels\Avsec\Pages\ImportScanQr;
 use App\Filament\Panels\Avsec\Resources\AllFlightPlans\AllFlightResource;
 use App\Filament\Panels\Avsec\Resources\AvsecVerifications\AvsecVerificationResource;
+use App\Filament\Panels\Avsec\Resources\FiledRpusDepartures\FiledRpusDepartureResource;
+use App\Filament\Panels\Avsec\Widgets\AllFlights;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
-use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 
@@ -22,8 +24,9 @@ class AvsecPanelProvider extends PanelProvider
                 ImportScanQr::class,
             ])
             ->resources([
+                FiledRpusDepartureResource::class,
                 AvsecVerificationResource::class,
                 AllFlightResource::class,
-            ]);
+            ])->widgets([AllFlights::class]);
     }
 }

@@ -8,4 +8,9 @@ use Filament\Resources\Pages\ListRecords;
 class ListAvsecVerifications extends ListRecords
 {
     protected static string $resource = AvsecVerificationResource::class;
+
+    public function getHeading(): ?string
+    {
+        return null;
+    }
 }
