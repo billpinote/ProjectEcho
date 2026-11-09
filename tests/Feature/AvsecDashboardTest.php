@@ -81,22 +81,24 @@ class AvsecDashboardTest extends TestCase
         $this->officer();
         $record = $verified->avsecVerification;
         Livewire::test(ListAvsecVerifications::class)->assertCanSeeTableRecords([$record])
-            ->assertTableColumnStateSet('confirmation_status', 'Cleared', $record)->assertTableActionHasUrl('view', AvsecVerificationResource::getUrl('view', ['record' => $record], panel: 'avsec'), $record)
+            ->assertTableColumnStateSet('confirmation_status', 'Clearance Granted', $record)
             ->assertDontSee('Frozen')->assertDontSee('FROZEN');
         $clearedTable = Livewire::test(ListAvsecVerifications::class)->instance()->getTable();
+        $this->assertSame(AvsecVerificationResource::getUrl('view', ['record' => $record], panel: 'avsec'), $clearedTable->getRecordUrl($record));
+        $this->assertTrue($clearedTable->shouldOpenRecordUrlInNewTab($record));
         $this->assertSame('Cleared Flights', $clearedTable->getHeading());
         $this->assertSame('Flights cleared by PNP AVSEC, including verification records from previous shifts.', $clearedTable->getDescription());
-        $this->assertSame('success', $clearedTable->getColumn('confirmation_status')->record($record)->getColor('Cleared'));
+        $this->assertSame('success', $clearedTable->getColumn('confirmation_status')->record($record)->getColor('Clearance Granted'));
         $this->get(AvsecVerificationResource::getUrl(panel: 'avsec'))->assertOk()
             ->assertSee('Flights cleared by PNP AVSEC, including verification records from previous shifts.');
-        $this->assertSame(['CALLSIGN', 'DATE', 'PTD', 'PIC', 'AVSEC STATUS'], array_values(array_map(fn ($column) => $column->getLabel(), $clearedTable->getColumns())));
+        $this->assertSame(['CALLSIGN', 'DATE', 'PTD', 'Pilot', 'AVSEC STATUS'], array_values(array_map(fn ($column) => $column->getLabel(), $clearedTable->getColumns())));
         $this->get(AvsecVerificationResource::getUrl('view', ['record' => $record], panel: 'avsec'))
             ->assertOk()->assertSee('<aside', false)->assertSee('fi-sidebar-header', false)->assertSee($record->verifier_name)
-            ->assertSee('Confirmed (Asia/Manila)')->assertDontSee('frozen');
+            ->assertSee('Decision time (Asia/Manila)')->assertDontSee('frozen');
     }
 
     #[DataProvider('ineligibleFlights')]
-    public function test_ineligible_departures_are_excluded(string $kind): void
+    public function test_monitoring_keeps_incomplete_records_while_scanner_requires_current_documents(string $kind): void
     {
         $flight = $this->readyFlight();
         match ($kind) {
@@ -109,7 +111,7 @@ class AvsecDashboardTest extends TestCase
             'expired' => $flight->forceFill(['date_of_flight' => now()->subDays(2)->toDateString()])->saveQuietly(),
         };
         $officer = $this->officer();
-        $this->assertFalse(app(AvsecDepartureQuery::class)->forOfficer($officer)->whereKey($flight)->exists());
+        $this->assertSame(in_array($kind, ['unsigned_plan', 'unsigned_manifest', 'missing_manifest'], true), app(AvsecDepartureQuery::class)->forOfficer($officer)->whereKey($flight)->exists());
         $this->get(ImportScanQr::getUrl(['flight' => $flight->id], panel: 'avsec'))->assertNotFound();
     }
 
@@ -199,49 +201,51 @@ class AvsecDashboardTest extends TestCase
             ->assertTableColumnFormattedStateSet('proposed_time', '0100Z', $visible[0])
             ->sortTable('proposed_time', 'desc')->assertCanSeeTableRecords($visible)
             ->searchTable('RPV0')->assertCanSeeTableRecords([$visible[0]])->assertCanNotSeeTableRecords([$visible[1]]);
-        $this->assertSame(['CALLSIGN', 'DATE', 'PTD', 'PIC', 'AVSEC STATUS'], array_values(array_map(fn ($column) => $column->getLabel(), $page->instance()->getTable()->getColumns())));
-        $page->assertTableActionHasUrl('view', route('flights.view', $visible[0]), $visible[0]);
+        $this->assertSame(['CALLSIGN', 'DATE', 'PTD', 'Pilot', 'AVSEC STATUS'], array_values(array_map(fn ($column) => $column->getLabel(), $page->instance()->getTable()->getColumns())));
+        $this->assertSame(route('flights.view', $visible[0]), $page->instance()->getTable()->getRecordUrl($visible[0]));
+        $this->assertTrue($page->instance()->getTable()->shouldOpenRecordUrlInNewTab($visible[0]));
     }
 
-    public function test_all_flights_displays_existing_statuses_and_avsec_clearance_without_changing_lifecycle(): void
+    public function test_clearance_status_remains_separate_from_atmo_rejection_and_lifecycle(): void
     {
         $this->travelTo(CarbonImmutable::parse('2030-01-01 14:30:00', 'UTC'));
         $awaiting = $this->readyFlight(['date_of_flight' => '2030-01-01']);
         $cleared = $this->readyFlight(['date_of_flight' => '2030-01-01']);
         $this->confirmFlightAvsec($cleared);
         $this->officer();
-        $allFlights = Livewire::test(AllFlights::class)->assertTableColumnStateSet('avsec_status', 'Awaiting AVSEC', $awaiting)
-            ->assertTableColumnStateSet('avsec_status', 'Cleared', $cleared)->assertDontSee('Frozen');
+        $allFlights = Livewire::test(AllFlights::class)->assertTableColumnStateSet('avsec_status', 'Pending Clearance', $awaiting)
+            ->assertTableColumnStateSet('avsec_status', 'Clearance Granted', $cleared)->assertDontSee('Frozen');
         $statusColumn = $allFlights->instance()->getTable()->getColumn('avsec_status')->record($cleared->fresh());
-        $this->assertSame('success', $statusColumn->getColor('Cleared'));
+        $this->assertSame('success', $statusColumn->getColor('Clearance Granted'));
         $this->assertSame('cleared', $statusColumn->getExtraCellAttributes()['data-flight-status']);
         $this->assertSame(FlightPlanStatus::Pending, $cleared->fresh()->status);
-        $this->assertSame('success', FlightStatusDisplay::avsecBadge($cleared, true)['color']);
+        $this->assertSame('success', FlightStatusDisplay::avsecBadge($cleared)['color']);
         $awaiting->loadMissing('manifest.persons', 'filingAuthorizations.pilotSignature', 'avsecVerification');
-        $this->assertSame('warning', FlightStatusDisplay::avsecBadge($awaiting, false)['color']);
+        $this->assertSame('warning', FlightStatusDisplay::avsecBadge($awaiting)['color']);
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
         app(FlightPlanMutationService::class)->reject($cleared, $atmo, 'AT', 'Review needed');
-        $badge = FlightStatusDisplay::avsecBadge($cleared->fresh(), true);
-        $this->assertSame('Rejected', $badge['label']);
-        $this->assertSame('danger', $badge['color']);
-        $rejectedPage = Livewire::test(AllFlights::class)->assertTableColumnStateSet('avsec_status', 'Rejected', $cleared);
-        $this->assertSame('danger', $rejectedPage->instance()->getTable()->getColumn('avsec_status')->record($cleared->fresh())->getColor('Rejected'));
-        Livewire::test(ListAvsecVerifications::class)->assertTableColumnStateSet('confirmation_status', 'Rejected', $cleared->avsecVerification()->sole());
+        $badge = FlightStatusDisplay::avsecBadge($cleared->fresh());
+        $this->assertSame('Clearance Granted', $badge['label']);
+        $this->assertSame('success', $badge['color']);
+        $rejectedPage = Livewire::test(AllFlights::class)->assertTableColumnStateSet('avsec_status', 'Clearance Granted', $cleared);
+        $this->assertSame('success', $rejectedPage->instance()->getTable()->getColumn('avsec_status')->record($cleared->fresh())->getColor('Clearance Granted'));
+        Livewire::test(ListAvsecVerifications::class)->assertTableColumnStateSet('confirmation_status', 'Clearance Granted', $cleared->avsecVerification()->sole());
         $this->assertTrue($cleared->fresh()->isAvsecFrozen());
     }
 
-    public function test_departures_have_exact_operational_columns_and_native_review_links(): void
+    public function test_departures_have_operational_columns_and_preview_links(): void
     {
         $flight = $this->readyFlight();
         $this->officer();
-        $page = Livewire::test(ListFiledRpusDepartures::class)->assertTableActionHasUrl('review', ImportScanQr::getUrl(['flight' => $flight->id], panel: 'avsec'), $flight)
-            ->assertTableColumnStateSet('avsec_status', 'Awaiting AVSEC', $flight)->assertDontSee('Frozen')
+        $page = Livewire::test(ListFiledRpusDepartures::class)
+            ->assertTableColumnStateSet('avsec_status', 'Pending Clearance', $flight)->assertDontSee('Frozen')
             ->assertSee('All dates and PTD are UTC (Z).', escape: false)
-            ->assertSee(ImportScanQr::getUrl(['flight' => $flight->id], panel: 'avsec'), false);
+            ->assertSee(route('flights.view', $flight), false);
         $table = $page->instance()->getTable();
-        $this->assertSame(['CALLSIGN', 'DATE', 'PTD', 'PIC', 'AVSEC STATUS'], array_values(array_map(fn ($column) => $column->getLabel(), $table->getColumns())));
-        $this->assertNull($table->getRecordUrl($flight));
-        $this->assertSame('warning', $table->getColumn('avsec_status')->record($flight)->getColor('Awaiting AVSEC'));
+        $this->assertSame(['CALLSIGN', 'DATE', 'PTD', 'Pilot', 'AVSEC STATUS'], array_values(array_map(fn ($column) => $column->getLabel(), $table->getColumns())));
+        $this->assertSame(route('flights.view', $flight), $table->getRecordUrl($flight));
+        $this->assertTrue($table->shouldOpenRecordUrlInNewTab($flight));
+        $this->assertSame('warning', $table->getColumn('avsec_status')->record($flight)->getColor('Pending Clearance'));
         $this->assertFalse($flight->isAvsecFrozen());
     }
 

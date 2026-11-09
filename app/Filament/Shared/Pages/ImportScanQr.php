@@ -221,7 +221,8 @@ class ImportScanQr extends Page
 
             if ($this->scannedPreviewPurpose() === 'pic_authorization'
                 && $flight !== null
-                && ! $flight->isPicAuthorizationDeclined()) {
+                && ! $flight->isPicAuthorizationDeclined()
+                && ! $flight->canSubmitToAtc()) {
                 $handoffToken = app(PicAuthorizationService::class)
                     ->createAuthorizationHandoff($flight);
                 session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
@@ -291,7 +292,7 @@ class ImportScanQr extends Page
                 'purpose' => $this->scannedPreviewPurpose(),
             ]);
 
-            if ($this->scannedPreviewPurpose() === 'pic_authorization' && ! $flight->isPicAuthorizationDeclined()) {
+            if ($this->scannedPreviewPurpose() === 'pic_authorization' && ! $flight->isPicAuthorizationDeclined() && ! $flight->canSubmitToAtc()) {
                 $handoffToken = app(PicAuthorizationService::class)
                     ->createAuthorizationHandoff($flight);
                 session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
@@ -340,7 +341,9 @@ class ImportScanQr extends Page
         }
 
         try {
-            app(PicAuthorizationService::class)->resolveAccessibleFlightFromPayload($payload, Auth::user());
+            app(PicAuthorizationService::class)->resolveAccessibleFlightFromPayload(
+                $payload, Auth::user(), requirePendingAuthorization: ! Auth::user()->isPilot(),
+            );
 
             return true;
         } catch (ValidationException $exception) {

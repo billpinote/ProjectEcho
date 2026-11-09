@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\FlightManifestController;
+use App\Http\Controllers\FlightPlans\AvsecClearanceController;
 use App\Http\Controllers\FlightPlans\FilingAuthorizationController;
 use App\Http\Controllers\FlightPlans\FlightPlanController;
 use App\Http\Controllers\FlightPlans\FlightPlanPdfController;
@@ -64,6 +65,8 @@ Route::post('/flightplan/discard-preview', [FlightPlanPreviewController::class, 
 Route::get('/flights/{flight}/qr', [FlightPlanQrController::class, 'showQr'])->name('flights.qr');
 Route::get('/flights/{flight}/qr-image', [FlightPlanQrController::class, 'downloadQrImage'])->name('flights.qr.download');
 Route::get('/flights/{flight}/view', [FlightPlanController::class, 'showFlightPlanView'])->name('flights.view');
+Route::post('/flights/{flight}/avsec-clearance', [AvsecClearanceController::class, 'store'])
+    ->middleware(['auth', 'throttle:20,1'])->name('flights.avsec-clearance');
 Route::post('/flights/{flight}/accept', [FlightPlanReviewController::class, 'acceptFlightPlan'])->name('flights.accept');
 Route::post('/flights/{flight}/reject', [FlightPlanReviewController::class, 'rejectFlightPlan'])->name('flights.reject');
 Route::get('/flights/{flight}/pdf', [FlightPlanPdfController::class, 'downloadPdf'])->name('flights.pdf.download');

@@ -7,6 +7,7 @@ use App\Domain\FlightPlans\Services\AvsecDepartureQuery;
 use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
+use App\Domain\FlightPlans\Services\FlightWorkflowService;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Filament\Panels\Avsec\Resources\FiledRpusDepartures\FiledRpusDepartureResource;
 use App\Filament\Shared\Pages\ImportScanQr as SharedImportScanQr;
@@ -38,6 +39,7 @@ class ImportScanQr extends SharedImportScanQr
         if (request()->has('flight')) {
             $flight = app(AvsecDepartureQuery::class)
                 ->forOfficer(Auth::user())->findOrFail(request()->integer('flight'));
+            abort_unless(app(FlightWorkflowService::class)->pendingStage($flight) === FlightStatusDisplay::AWAITING_AVSEC, 404);
             abort_unless(Auth::user()->can('view', $flight), 403);
             $this->lookupPayload(app(FlightPlanQrPayloadService::class)->buildPayload($flight), false, false);
         }
@@ -67,7 +69,7 @@ class ImportScanQr extends SharedImportScanQr
         $flight = app(AvsecVerificationService::class)->resolve($payload, Auth::user());
         $this->reviewedFingerprint = app(AvsecVerificationService::class)->reviewFingerprint($flight);
         $verification = $flight->avsecVerification()->first();
-        $status = FlightStatusDisplay::avsecBadge($flight, $verification !== null);
+        $status = FlightStatusDisplay::avsecBadge($flight);
         $this->lastProcessedPayload = $payload;
         $this->payload = $payload;
         $flight->loadMissing('manifest.persons');
@@ -90,6 +92,7 @@ class ImportScanQr extends SharedImportScanQr
             'verifier' => $verification?->verifier_name,
             'verified_at' => $verification?->verified_at?->setTimezone('Asia/Manila')->format('Y-m-d H:i'),
             'verified' => $verification !== null,
+            'can_decide' => app(AvsecVerificationService::class)->canDecide($flight, Auth::user()),
             'view_url' => route('flights.view', $flight),
             'manifest_url' => $flight->manifest()->exists() ? route('flights.manifest.pdf', $flight) : null,
         ];

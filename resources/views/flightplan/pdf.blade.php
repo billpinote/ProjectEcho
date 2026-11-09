@@ -377,6 +377,15 @@
         }
 
         .echo-review-button-primary:hover { background: #1d4ed8; }
+        .echo-avsec-preview .echo-review-button:disabled { opacity: .55; cursor: not-allowed; }
+        .echo-avsec-summary { width: min(794px, calc(100% - 32px)); margin: 16px auto; padding: 16px; box-sizing: border-box; border-radius: 12px; background: #fff; font-size: 14px; line-height: 1.5; }
+        .echo-avsec-summary h2 { margin: 0 0 8px; font-size: 20px; }
+        .echo-avsec-summary p { margin: 6px 0; }
+        .echo-avsec-toolbar { position: static; margin: 16px auto; }
+        .echo-avsec-toolbar .echo-review-button { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+        .echo-avsec-preview .echo-review-modal input[type="text"] { width: 100%; min-height: 44px; padding: 10px; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 7px; }
+        .echo-avsec-preview .preview-wrapper { max-width: 100%; box-sizing: border-box; overflow-x: auto; }
+        .echo-avsec-preview .echo-review-modal-card { max-height: calc(100dvh - 32px); overflow-y: auto; }
 
         .echo-review-document-spacer { height: 78px; }
 
@@ -457,7 +466,7 @@
         }
     </style>
 </head>
-<body class="{{ isset($isPreview) ? 'preview' : '' }}{{ isset($isPreview) && ($showReviewActions ?? false) ? ' preview-has-review-toolbar' : '' }}">
+<body class="{{ isset($isPreview) ? 'preview' : '' }}{{ isset($isPreview) && ($showReviewActions ?? false) ? ' preview-has-review-toolbar' : '' }}{{ ($showAvsecActions ?? false) ? ' echo-avsec-preview' : '' }}">
     @if(isset($filingPackage))
         <section style="background: white; padding: 12px; margin: 12px auto; max-width: 794px;">
             <strong>Review complete filing #{{ $filingPackage->id }}</strong>
@@ -514,10 +523,18 @@
 
     @if(isset($isPreview))
         @php
-            $previewStatus = $flight->exists
-                ? \App\Domain\FlightPlans\Support\FlightStatusDisplay::badge($flight, auth()->user()?->role)['label']
-                : ($flight->status?->label() ?? 'Unknown');
-            $previewStatusClass = match ($flight->status) {
+            $previewBadge = $flight->exists
+                ? \App\Domain\FlightPlans\Support\FlightStatusDisplay::badge($flight, auth()->user()?->role)
+                : null;
+            $previewStatus = $previewBadge['label'] ?? ($flight->status?->label() ?? 'Unknown');
+            $usesClearancePalette = $flight->exists && (
+                (auth()->user()?->isAvsec() ?? false)
+                || \App\Domain\FlightPlans\Enums\AvsecClearanceState::tryFrom($previewBadge['key']) !== null
+            );
+            $previewPalette = $usesClearancePalette
+                ? \Filament\Support\Facades\FilamentColor::getColor($previewBadge['color'])
+                : null;
+            $previewStatusClass = $usesClearancePalette ? null : match ($flight->status) {
                 \App\Domain\FlightPlans\Enums\FlightPlanStatus::Pending => 'pending',
                 \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted => 'accepted',
                 \App\Domain\FlightPlans\Enums\FlightPlanStatus::Active => 'active',
@@ -538,7 +555,14 @@
                 <h1 class="echo-preview-title">Flight Plan Preview</h1>
                 <p class="echo-preview-aircraft">{{ $flight->aircraft_identification }}</p>
             </div>
-            <span class="echo-preview-status-badge echo-preview-status-{{ $previewStatusClass }}">{{ $previewStatus }}</span>
+            <span
+                aria-label="Flight plan status"
+                @class(['echo-preview-status-badge', 'echo-preview-status-'.$previewStatusClass => ! $usesClearancePalette])
+                @if($usesClearancePalette)
+                    data-avsec-preview-color="{{ $previewBadge['color'] }}"
+                    @style(['border-color: '.$previewPalette[300], 'background: '.$previewPalette[50], 'color: '.$previewPalette[700]])
+                @endif
+            >{{ $previewStatus }}</span>
         </div>
 
         @if($flight->revised_eobt !== null)
@@ -1340,7 +1364,11 @@
         @include('flightplan.partials.activity')
     @endisset
 
-    @if(isset($isPreview) && (($showReviewActions ?? false) || ($reviewCompleted ?? false)))
+    @if($showAvsecActions ?? false)
+        @include('flightplan.partials.avsec-actions')
+    @endif
+
+    @if(isset($isPreview) && (($showReviewActions ?? false) || ($reviewCompleted ?? false) || ($showAvsecActions ?? false)))
         @if($showReviewActions ?? false)
         <div class="echo-review-document-spacer" aria-hidden="true"></div>
         <div class="echo-review-toolbar" aria-label="Flight plan review actions">
@@ -1351,11 +1379,18 @@
                 @else
                     <button class="echo-review-button echo-review-button-neutral echo-review-manifest-action" type="button" disabled aria-disabled="true">Review Flight Manifest — {{ $manifestReviewUnavailableReason ?? 'Manifest unavailable' }}</button>
                 @endif
+                @if($canRejectFlightPlan ?? false)
                 <button class="echo-review-button echo-review-button-danger" type="button" data-open-review-modal="reject-flight-plan">Reject</button>
+                @endif
                 @if($canAcceptFlightPlan ?? false)
                 <button class="echo-review-button echo-review-button-primary" type="button" data-open-review-modal="accept-flight-plan">&#10003; Accept Flight Plan</button>
+                @elseif($acceptUnavailableReason ?? null)
+                <button class="echo-review-button echo-review-button-neutral" type="button" disabled aria-describedby="accept-unavailable-reason">Accept Flight Plan</button>
                 @endif
             </div>
+            @if($acceptUnavailableReason ?? null)
+                <p id="accept-unavailable-reason" class="echo-review-modal-copy" role="note">{{ $acceptUnavailableReason }}</p>
+            @endif
         </div>
 
         <div class="echo-review-modal" id="reject-flight-plan" role="dialog" aria-modal="true" aria-labelledby="reject-flight-plan-title" hidden>
@@ -1457,13 +1492,13 @@
         </script>
     @endif
 
-    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
+    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false) && !($showAvsecActions ?? false))
     <div style="display:flex; justify-content:center; margin-top:10px;">
         <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; Close Preview</button>
     </div>
     @endif
 
-    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false))
+    @if(isset($isPreview) && !($showReviewActions ?? false) && !($reviewCompleted ?? false) && !($showAvsecActions ?? false))
         <script>
             (() => {
                 const closePreview = () => {

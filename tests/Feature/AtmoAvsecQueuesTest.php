@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\FlightPlans\Services\FlightPlanPdfService;
+use App\Domain\FlightPlans\Services\FlightPlanQrPayloadService;
 use App\Domain\FlightPlans\Services\FlightWorkflowService;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Users\Enums\UserRole;
@@ -14,6 +16,7 @@ use App\Filament\Panels\Atmo\Resources\AwaitingAvsecFlights\Pages\ListAwaitingAv
 use App\Filament\Panels\Atmo\Resources\Flights\FlightResource;
 use App\Filament\Panels\Atmo\Resources\Flights\Pages\ListFlights;
 use App\Models\Flight;
+use App\Models\FlightPlanEvent;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,17 +60,17 @@ class AtmoAvsecQueuesTest extends TestCase
         $this->assertSame('1', AwaitingAvsecFlightResource::getNavigationBadge());
         Livewire::test(ListAwaitingAvsecFlights::class)->assertCanSeeTableRecords([$flight])
             ->assertTableActionDoesNotExist('accept')->assertTableActionDoesNotExist('edit');
-        Livewire::test(ListAllFlights::class)->assertSee('Awaiting AVSEC')->assertTableColumnVisible('status_presentation');
+        Livewire::test(ListAllFlights::class)->assertSee('Pending AVSEC')->assertTableColumnVisible('status_presentation');
         $this->post(route('flights.accept', $flight))->assertForbidden();
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Awaiting AVSEC')->assertDontSee('data-open-review-modal="accept-flight-plan"', false);
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Pending AVSEC')->assertDontSee('data-open-review-modal="accept-flight-plan"', false);
         $this->assertNull($flight->fresh()->reviewed_at);
         $this->confirmFlightAvsec($flight);
         $this->assertFalse(AwaitingAvsecFlightResource::getEloquentQuery()->whereKey($flight)->exists());
         $this->assertTrue(FlightResource::getEloquentQuery()->whereKey($flight)->exists());
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
         Livewire::test(ListFlights::class)->assertCanSeeTableRecords([$flight]);
-        Livewire::test(ListAllFlights::class)->assertSee('Pending ATMO');
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Pending ATMO')->assertSee('data-open-review-modal="accept-flight-plan"', false);
+        Livewire::test(ListAllFlights::class)->assertSee('AVSEC Approved');
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('AVSEC Approved')->assertSee('data-open-review-modal="accept-flight-plan"', false);
         $this->post(route('flights.accept', $flight))->assertRedirect();
     }
 
@@ -87,6 +90,39 @@ class AtmoAvsecQueuesTest extends TestCase
         $this->assertSame(FlightStatusDisplay::PENDING, FlightStatusDisplay::status($unsigned));
         $this->atmo();
         $this->assertSame(0, AwaitingAvsecFlightResource::getEloquentQuery()->count());
+    }
+
+    public function test_denied_clearance_enters_atmo_review_and_preserves_independent_decision_history(): void
+    {
+        $flight = $this->readyFlight();
+        $officer = User::factory()->create(['role' => UserRole::Avsec, 'station' => 'RPUS']);
+        $denial = app(AvsecVerificationService::class)->deny(
+            app(FlightPlanQrPayloadService::class)->buildPayload($flight), $officer, 'Offline clearance denied',
+        );
+        $denialBefore = $denial->fresh()->getAttributes();
+        $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
+        $this->assertSame('Clearance Denied', FlightStatusDisplay::badge($flight->fresh(), UserRole::Avsec)['label']);
+        $atmo = $this->atmo();
+        $this->assertFalse(AwaitingAvsecFlightResource::getEloquentQuery()->whereKey($flight)->exists());
+        $this->assertTrue(FlightResource::getEloquentQuery()->whereKey($flight)->exists());
+        Livewire::test(ListAwaitingAvsecFlights::class)->assertCanNotSeeTableRecords([$flight]);
+        Livewire::test(ListFlights::class)->assertCanSeeTableRecords([$flight])
+            ->assertTableColumnStateSet('status_presentation', 'AVSEC Denied', $flight)->assertSee('AVSEC Denied');
+        $this->assertTrue($atmo->can('reject', $flight));
+        $this->assertFalse($atmo->can('accept', $flight));
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('AVSEC Denied')
+            ->assertSee('data-open-review-modal="reject-flight-plan"', false)
+            ->assertSee('disabled aria-describedby="accept-unavailable-reason"', false)
+            ->assertSee('ATMO acceptance requires AVSEC approval.')
+            ->assertDontSee('data-open-review-modal="accept-flight-plan"', false);
+        $this->post(route('flights.accept', $flight))->assertForbidden();
+        $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
+        $this->post(route('flights.reject', $flight), ['rejection_reason' => 'ATMO operational review declined'])
+            ->assertRedirect(route('flights.view', $flight));
+        $this->assertSame(FlightPlanStatus::Rejected, $flight->fresh()->status);
+        $this->assertSame($denialBefore, $denial->fresh()->getAttributes());
+        $this->assertSame(1, $flight->events()->where('event_type', FlightPlanEvent::TYPE_AVSEC_DENIED)->count());
+        $this->assertSame(1, $flight->events()->where('event_type', FlightPlanEvent::TYPE_ATC_REJECTED)->count());
     }
 
     public function test_expired_and_declined_labels_take_precedence_and_station_access_is_preserved(): void
@@ -114,14 +150,14 @@ class AtmoAvsecQueuesTest extends TestCase
         $statuses = $flights->map(fn (Flight $flight) => FlightStatusDisplay::badge($flight, UserRole::Atmo)['label'])->all();
         $queries = DB::getQueryLog();
         DB::disableQueryLog();
-        $this->assertEqualsCanonicalizing(['Awaiting AVSEC', 'Pending ATMO'], $statuses);
+        $this->assertEqualsCanonicalizing(['Pending AVSEC', 'AVSEC Approved'], $statuses);
         $this->assertSame([], $queries);
     }
 
     public function test_navigation_places_awaiting_avsec_immediately_before_pending(): void
     {
         $this->atmo();
-        $this->get('/atmo/awaiting-avsec')->assertOk()->assertSeeInOrder(['Awaiting AVSEC', 'Pending Flight Plans']);
+        $this->get('/atmo/awaiting-avsec')->assertOk()->assertSeeInOrder(['AVSEC Clearance', 'Pending Flight Plans']);
         $this->assertLessThan(FlightResource::getNavigationSort(), AwaitingAvsecFlightResource::getNavigationSort());
     }
 

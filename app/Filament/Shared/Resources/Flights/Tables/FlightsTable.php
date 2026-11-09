@@ -5,6 +5,8 @@ namespace App\Filament\Shared\Resources\Flights\Tables;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
+use App\Filament\Panels\Atmo\Resources\AwaitingAvsecFlights\AwaitingAvsecFlightResource;
+use App\Filament\Panels\Atmo\Resources\Flights\FlightResource as AtmoFlightResource;
 use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource as DispatchAwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
@@ -278,6 +280,8 @@ class FlightsTable
             MyArchivedFlightResource::class,
             AwaitingAuthorizationFlightResource::class,
             DispatchAwaitingAuthorizationFlightResource::class,
+            AwaitingAvsecFlightResource::class,
+            AtmoFlightResource::class,
         ], true)) {
             array_unshift($columns, FlightStatusDisplay::tableColumn());
         }

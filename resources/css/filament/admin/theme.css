@@ -8,6 +8,26 @@
 @source '../../../../resources/views/components/manifest-person.blade.php';
 @source '../../../../resources/views/components/pilot/**/*.blade.php';
 
+@layer components {
+    .fi-ta-row.echo-avsec-linked-row {
+        @apply cursor-pointer transition-colors;
+    }
+
+    .fi-ta-row.echo-avsec-linked-row:hover,
+    .fi-ta-row.echo-avsec-linked-row:focus-within {
+        @apply bg-primary-50 dark:bg-primary-500/10;
+    }
+
+    .echo-avsec-record-link {
+        min-height: 44px;
+    }
+
+    .echo-avsec-record-link:focus-visible {
+        outline: 2px solid var(--color-primary-600);
+        outline-offset: -2px;
+    }
+}
+
 @layer base {
     :root {
         --echo-shadow-soft: 0 12px 32px rgba(10, 63, 50, 0.06);

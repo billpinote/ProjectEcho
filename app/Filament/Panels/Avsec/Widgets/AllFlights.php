@@ -8,7 +8,6 @@ use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
-use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -34,19 +33,21 @@ class AllFlights extends TableWidget
                 TextColumn::make('date_of_flight')->label('DATE')->date('Y-m-d', timezone: 'UTC')->sortable(),
                 TextColumn::make('proposed_time')->label('PTD')->formatStateUsing(fn ($state) => UtcFourDigitTime::formatForDisplay($state).'Z')
                     ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy('date_of_flight', $direction)->orderBy('proposed_time', $direction)),
-                TextColumn::make('pilot_in_command')->label('PIC'),
+                TextColumn::make('pilot_in_command')->label('Pilot'),
                 FlightStatusDisplay::tableColumn(UserRole::Avsec, 'avsec_status')->label('AVSEC STATUS')
-                    ->state(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record, $record->avsecVerification !== null)['label'])
-                    ->icon(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record, $record->avsecVerification !== null)['icon'])
-                    ->tooltip(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record, $record->avsecVerification !== null)['tooltip'])
+                    ->state(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record)['label'])
+                    ->icon(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record)['icon'])
+                    ->tooltip(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record)['tooltip'])
                     ->extraCellAttributes(fn (Flight $record) => [
                         'class' => 'echo-flight-status-cell',
-                        'data-flight-status' => FlightStatusDisplay::avsecBadge($record, $record->avsecVerification !== null)['key'],
-                        'data-flight-status-outlined' => FlightStatusDisplay::avsecBadge($record, $record->avsecVerification !== null)['outlined'] ? 'true' : 'false',
+                        'data-flight-status' => FlightStatusDisplay::avsecBadge($record)['key'],
+                        'data-flight-status-outlined' => FlightStatusDisplay::avsecBadge($record)['outlined'] ? 'true' : 'false',
                     ])
-                    ->color(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record, $record->avsecVerification !== null)['color']),
-            ])->recordActions([
-                Action::make('view')->label('View')->url(fn (Flight $record) => route('flights.view', $record)),
-            ])->paginated([10, 25, 50])->defaultPaginationPageOption(10);
+                    ->color(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record)['color']),
+            ])->recordActions([])->recordAction(null)
+            ->recordUrl(fn (Flight $record) => route('flights.view', $record))->openRecordUrlInNewTab()
+            ->recordClasses('echo-avsec-linked-row')
+            ->extraRecordLinkAttributes(['class' => 'echo-avsec-record-link', 'title' => 'Opens in a new tab'])
+            ->paginated([10, 25, 50])->defaultPaginationPageOption(10);
     }
 }

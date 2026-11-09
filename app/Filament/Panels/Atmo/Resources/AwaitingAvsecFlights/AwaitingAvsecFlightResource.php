@@ -17,9 +17,9 @@ class AwaitingAvsecFlightResource extends FlightResource
 {
     protected static ?string $slug = 'awaiting-avsec';
 
-    protected static ?string $navigationLabel = 'Awaiting AVSEC';
+    protected static ?string $navigationLabel = 'AVSEC Clearance';
 
-    protected static ?string $pluralModelLabel = 'flights awaiting AVSEC';
+    protected static ?string $pluralModelLabel = 'AVSEC Clearance';
 
     protected static ?int $navigationSort = 0;
 
@@ -62,7 +62,7 @@ class AwaitingAvsecFlightResource extends FlightResource
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'Signed filings awaiting AVSEC confirmation';
+        return 'Signed filings pending an AVSEC decision';
     }
 
     public static function table(Table $table): Table

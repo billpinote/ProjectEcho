@@ -483,7 +483,7 @@
                         @if($this->isAvsecVerificationPage())
                             <div class="echo-workflow-step mt-4">
                                 <p>Server record #{{ $matchedFlight['id'] }} · Revision {{ $matchedFlight['revision'] }}</p>
-                                <p>PIC: {{ $matchedFlight['pic'] ?? 'Not authorized' }} · Aircraft: {{ $matchedFlight['aircraft'] }}</p>
+                                <p>Pilot: {{ $matchedFlight['pic'] ?? 'Not authorized' }} · Aircraft: {{ $matchedFlight['aircraft'] }}</p>
                                 <p>Flight plan and manifest signatures: {{ $matchedFlight['authorized'] ? 'Current' : 'Required before confirmation' }}</p>
                                 <p>Departure (Asia/Manila): {{ $matchedFlight['local_departure'] }}</p>
                                 <p>Flight plan authorization: {{ $matchedFlight['flight_authorized'] ? 'Current' : 'Required' }}</p>
@@ -502,10 +502,10 @@
                                 @if($matchedFlight['manifest_url'])
                                     <p><a href="{{ $matchedFlight['manifest_url'] }}" target="_blank" rel="noopener noreferrer">Review passenger / cargo manifest</a></p>
                                 @else
-                                    <p>Manifest missing</p>
+                                    <p>Manifest Required</p>
                                 @endif
                                 <p>PNP AVSEC clearance procedures take place offline. Echo records this confirmation; it does not issue PNP approval, authenticate a physical signature, or authorize departure.</p>
-                                @unless($matchedFlight['verified'])
+                                @if($matchedFlight['can_decide'])
                                     <label class="block mt-3">PNP reference number (optional)
                                         <input type="text" wire:model="pnpReference" maxlength="255" class="echo-input w-full">
                                     </label>
@@ -515,8 +515,8 @@
                                         {{ \App\Domain\FlightPlans\Services\AvsecVerificationService::CONFIRMATION }}
                                     </label>
                                     <p>Confirmation permanently protects this submission, including its manifest, from document changes. Revised EOBT and permitted lifecycle updates remain available.</p>
-                                    <button type="button" wire:click="confirmClearance" wire:loading.attr="disabled" class="echo-button echo-button-primary mt-3">Confirm AVSEC procedures completed</button>
-                                @endunless
+                                    <button type="button" wire:click="confirmClearance" wire:confirm="Confirm that PNP-AVSEC clearance has been granted on the signed offline clearance form." wire:loading.attr="disabled" class="echo-button echo-button-primary mt-3">Grant Clearance</button>
+                                @endif
                                 @foreach(['avsec', 'confirmation', 'reference', 'manifest'] as $field)
                                     @error($field)<p role="alert">{{ $message }}</p>@enderror
                                 @endforeach

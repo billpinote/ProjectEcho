@@ -7,7 +7,7 @@
     </div>
     @endif
     @if (! $flight->hasBeenAccepted() && ! $flight->isPicAuthorizationDeclined())
-        <p role="status">{{ $flight->documentSignatureStatus() }}</p>
+        <p role="status">{{ \App\Domain\FlightPlans\Support\FlightStatusDisplay::badge($flight, auth()->user()?->role)['label'] }}</p>
     @endif
     <div class="flex flex-col gap-6" wire:ignore>
         @include('flightplan.partials.manifest-form')

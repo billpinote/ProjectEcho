@@ -5,11 +5,10 @@ namespace App\Filament\Panels\Avsec\Resources\FiledRpusDepartures;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\AvsecDepartureQuery;
 use App\Domain\FlightPlans\Services\AvsecVerificationService;
-use App\Filament\Panels\Avsec\Pages\ImportScanQr;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Filament\Panels\Avsec\Resources\FiledRpusDepartures\Pages\ListFiledRpusDepartures;
 use App\Models\Flight;
 use Carbon\CarbonImmutable;
-use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -74,20 +73,23 @@ class FiledRpusDepartureResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->heading('Filed RPUS Departures')
-            ->description('All dates and PTD are UTC (Z). Eligible departures awaiting AVSEC clearance.')
+            ->description('All dates and PTD are UTC (Z). RPUS departures, including records awaiting supporting documents.')
             ->defaultSort(fn (Builder $query) => $query->orderBy('date_of_flight')->orderBy('proposed_time')->orderBy('id'))
             ->columns([
                 TextColumn::make('aircraft_identification')->label('CALLSIGN')->searchable()->sortable()->weight('bold'),
                 TextColumn::make('date_of_flight')->label('DATE')->date('Y-m-d', timezone: 'UTC')->sortable(),
                 TextColumn::make('proposed_time')->label('PTD')->state(fn (Flight $record) => filled($record->proposed_time) ? UtcFourDigitTime::formatForDisplay($record->proposed_time).'Z' : null)
                     ->sortable(query: fn (Builder $query, string $direction) => $query->orderBy('date_of_flight', $direction)->orderBy('proposed_time', $direction)),
-                TextColumn::make('pilot_in_command')->label('PIC'),
-                TextColumn::make('avsec_status')->label('AVSEC STATUS')->badge()->state('Awaiting AVSEC')->color('warning'),
+                TextColumn::make('pilot_in_command')->label('Pilot'),
+                TextColumn::make('avsec_status')->label('AVSEC STATUS')->badge()
+                    ->state(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record)['label'])
+                    ->color(fn (Flight $record) => FlightStatusDisplay::avsecBadge($record)['color']),
             ])->filters([
                 SelectFilter::make('destination_aerodrome')->label('Destination')->options(fn () => static::getEloquentQuery()->distinct()->pluck('destination_aerodrome', 'destination_aerodrome')->all()),
-            ])->recordUrl(null)->recordActions([
-                Action::make('review')->label('Review')->url(fn (Flight $record) => ImportScanQr::getUrl(['flight' => $record->id], panel: 'avsec')),
-            ])
+            ])->recordActions([])->recordAction(null)
+            ->recordUrl(fn (Flight $record) => route('flights.view', $record))->openRecordUrlInNewTab()
+            ->recordClasses('echo-avsec-linked-row')
+            ->extraRecordLinkAttributes(['class' => 'echo-avsec-record-link', 'title' => 'Opens in a new tab'])
             ->paginated([10, 25, 50])->defaultPaginationPageOption(10);
     }
 }

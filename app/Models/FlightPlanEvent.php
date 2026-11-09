@@ -32,6 +32,8 @@ class FlightPlanEvent extends Model
 
     public const TYPE_AVSEC_VERIFIED = 'avsec_verified';
 
+    public const TYPE_AVSEC_DENIED = 'avsec_denied';
+
     public const TYPE_ATC_REJECTED = 'atc_rejected';
 
     public const TYPE_DELAYED = 'delayed';

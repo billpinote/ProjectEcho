@@ -587,7 +587,7 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_avsec_cannot_view_flight_before_pic_authorization(): void
+    public function test_avsec_can_inspect_flight_before_pic_authorization_without_clearance_actions(): void
     {
         $avsec = $this->user(UserRole::Avsec);
         $avsec->forceFill(['station' => 'RPUS'])->save();
@@ -596,11 +596,12 @@ class PicAuthorizationWorkflowTest extends TestCase
         $this->actingAs($avsec)
             ->get(route('flights.view', $flight))
             ->assertOk()
-            ->assertSeeText('PIC Authorization Pending')
-            ->assertSeeText('This flight plan is not yet available for operational review. PIC authorization must be completed first.')
-            ->assertSeeText('Close')
-            ->assertDontSee('FLIGHT PLAN', false)
-            ->assertDontSeeText('PIC-001');
+            ->assertViewIs('flightplan.pdf')
+            ->assertViewHas('canDecideClearance', false)
+            ->assertSeeText('Manifest Required')
+            ->assertSeeText('Close Preview')
+            ->assertSee('FLIGHT PLAN', false);
+        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->fresh()->status);
     }
 
     public function test_atmo_can_view_flight_after_pic_authorization_and_revision_invalidation_reprotects_it(): void
