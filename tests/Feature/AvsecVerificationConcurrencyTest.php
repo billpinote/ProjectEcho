@@ -53,6 +53,8 @@ while (!file_exists($argv[1].'.go')) { usleep(10000); }
 try {
     if ($argv[5] === 'confirm') {
         app(App\Domain\FlightPlans\Services\AvsecVerificationService::class)->confirm($argv[3], App\Models\User::findOrFail($argv[4]), true);
+    } elseif ($argv[5] === 'deny') {
+        app(App\Domain\FlightPlans\Services\AvsecVerificationService::class)->deny($argv[3], App\Models\User::findOrFail($argv[4]), 'Offline clearance denied');
     } else {
         App\Models\Flight::findOrFail($argv[7])->update(['route' => 'CONCURRENT CORRECTION']);
     }
@@ -62,7 +64,7 @@ try {
 }
 PHP;
             foreach (['confirm', $secondOperation] as $index => $operation) {
-                $process = new Process([PHP_BINARY, '-d', 'memory_limit=256M', '-r', $script,
+                $process = new Process([PHP_BINARY, '-d', 'memory_limit=256M', '-d', 'upload_tmp_dir='.ini_get('upload_tmp_dir'), '-r', $script,
                     $database, Storage::disk('local')->path(''), $payload, (string) $officer->id, $operation, (string) $index, (string) $flight->id,
                 ], base_path(), ['APP_ENV' => 'testing', 'APP_KEY' => config('app.key')], timeout: 45);
                 $process->start();
@@ -86,6 +88,9 @@ PHP;
             if ($flight->isAvsecFrozen()) {
                 $this->assertSame('DCT', $flight->route);
                 $this->assertSame(1, $flight->events()->where('event_type', 'avsec_verified')->count());
+            } elseif ($secondOperation === 'deny') {
+                $this->assertSame(1, $flight->avsecDenials()->count());
+                $this->assertSame('DCT', $flight->route);
             } else {
                 $this->assertSame('CONCURRENT CORRECTION', $flight->route);
             }
@@ -107,6 +112,6 @@ PHP;
 
     public static function races(): array
     {
-        return [['confirm'], ['mutate']];
+        return [['confirm'], ['mutate'], ['deny']];
     }
 }

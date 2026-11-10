@@ -104,8 +104,19 @@ Controllers retain HTTP validation and responses. Services own the database chan
 
 PIC authorization and ATC acceptance remain separate decisions.
 
-RPUS departures also require AVSEC confirmation before ATMO acceptance. The AVSEC
-panel reuses the flight-plan scanner to load the authoritative server record.
+### AVSEC Clearance
+
+`FlightPlanController::showFlightPlanView()` renders the same flight-plan preview
+for authorized AVSEC officers, including before Pilot authorization is complete.
+This viewing exception does not change Pilot or ATMO access restrictions.
+`AvsecClearanceController` validates and delegates clearance decisions to
+`AvsecVerificationService`; it does not perform ATMO acceptance or rejection.
+Grants retain the immutable verification record and document protection. Denials
+use the existing flight audit events, scoped to the flight revision, without
+creating a grant record or changing the flight status or manifest contents.
+
+RPUS departures also require AVSEC confirmation before ATMO acceptance. Normal AVSEC
+reviews open the flight preview; QR scanning remains an optional lookup path.
 Only active RPUS AVSEC officers may confirm that offline PNP clearance procedures
 are complete. Echo does not issue a PNP form or authenticate a physical signature.
 Confirmation permanently freezes the approved flight plan, manifest, ordered

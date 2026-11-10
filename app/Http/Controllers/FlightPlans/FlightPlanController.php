@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers\FlightPlans;
 
+use App\Domain\FlightPlans\Enums\AvsecClearanceState;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrRenderer;
 use App\Domain\FlightPlans\Services\FlightPlanSubmissionService;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Filament\Panels\Pilot\Resources\Flights\FlightResource as PilotFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Http\Controllers\Controller;
@@ -94,7 +97,10 @@ class FlightPlanController extends Controller
             ],
         ];
 
-        if ($flight->requiresPicAuthorization() && ! $flight->isPicAuthorizationCurrent()) {
+        $isAvsec = Auth::user()->isAvsec();
+        $clearance = app(AvsecVerificationService::class);
+
+        if (! $isAvsec && $flight->requiresPicAuthorization() && ! $flight->isPicAuthorizationCurrent()) {
             return view('flightplan.pic-authorization-required', [
                 'noticeHeading' => 'PIC Authorization Pending',
                 'noticeMessage' => 'This flight plan is not yet available for operational review. PIC authorization must be completed first.',
@@ -112,9 +118,17 @@ class FlightPlanController extends Controller
         }
 
         $backActionUrl = $this->browser->roleAwarePanelUrl();
+        $canAcceptFlightPlan = Auth::user()?->can('accept', $flight) ?? false;
+        $canRejectFlightPlan = Auth::user()?->can('reject', $flight) ?? false;
 
         return view('flightplan.pdf', [
             ...$activity,
+            'showAvsecActions' => $isAvsec,
+            'avsecStatus' => $isAvsec ? FlightStatusDisplay::avsecBadge($flight) : null,
+            'avsecDenial' => $isAvsec ? $clearance->denialFor($flight) : null,
+            'canDecideClearance' => $isAvsec && $clearance->canDecide($flight, Auth::user()),
+            'reviewedFingerprint' => $isAvsec ? $clearance->reviewFingerprint($flight) : null,
+            'avsecManifestAvailable' => $isAvsec && $clearance->manifestAvailable($flight),
             'flight' => $flight,
             'qrCodeBase64' => $this->qrRenderer->generateFlightPlanQrCodeBase64($flight),
             'isPreview' => true,
@@ -130,12 +144,16 @@ class FlightPlanController extends Controller
             'backActionLabel' => 'Back to Dashboard',
             'backActionIsDashboard' => true,
             'acceptActionUrl' => route('flights.accept', $flight),
-            'canAcceptFlightPlan' => Auth::user()?->can('accept', $flight) ?? false,
+            'canAcceptFlightPlan' => $canAcceptFlightPlan,
+            'canRejectFlightPlan' => $canRejectFlightPlan,
+            'acceptUnavailableReason' => $canRejectFlightPlan && ! $canAcceptFlightPlan
+                && $clearance->currentState($flight) === AvsecClearanceState::Denied
+                ? 'ATMO acceptance requires AVSEC approval. This flight plan remains available for review or rejection.' : null,
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->browser->resolveAtcWiresign(),
             'picDeclineDetails' => $flight->pic_authorization_status === 'declined',
-            'backActionLabel' => $flight->pic_authorization_status === 'declined' ? 'Back to Archive' : 'Back to Dashboard',
-            'backActionUrl' => $flight->pic_authorization_status === 'declined'
+            'backActionLabel' => ! $isAvsec && $flight->pic_authorization_status === 'declined' ? 'Back to Archive' : 'Back to Dashboard',
+            'backActionUrl' => ! $isAvsec && $flight->pic_authorization_status === 'declined'
                 ? MyArchivedFlightResource::getUrl('index', panel: 'pilot')
                 : $backActionUrl,
             'correctResubmitUrl' => $flight->pic_authorization_status === 'declined'

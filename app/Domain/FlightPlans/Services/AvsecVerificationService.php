@@ -2,6 +2,7 @@
 
 namespace App\Domain\FlightPlans\Services;
 
+use App\Domain\FlightPlans\Enums\AvsecClearanceState;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\Users\Enums\UserRole;
@@ -20,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 
 class AvsecVerificationService
 {
-    public const CONFIRMATION = 'I confirm that the required PNP AVSEC clearance procedures have been completed for this flight.';
+    public const CONFIRMATION = 'Confirm that PNP-AVSEC clearance has been granted on the signed offline clearance form.';
 
     public function __construct(private FlightPlanQrPayloadService $payloads, private FilingAuthorizationService $authorizations, private FilingDocumentRegistry $documents) {}
 
@@ -62,21 +63,28 @@ class AvsecVerificationService
         return $flight;
     }
 
-    public function confirm(string $payload, User $actor, bool $confirmed, ?string $reference = null): AvsecVerification
+    public function confirm(string $payload, User $actor, bool $confirmed, ?string $reference = null, ?string $reviewedFingerprint = null): AvsecVerification
     {
         Validator::make(['confirmation' => $confirmed, 'reference' => $reference], [
             'confirmation' => ['accepted'], 'reference' => ['nullable', 'string', 'max:255'],
         ])->validate();
 
         try {
-            return DB::transaction(function () use ($payload, $actor, $reference): AvsecVerification {
+            return DB::transaction(function () use ($payload, $actor, $reference, $reviewedFingerprint): AvsecVerification {
                 $flight = $this->resolve($payload, $actor);
                 if ($flight->avsecVerification()->exists()) {
                     throw ValidationException::withMessages(['avsec' => 'This flight already has a permanent AVSEC confirmation.']);
                 }
+                $this->assertNoDenial($flight);
                 if ($flight->status !== FlightPlanStatus::Pending || $flight->hasBeenAccepted() || $flight->isPendingExpired()
                     || ! $flight->isPicAuthorizationCurrent() || ! $this->authorizations->isReadyForAtmo($flight)) {
                     throw ValidationException::withMessages(['avsec' => 'A current PIC-authorized flight plan and complete, signed manifest are required before AVSEC confirmation.']);
+                }
+                if ($flight->pic_authorization_archived_at !== null) {
+                    throw ValidationException::withMessages(['avsec' => 'Archived filings cannot be confirmed.']);
+                }
+                if ($reviewedFingerprint !== null && ! hash_equals($reviewedFingerprint, $this->reviewFingerprint($flight))) {
+                    throw ValidationException::withMessages(['avsec' => 'The reviewed documents have changed. Reload and review the current flight plan and manifest.']);
                 }
                 app(FlightManifestService::class)->assertComplete($flight);
                 $pdfs = app(FlightPlanPdfService::class);
@@ -94,6 +102,7 @@ class AvsecVerificationService
                     'approved_content' => $content, 'pnp_reference_number' => filled($reference) ? trim($reference) : null,
                 ])->save();
                 FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_AVSEC_VERIFIED, $actor, null, [
+                    'decision' => 'granted',
                     'verification_id' => $verification->id, 'flight_revision' => $verification->flight_revision,
                     'content_sha256' => $verification->content_sha256, 'confirmation' => self::CONFIRMATION,
                     'pnp_reference_number' => $verification->pnp_reference_number, 'station' => 'RPUS',
@@ -107,6 +116,94 @@ class AvsecVerificationService
             }
 
             throw ValidationException::withMessages(['avsec' => 'The filing is being changed or confirmed by another request. Reload the current record before retrying.']);
+        }
+    }
+
+    public function reviewFingerprint(Flight $flight): string
+    {
+        return FilingDocumentRegistry::fingerprint($this->approvedContent($flight));
+    }
+
+    public function manifestAvailable(Flight $flight): bool
+    {
+        $flight->loadMissing('manifest.persons');
+        try {
+            app(FlightManifestService::class)->assertComplete($flight, loaded: true);
+
+            return true;
+        } catch (ValidationException) {
+            return false;
+        }
+    }
+
+    public function denialFor(Flight $flight, bool $loaded = false): ?FlightPlanEvent
+    {
+        $denials = $loaded ? $flight->avsecDenials : $flight->avsecDenials()->get();
+
+        return $denials->sortByDesc('id')->first(
+            fn (FlightPlanEvent $event) => (int) ($event->new_values['flight_revision'] ?? 0) === (int) $flight->revision_number,
+        );
+    }
+
+    public function currentState(Flight $flight, bool $loaded = false): AvsecClearanceState
+    {
+        if (! $flight->exists || ! self::requiredFor($flight)) {
+            return AvsecClearanceState::Awaiting;
+        }
+        if ($this->validFor($flight, $loaded)) {
+            return AvsecClearanceState::Granted;
+        }
+
+        return $this->denialFor($flight, $loaded) !== null ? AvsecClearanceState::Denied : AvsecClearanceState::Awaiting;
+    }
+
+    public function canDecide(Flight $flight, ?User $actor): bool
+    {
+        return self::eligibleOfficer($actor) && self::requiredFor($flight) && $actor->can('view', $flight)
+            && $flight->status === FlightPlanStatus::Pending && ! $flight->hasBeenAccepted()
+            && ! $flight->isPendingExpired() && $flight->pic_authorization_archived_at === null
+            && $flight->avsecVerification === null && $this->denialFor($flight) === null
+            && $this->manifestAvailable($flight) && $flight->isPicAuthorizationCurrent()
+            && $this->authorizations->isReadyForAtmo($flight);
+    }
+
+    public function deny(string $payload, User $actor, string $reason, ?string $reference = null, ?string $reviewedFingerprint = null): FlightPlanEvent
+    {
+        $reason = trim($reason);
+        Validator::make(['reason' => $reason, 'reference' => $reference], [
+            'reason' => ['required', 'string', 'max:255'], 'reference' => ['nullable', 'string', 'max:255'],
+        ])->validate();
+
+        try {
+            return DB::transaction(function () use ($payload, $actor, $reason, $reference, $reviewedFingerprint): FlightPlanEvent {
+                $flight = $this->resolve($payload, $actor);
+                if (! $this->canDecide($flight, $actor)) {
+                    throw ValidationException::withMessages(['avsec' => 'A current Pilot-authorized flight plan and complete, signed manifest with no recorded clearance decision are required.']);
+                }
+                $fingerprint = $this->reviewFingerprint($flight);
+                if ($reviewedFingerprint !== null && ! hash_equals($reviewedFingerprint, $fingerprint)) {
+                    throw ValidationException::withMessages(['avsec' => 'The reviewed documents have changed. Reload and review the current flight plan and manifest.']);
+                }
+
+                return FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_AVSEC_DENIED, $actor, null, [
+                    'decision' => 'denied', 'flight_revision' => $flight->revision_number,
+                    'content_sha256' => $fingerprint, 'verifier_name' => $actor->fullName(),
+                    'station' => 'RPUS', 'pnp_reference_number' => filled($reference) ? trim($reference) : null,
+                ], $reason);
+            }, 3);
+        } catch (DeadlockException|QueryException $exception) {
+            if (! (new ConcurrencyErrorDetector)->causedByConcurrencyError($exception)) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages(['avsec' => 'Another request is changing this filing. Reload before retrying.']);
+        }
+    }
+
+    private function assertNoDenial(Flight $flight): void
+    {
+        if ($this->denialFor($flight) !== null) {
+            throw ValidationException::withMessages(['avsec' => 'Clearance has already been denied for this flight revision.']);
         }
     }
 

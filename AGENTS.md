@@ -281,3 +281,7 @@ Before finishing:
 - Report what changed and why.
 - List the checks actually run.
 - Identify remaining failures, limitations, or follow-up work.
+
+## Collaboration
+
+Follow the [Project Echo Collaboration Guide](PROJECT_ECHO_COLLABORATION_GUIDE.md) for Bill's communication and development workflow preferences.

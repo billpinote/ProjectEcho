@@ -325,7 +325,7 @@ class PicAuthorizationService
         }
     }
 
-    public function resolveAccessibleFlightFromPayload(string $payload, User $user): Flight
+    public function resolveAccessibleFlightFromPayload(string $payload, User $user, bool $requirePendingAuthorization = true): Flight
     {
         $payloadService = app(FlightPlanQrPayloadService::class);
         $parsed = $payloadService->parsePayload($payload);
@@ -353,7 +353,7 @@ class PicAuthorizationService
             throw ValidationException::withMessages(['payload' => 'This QR payload is stale. Scan the current flight-plan QR again.']);
         }
 
-        if ($flight->canSubmitToAtc()) {
+        if ($requirePendingAuthorization && $flight->canSubmitToAtc()) {
             throw ValidationException::withMessages(['payload' => 'This flight plan no longer requires PIC authorization.']);
         }
 

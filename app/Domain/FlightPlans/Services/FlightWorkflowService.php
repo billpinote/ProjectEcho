@@ -2,6 +2,7 @@
 
 namespace App\Domain\FlightPlans\Services;
 
+use App\Domain\FlightPlans\Enums\AvsecClearanceState;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Models\Flight;
@@ -11,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class FlightWorkflowService
 {
-    private const RELATIONS = ['manifest.persons', 'filingAuthorizations.pilotSignature', 'avsecVerification'];
+    private const RELATIONS = ['manifest.persons', 'filingAuthorizations.pilotSignature', 'avsecVerification', 'avsecDenials'];
 
     public function __construct(private FilingAuthorizationService $authorizations, private FlightManifestService $manifests, private AvsecVerificationService $avsec) {}
 
@@ -44,11 +45,12 @@ class FlightWorkflowService
         if (! AvsecVerificationService::requiredFor($flight)) {
             return FlightStatusDisplay::PENDING_ATMO;
         }
-        if ($flight->avsecVerification === null) {
-            return FlightStatusDisplay::AWAITING_AVSEC;
-        }
 
-        return $this->avsec->validFor($flight, loaded: true) ? FlightStatusDisplay::PENDING_ATMO : FlightStatusDisplay::PENDING;
+        return match ($this->avsec->currentState($flight, loaded: true)) {
+            AvsecClearanceState::Granted, AvsecClearanceState::Denied => FlightStatusDisplay::PENDING_ATMO,
+            AvsecClearanceState::Awaiting => $flight->avsecVerification === null
+                ? FlightStatusDisplay::AWAITING_AVSEC : FlightStatusDisplay::PENDING,
+        };
     }
 
     public function queue(Builder $query, string $stage): Builder

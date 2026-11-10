@@ -23,6 +23,11 @@ use Illuminate\Validation\ValidationException;
 
 class Flight extends Model
 {
+    public function avsecDenials(): HasMany
+    {
+        return $this->hasMany(FlightPlanEvent::class)->where('event_type', FlightPlanEvent::TYPE_AVSEC_DENIED);
+    }
+
     public function filingAuthorizations(): HasMany
     {
         return $this->hasMany(FilingAuthorization::class);

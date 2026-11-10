@@ -3,6 +3,7 @@
 namespace App\Filament\Panels\Pilot\Widgets;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\FlightWorkflowService;
 use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Models\Flight;
@@ -195,25 +196,7 @@ class PilotDashboardWidget extends Widget
 
     private function flightQuery(User $user): Builder
     {
-        $query = Flight::query()
-            ->select([
-                'id',
-                'filed_by_user_id',
-                'aircraft_identification',
-                'departure_aerodrome',
-                'destination_aerodrome',
-                'date_of_flight',
-                'proposed_time',
-                'type_of_aircraft',
-                'flight_rules',
-                'status',
-                'time_start_up',
-                'time_block_off',
-                'time_airborne',
-                'time_touchdown',
-                'time_block_on',
-                'time_shutdown',
-            ])->withExists('manifest');
+        $query = app(FlightWorkflowService::class)->withStatusContext(Flight::query())->withExists('manifest');
 
         return FlightAccess::restrictQueryToPilotInvolvement($query, $user);
     }

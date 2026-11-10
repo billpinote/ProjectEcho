@@ -2,8 +2,10 @@
 
 namespace App\Domain\FlightPlans\Services;
 
+use App\Domain\FlightPlans\Enums\AvsecClearanceState;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Models\Flight;
 use Carbon\Carbon;
 
@@ -30,6 +32,7 @@ class FlightPlanQrLookupService
             }
 
             $flight = Flight::find((int) $parsedPayload['flight_id']);
+            $badge = $flight !== null ? $this->clearanceBadge($flight) : null;
             $status = $flight?->status instanceof FlightPlanStatus
                 ? $flight->status
                 : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
@@ -42,8 +45,8 @@ class FlightPlanQrLookupService
                 'departure_aerodrome' => (string) ($snapshot['departure_aerodrome'] ?? 'N/A'),
                 'destination_aerodrome' => (string) ($snapshot['destination_aerodrome'] ?? 'N/A'),
                 'status' => $status?->value ?? 'verified_qr_only',
-                'status_label' => $status?->label() ?? 'Valid QR. Needs ATC Review.',
-                'status_color' => $status?->filamentColor() ?? 'info',
+                'status_label' => $badge['label'] ?? $status?->label() ?? 'Valid QR. Needs ATC Review.',
+                'status_color' => $badge['color'] ?? $status?->filamentColor() ?? 'info',
                 'flight' => $flight,
                 'preview' => [
                     'payload' => $parsedPayload['normalized_payload'],
@@ -65,6 +68,7 @@ class FlightPlanQrLookupService
         $status = $flight->status instanceof FlightPlanStatus
             ? $flight->status
             : FlightPlanStatus::tryFrom((string) $flight->status);
+        $badge = $this->clearanceBadge($flight);
 
         return [
             'id' => $flight->getKey(),
@@ -74,11 +78,18 @@ class FlightPlanQrLookupService
             'departure_aerodrome' => (string) ($flight->departure_aerodrome ?? 'N/A'),
             'destination_aerodrome' => (string) ($flight->destination_aerodrome ?? 'N/A'),
             'status' => $status?->value ?? (string) ($flight->status ?? 'unknown'),
-            'status_label' => $status?->label() ?? str((string) ($flight->status ?? 'unknown'))->headline()->toString(),
-            'status_color' => $status?->filamentColor() ?? 'gray',
+            'status_label' => $badge['label'] ?? $status?->label() ?? str((string) ($flight->status ?? 'unknown'))->headline()->toString(),
+            'status_color' => $badge['color'] ?? $status?->filamentColor() ?? 'gray',
             'flight' => $flight,
             'preview' => null,
         ];
+    }
+
+    private function clearanceBadge(Flight $flight): ?array
+    {
+        $badge = FlightStatusDisplay::badge($flight);
+
+        return AvsecClearanceState::tryFrom($badge['key']) !== null ? $badge : null;
     }
 
     private function formatFlightDateForLookup(mixed $value): string

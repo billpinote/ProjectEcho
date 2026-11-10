@@ -216,9 +216,9 @@ class AvsecVerificationTest extends TestCase
             ->searchTable($flight->aircraft_identification)->assertCanSeeTableRecords([$record])
             ->filterTable('flight_status', FlightPlanStatus::Rejected->value)->assertCanSeeTableRecords([$record]);
         $this->actingAs($this->officer())->get(AvsecVerificationResource::getUrl('view', ['record' => $record], panel: 'avsec'))
-            ->assertOk()->assertSee('PNP-123')->assertSee('Confirmed (Asia/Manila)');
+            ->assertOk()->assertSee('PNP-123')->assertSee('Decision time (Asia/Manila)');
         Livewire::actingAs($this->officer())->test(ImportScanQr::class)->set('payload', $this->payload($flight))->call('submit')
-            ->assertSet('matchedFlight.verified', true)->assertSee('AVSEC confirmed');
+            ->assertSet('matchedFlight.verified', true)->assertSet('matchedFlight.status_color', 'success')->assertSee('Clearance Granted');
         $this->actingAs($this->officer(['station' => 'RPLL']))->get('/avsec/avsec-verifications')->assertForbidden();
     }
 

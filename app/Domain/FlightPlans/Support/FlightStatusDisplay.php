@@ -2,7 +2,9 @@
 
 namespace App\Domain\FlightPlans\Support;
 
+use App\Domain\FlightPlans\Enums\AvsecClearanceState;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FlightWorkflowService;
 use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
@@ -104,7 +106,20 @@ final class FlightStatusDisplay
      */
     public static function badge(Flight $flight, UserRole|string|null $viewerRole = null): array
     {
+        if (self::resolveViewerRole($viewerRole) === UserRole::Avsec) {
+            return self::avsecBadge($flight);
+        }
+
         $status = self::status($flight);
+
+        if ($flight->exists && AvsecVerificationService::requiredFor($flight)
+            && in_array($status, [self::PENDING, self::AWAITING_AVSEC, self::PENDING_ATMO], true)) {
+            $flight->loadMissing(['manifest.persons', 'filingAuthorizations.pilotSignature', 'avsecVerification', 'avsecDenials']);
+            $clearance = app(AvsecVerificationService::class)->currentState($flight, loaded: true);
+            if ($clearance !== AvsecClearanceState::Awaiting || $status === self::AWAITING_AVSEC) {
+                return self::clearanceBadge($clearance, self::resolveViewerRole($viewerRole));
+            }
+        }
 
         if (self::resolveViewerRole($viewerRole) === UserRole::Pilot
             && in_array($status, [self::PENDING, self::AWAITING_PIC], true)
@@ -121,6 +136,40 @@ final class FlightStatusDisplay
             'icon' => self::icon($status),
             'outlined' => self::isOutlined($status),
             'tooltip' => self::tooltip($status, $viewerRole),
+        ];
+    }
+
+    /** @return array{key: string, label: string, color: string, icon: string, outlined: bool, tooltip: string} */
+    public static function avsecBadge(Flight $flight): array
+    {
+        $service = app(AvsecVerificationService::class);
+        $flight->loadMissing(['manifest.persons', 'filingAuthorizations.pilotSignature', 'avsecVerification', 'avsecDenials']);
+        $clearance = $service->currentState($flight, loaded: true);
+        if ($clearance !== AvsecClearanceState::Awaiting) {
+            return self::clearanceBadge($clearance, UserRole::Avsec);
+        }
+        [$key, $label, $color, $icon, $tooltip] = match (true) {
+            ! $service->manifestAvailable($flight) => ['manifest_required', 'Manifest Required', 'warning', 'heroicon-o-document-text', 'Pilot or Dispatch must complete the required manifest.'],
+            default => ['pending_clearance', 'Pending Clearance', 'warning', 'heroicon-o-clock', 'Review both supporting documents. Current Pilot signatures are required before recording clearance.'],
+        };
+
+        return [
+            'key' => $key, 'label' => $label, 'color' => $color,
+            'icon' => $icon, 'outlined' => false, 'tooltip' => $tooltip,
+        ];
+    }
+
+    /** @return array{key: string, label: string, color: string, icon: string, outlined: bool, tooltip: string} */
+    private static function clearanceBadge(AvsecClearanceState $state, ?UserRole $viewerRole = null): array
+    {
+        return [
+            'key' => $state->value, 'label' => $state->label($viewerRole), 'color' => $state->color(),
+            'icon' => $state->icon(), 'outlined' => $state === AvsecClearanceState::Awaiting,
+            'tooltip' => match ($state) {
+                AvsecClearanceState::Granted => 'Offline PNP-AVSEC clearance granted; ATMO acceptance remains separate.',
+                AvsecClearanceState::Denied => 'Offline PNP-AVSEC clearance denied. Review the recorded reason.',
+                AvsecClearanceState::Awaiting => 'Awaiting confirmation of offline PNP-AVSEC clearance.',
+            },
         ];
     }
 
@@ -148,7 +197,7 @@ final class FlightStatusDisplay
     public static function label(string $status, UserRole|string|null $viewerRole = null): string
     {
         if (in_array($status, [self::AWAITING_AVSEC, self::PENDING_ATMO], true)) {
-            return $status === self::AWAITING_AVSEC ? 'Awaiting AVSEC' : 'Pending ATMO';
+            return $status === self::AWAITING_AVSEC ? AvsecClearanceState::Awaiting->label(self::resolveViewerRole($viewerRole)) : 'Pending ATMO';
         }
         $role = self::resolveViewerRole($viewerRole);
 

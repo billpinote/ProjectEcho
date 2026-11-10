@@ -51,6 +51,10 @@ class ScanAuthorizationQr extends ImportScanQr
 
     protected function scannedFlightViewUrl(?Flight $flight, string $previewToken): string
     {
+        if ($flight?->canSubmitToAtc()) {
+            return route('flights.view', $flight);
+        }
+
         if ($flight?->isPicAuthorizationDeclined()) {
             return route('flightplan.scan-qr.preview', ['token' => $previewToken]);
         }
