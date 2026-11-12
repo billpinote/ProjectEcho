@@ -2,7 +2,6 @@
 
 namespace App\Domain\FlightPlans\Services;
 
-use App\Domain\FlightPlans\Enums\AvsecClearanceState;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
@@ -32,7 +31,7 @@ class FlightPlanQrLookupService
             }
 
             $flight = Flight::find((int) $parsedPayload['flight_id']);
-            $badge = $flight !== null ? $this->clearanceBadge($flight) : null;
+            $badge = $flight !== null ? $this->statusBadge($flight) : null;
             $status = $flight?->status instanceof FlightPlanStatus
                 ? $flight->status
                 : FlightPlanStatus::tryFrom((string) ($flight?->status ?? ''));
@@ -68,7 +67,7 @@ class FlightPlanQrLookupService
         $status = $flight->status instanceof FlightPlanStatus
             ? $flight->status
             : FlightPlanStatus::tryFrom((string) $flight->status);
-        $badge = $this->clearanceBadge($flight);
+        $badge = $this->statusBadge($flight);
 
         return [
             'id' => $flight->getKey(),
@@ -85,11 +84,9 @@ class FlightPlanQrLookupService
         ];
     }
 
-    private function clearanceBadge(Flight $flight): ?array
+    private function statusBadge(Flight $flight): ?array
     {
-        $badge = FlightStatusDisplay::badge($flight);
-
-        return AvsecClearanceState::tryFrom($badge['key']) !== null ? $badge : null;
+        return FlightStatusDisplay::badge($flight);
     }
 
     private function formatFlightDateForLookup(mixed $value): string

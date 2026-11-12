@@ -3,9 +3,11 @@
 namespace App\Filament\Panels\Pilot\Pages;
 
 use App\Auth\AuthenticationEvidence;
+use App\Domain\FlightPlans\Rules\UtcFourDigitTime;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Filament\Shared\Pages\ImportScanQr;
@@ -51,7 +53,7 @@ class ScanAuthorizationQr extends ImportScanQr
 
     protected function scannedFlightViewUrl(?Flight $flight, string $previewToken): string
     {
-        if ($flight?->canSubmitToAtc()) {
+        if ($flight !== null && ! app(PicAuthorizationService::class)->needsAuthorization($flight) && ! $flight->isPicAuthorizationDeclined()) {
             return route('flights.view', $flight);
         }
 
@@ -68,15 +70,15 @@ class ScanAuthorizationQr extends ImportScanQr
 
         if ($flight === null
             || $flight->isPicAuthorizationDeclined()
-            || ! $flight->requiresPicAuthorization()
-            || $flight->isPicAuthorizationCurrent()) {
+            || ! app(PicAuthorizationService::class)->canReviewFiling(auth()->user(), $flight)) {
             return false;
         }
 
         try {
             app(PicAuthorizationService::class)->eligibleCredentials(auth()->user(), $flight);
 
-            return (int) $flight->prepared_by_user_id !== (int) auth()->id();
+            return (int) $flight->prepared_by_user_id !== (int) auth()->id()
+                || (int) $flight->pilot_in_command_user_id === (int) auth()->id();
         } catch (ValidationException) {
             return false;
         }
@@ -86,7 +88,8 @@ class ScanAuthorizationQr extends ImportScanQr
     {
         return $this->matchedFlight !== null
             && (int) $this->matchedFlight['id'] > 0
-            && (int) Flight::query()->whereKey($this->matchedFlight['id'])->value('prepared_by_user_id') === (int) auth()->id();
+            && (int) Flight::query()->whereKey($this->matchedFlight['id'])->value('prepared_by_user_id') === (int) auth()->id()
+            && (int) Flight::query()->whereKey($this->matchedFlight['id'])->value('pilot_in_command_user_id') !== (int) auth()->id();
     }
 
     public function isPicAuthorizationDeclined(): bool
@@ -103,7 +106,7 @@ class ScanAuthorizationQr extends ImportScanQr
 
     public function authorizeAsPic(): void
     {
-        $this->authorizeFiling(false);
+        $this->authorizeFiling(true);
     }
 
     public function authorizeAndSignAsPic(): void
@@ -125,6 +128,14 @@ class ScanAuthorizationQr extends ImportScanQr
         ])->all();
     }
 
+    public function authorizationUnavailableReason(): ?string
+    {
+        $flight = $this->matchedFlight !== null ? Flight::find((int) $this->matchedFlight['id']) : null;
+
+        return $flight === null ? 'Load a current filing first.'
+            : app(PicAuthorizationService::class)->authorizationUnavailableReason($flight, auth()->user());
+    }
+
     public function hasApprovedSignature(): bool
     {
         return auth()->user()?->approvedSignature()->where('status', 'approved')->exists() ?? false;
@@ -133,13 +144,26 @@ class ScanAuthorizationQr extends ImportScanQr
     private function authorizeFiling(bool $applySignature): void
     {
         try {
-            app(PicAuthorizationService::class)->authorizeFromHandoff(
+            $flight = app(PicAuthorizationService::class)->resolveAuthorizationHandoff($this->picAuthorizationHandoffToken ?? '');
+            $selfPrepared = $flight !== null && (int) $flight->prepared_by_user_id === (int) auth()->id()
+                && (int) $flight->pilot_in_command_user_id === (int) auth()->id();
+            $flight = app(PicAuthorizationService::class)->authorizeFromHandoff(
                 $this->picAuthorizationHandoffToken ?? '',
                 auth()->user(),
                 AuthenticationEvidence::fromSession(Filament::auth()),
-                applySignature: $applySignature,
+                applySignature: true,
+                selfPrepared: $selfPrepared,
             );
             $this->picAuthorizationHandoffToken = null;
+            $badge = FlightStatusDisplay::badge($flight, auth()->user()->role);
+            $this->matchedFlight = [
+                'id' => $flight->id, 'aircraft_identification' => $flight->aircraft_identification,
+                'date_of_flight' => (string) $flight->date_of_flight,
+                'proposed_time' => UtcFourDigitTime::formatForDisplay($flight->proposed_time),
+                'departure_aerodrome' => $flight->departure_aerodrome, 'destination_aerodrome' => $flight->destination_aerodrome,
+                'status' => $badge['key'], 'status_label' => $badge['label'], 'status_color' => $badge['color'],
+                'view_url' => route('flights.view', $flight),
+            ];
             Notification::make()->success()->title('Flight plan authorized as PIC')->send();
         } catch (ValidationException $exception) {
             $this->setValidationErrors($exception);

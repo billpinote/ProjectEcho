@@ -50,6 +50,9 @@ class PicAuthorizationPreviewController extends Controller
             'flight' => $flight,
             'filingPackage' => $package,
             'filingToken' => $token,
+            'canAuthorizeFiling' => $this->authorizations->canReviewFiling(Auth::user(), $flight),
+            'authorizationUnavailableReason' => $this->authorizations->authorizationUnavailableReason($flight, Auth::user()),
+            'hasApprovedPilotSignature' => Auth::user()->approvedSignature()->where('status', 'approved')->exists(),
             'selfFilingAuthorization' => (int) $flight->prepared_by_user_id === (int) Auth::id()
                 && (int) $flight->pilot_in_command_user_id === (int) Auth::id(),
             'qrCodeBase64' => $payload !== null ? $this->qrRenderer->generateQrCodeBase64FromPayload($payload) : null,

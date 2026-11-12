@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\Users\Enums\UserRole;
 use App\Models\Flight;
 use App\Models\User;
 
@@ -40,8 +41,13 @@ class FlightPolicy
     public function update(User $user, Flight $flight): bool
     {
         return $user->is_active
-            && $user->hasFullFlightAccess()
+            && ($user->hasFullFlightAccess()
+                || (in_array($user->role, [UserRole::Pilot, UserRole::Dispatch], true)
+                    && (FlightAccess::operatorMatches($user, $flight) || ($user->operator_id === null && $flight->operator_id === null))
+                    && in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true)
+                    && FlightAccess::isCreator($user, $flight)))
             && FlightAccess::canView($user, $flight)
+            && ($user->role !== UserRole::Atmo || ($flight->status === FlightPlanStatus::Pending && $flight->canSubmitToAtc()))
             && ! $flight->hasBeenAccepted()
             && ! $flight->isAvsecFrozen()
             && $flight->pic_authorization_status !== 'declined';
@@ -52,7 +58,10 @@ class FlightPolicy
      */
     public function delete(User $user, Flight $flight): bool
     {
-        return $user->hasFullFlightAccess() && ! $flight->hasBeenAccepted()
+        return $user->is_active && $user->hasFullFlightAccess()
+            && FlightAccess::canView($user, $flight)
+            && ($user->role !== UserRole::Atmo || $flight->canSubmitToAtc())
+            && ! $flight->hasBeenAccepted()
             && ! $flight->isAvsecFrozen()
             && ! $flight->filingAuthorizations()->exists();
     }
@@ -62,7 +71,7 @@ class FlightPolicy
      */
     public function restore(User $user, Flight $flight): bool
     {
-        return $user->hasFullFlightAccess();
+        return $user->is_active && $user->hasFullFlightAccess() && FlightAccess::canView($user, $flight);
     }
 
     /**
@@ -93,6 +102,7 @@ class FlightPolicy
     public function reject(User $user, Flight $flight): bool
     {
         return $user->canReviewFlightPlans()
+            && $flight->status === FlightPlanStatus::Pending
             && ! $flight->hasBeenAccepted()
             && $flight->canSubmitToAtc()
             && FlightAccess::canView($user, $flight);
@@ -125,14 +135,18 @@ class FlightPolicy
 
     public function delay(User $user, Flight $flight): bool
     {
-        return $user->isPilot()
+        return $user->is_active
+            && FlightAccess::canView($user, $flight)
+            && $user->isPilot()
             && $flight->isPilotInCommand($user)
             && $flight->canBeDelayedByPilot();
     }
 
     public function cancel(User $user, Flight $flight): bool
     {
-        return $user->isPilot()
+        return $user->is_active
+            && FlightAccess::canView($user, $flight)
+            && $user->isPilot()
             && $flight->isPilotInCommand($user)
             && $flight->canBeCancelledByPilot();
     }

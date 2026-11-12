@@ -77,9 +77,10 @@ class AvsecStatusSynchronizationTest extends TestCase
         $pilot = $flight->filedBy;
         $this->actingAs($pilot);
         Filament::setCurrentPanel(Filament::getPanel('pilot'));
-        Livewire::test(ListMyCurrentFlights::class)->assertCanSeeTableRecords([$flight])
-            ->assertTableColumnStateSet('status_presentation', $label, $flight)->assertSee($label)->assertSee('fi-color-'.$color, false);
-        Livewire::test(PilotDashboardWidget::class)->assertSee($label)->assertSee('fi-color-'.$color, false);
+        $pilotPage = Livewire::test(ListMyCurrentFlights::class)->assertCanSeeTableRecords([$flight])
+            ->assertTableColumnStateSet('status_presentation', $label, $flight)->assertSee($label);
+        $this->assertSame($color, $pilotPage->instance()->getTable()->getColumn('status_presentation')->record($flight)->getColor($label));
+        Livewire::test(PilotDashboardWidget::class)->assertSee($label);
         $this->get('/pilot/my-current-flights')->assertOk()->assertSee($label);
         $this->get(route('flights.view', $flight))->assertOk()->assertSee($label)->assertSee('data-avsec-preview-color="'.$color.'"', false);
         Livewire::test(PilotScanner::class)->set('payload', $payload)->call('submit')->assertHasNoErrors()
@@ -106,16 +107,17 @@ class AvsecStatusSynchronizationTest extends TestCase
         $officer = User::factory()->create(['role' => UserRole::Avsec, 'station' => 'RPUS']);
         $this->actingAs($officer);
         Filament::setCurrentPanel(Filament::getPanel('avsec'));
+        $clearanceColor = $decision === 'granted' ? 'success' : $color;
         $avsecLabel = match ($decision) {
-            'granted' => 'Clearance Granted', 'denied' => 'Clearance Denied', default => 'Pending Clearance',
+            'granted' => 'Clearance Granted', 'denied' => 'Clearance Denied', default => 'For AVSEC Clearance',
         };
         $this->get(route('flights.view', $flight))->assertOk()->assertSee($avsecLabel)
-            ->assertViewHas('avsecStatus', fn (array $status) => $status['label'] === $avsecLabel && $status['color'] === $color);
+            ->assertViewHas('avsecStatus', fn (array $status) => $status['label'] === $avsecLabel && $status['color'] === $clearanceColor);
     }
 
     public static function clearanceStates(): array
     {
-        return [['awaiting', 'Pending AVSEC', 'warning'], ['granted', 'AVSEC Approved', 'success'], ['denied', 'AVSEC Denied', 'danger']];
+        return [['awaiting', 'For AVSEC Clearance', 'warning'], ['granted', 'For ATMO Signature', 'gray'], ['denied', 'AVSEC Denied', 'danger']];
     }
 
     public function test_denial_is_fresh_after_reopening_and_applies_only_to_its_current_revision(): void
@@ -128,7 +130,7 @@ class AvsecStatusSynchronizationTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('pilot'));
         $payload = app(FlightPlanQrPayloadService::class)->buildPayload($flight);
         $scanner = Livewire::test(PilotScanner::class)->set('payload', $payload)->call('submit')
-            ->assertSet('matchedFlight.status_label', 'Pending AVSEC');
+            ->assertSet('matchedFlight.status_label', 'For AVSEC Clearance');
         $this->deny($flight);
         $this->assertSame(AvsecClearanceState::Denied, $service->currentState($flight));
         $scanner->call('submit')->assertSet('matchedFlight.status_label', 'AVSEC Denied');
@@ -147,7 +149,7 @@ class AvsecStatusSynchronizationTest extends TestCase
         $packages = app(FilingAuthorizationService::class);
         $packages->decide($packages->request($flight), $flight, $flight->filedBy, true, null, $signature);
         $flight->refresh()->forceFill(['status' => FlightPlanStatus::Pending])->saveQuietly();
-        $this->assertSame('Pending AVSEC', FlightStatusDisplay::badge($flight->refresh(), UserRole::Pilot)['label']);
+        $this->assertSame('For AVSEC Clearance', FlightStatusDisplay::badge($flight->refresh(), UserRole::Pilot)['label']);
     }
 
     public function test_current_grant_requires_matching_revision_and_untampered_evidence(): void
@@ -165,7 +167,7 @@ class AvsecStatusSynchronizationTest extends TestCase
         $this->assertSame(1, $flight->avsecVerification()->count());
     }
 
-    public function test_scanners_and_previews_preserve_operator_isolation_and_unsigned_atmo_restrictions(): void
+    public function test_scanners_and_previews_preserve_operator_isolation_and_allow_unsigned_atmo_preview(): void
     {
         $flight = $this->readyFlight();
         $this->deny($flight);
@@ -181,8 +183,8 @@ class AvsecStatusSynchronizationTest extends TestCase
         $this->actingAs($atmo);
         Filament::setCurrentPanel(Filament::getPanel('atmo'));
         Livewire::test(AtmoScanner::class)->set('payload', app(FlightPlanQrPayloadService::class)->buildPayload($unsigned))->call('submit')
-            ->assertSet('matchedFlight', null);
-        $this->get(route('flights.view', $unsigned))->assertForbidden();
+            ->assertSet('matchedFlight.id', $unsigned->id);
+        $this->get(route('flights.view', $unsigned))->assertOk()->assertViewHas('canAcceptFlightPlan', false);
         $this->assertFalse($atmo->can('accept', $flight));
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
     }

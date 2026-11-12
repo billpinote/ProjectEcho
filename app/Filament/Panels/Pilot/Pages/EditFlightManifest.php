@@ -3,6 +3,7 @@
 namespace App\Filament\Panels\Pilot\Pages;
 
 use App\Auth\AuthenticationEvidence;
+use App\Domain\FlightPlans\Services\FlightManifestService;
 use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Http\Controllers\FlightManifestController;
@@ -38,57 +39,54 @@ class EditFlightManifest extends Page
     {
         $this->flightId = $flight->id;
         Gate::authorize('view', $flight);
-        if (request()->boolean('confirm_signature')) {
-            $this->mountAction('signManifest');
-        } elseif (request()->boolean('confirm_flight_plan')) {
-            $this->mountAction('signFlightPlan');
+        if ((request()->boolean('confirm_signature') || request()->boolean('confirm_flight_plan'))
+            && $this->authorizationUnavailableReason() === null) {
+            $this->mountAction('signFiling');
         }
     }
 
-    public function signManifestAction(): Action
+    public function authorizationUnavailableReason(): ?string
     {
-        return $this->signatureAction('signManifest', 'passenger_cargo_manifest', 'Authorize Manifest Signature');
+        $flight = Flight::findOrFail($this->flightId);
+        if (! app(PicAuthorizationService::class)->needsAuthorization($flight)) {
+            return 'The current filing package has already been authorized.';
+        }
+
+        return app(PicAuthorizationService::class)->authorizationUnavailableReason($flight, auth()->user());
     }
 
-    public function signFlightPlanAction(): Action
+    public function signFilingAction(): Action
     {
-        return $this->signatureAction('signFlightPlan', 'flight_plan', 'Authorize Flight Filing');
-    }
-
-    private function signatureAction(string $name, string $type, string $heading): Action
-    {
-        return Action::make($name)->label($heading)->requiresConfirmation()->modalHeading($heading)
-            ->modalDescription($type === 'flight_plan'
-                ? 'Sign the current saved flight plan only. The manifest requires its own signature confirmation.'
-                : 'Sign the saved passenger/cargo manifest only. Unsaved edits are not included. Your existing flight-plan signature is preserved.')
-            ->modalSubmitActionLabel('Authorize & Sign')->modalCancelActionLabel('Cancel')
-            ->visible(function () use ($type): bool {
+        return Action::make('signFiling')->label('Authorize & Sign Filing')->requiresConfirmation()
+            ->modalHeading('Authorize Complete Filing')
+            ->modalDescription('Review the current flight plan and complete passenger/cargo manifest. One signature authorizes this entire filing package. Unsaved edits are not included.')
+            ->modalSubmitActionLabel('Authorize & Sign Filing')->modalCancelActionLabel('Cancel')
+            ->visible(function (): bool {
                 $flight = Flight::findOrFail($this->flightId);
 
-                return auth()->user()?->isPilot() && (int) $flight->pilot_in_command_user_id === (int) auth()->id()
-                    && ($type !== 'flight_plan' || (int) $flight->prepared_by_user_id === (int) auth()->id())
-                    && ! $flight->hasBeenAccepted() && ! $flight->isAvsecFrozen() && ! $flight->isPicAuthorizationDeclined()
-                    && ($type !== 'passenger_cargo_manifest' || $flight->manifest()->exists());
+                return auth()->user()?->isPilot() && auth()->user()->is_active
+                    && (int) $flight->pilot_in_command_user_id === (int) auth()->id()
+                    && app(PicAuthorizationService::class)->canReviewFiling(auth()->user(), $flight);
             })
-            ->mountUsing(function () use ($type): void {
+            ->disabled(fn (): bool => $this->authorizationUnavailableReason() !== null)
+            ->mountUsing(function (): void {
                 $flight = Flight::findOrFail($this->flightId);
                 Gate::authorize('view', $flight);
-                $documents = app(FilingDocumentRegistry::class)->snapshots($flight);
-                abort_unless(isset($documents[$type]), 422);
-                $this->reviewedFingerprint = FilingDocumentRegistry::documentFingerprint($documents, $type);
+                app(FlightManifestService::class)->assertComplete($flight);
+                $this->reviewedFingerprint = FilingDocumentRegistry::fingerprint(app(FilingDocumentRegistry::class)->snapshots($flight));
                 $this->reviewedSignatureId = auth()->user()->approvedSignature()->where('status', 'approved')->value('id');
             })
-            ->action(function () use ($type): void {
+            ->action(function (): void {
                 try {
                     if ($this->reviewedSignatureId === null || $this->reviewedFingerprint === null) {
-                        throw ValidationException::withMessages(['signature' => 'An approved pilot signature is required. Your manifest remains saved; reopen confirmation after signature approval.']);
+                        throw ValidationException::withMessages(['signature' => 'An approved pilot signature and current package review are required. Your saved documents have been preserved.']);
                     }
                     app(PicAuthorizationService::class)->authorizeSelfFiling(Flight::findOrFail($this->flightId),
                         auth()->user(), AuthenticationEvidence::fromSession(Filament::auth()),
-                        $this->reviewedSignatureId, $this->reviewedFingerprint, $type);
-                    Notification::make()->success()->title('Saved document signed')->send();
+                        $this->reviewedSignatureId, $this->reviewedFingerprint);
+                    Notification::make()->success()->title('Complete filing authorized and signed')->send();
                 } catch (ValidationException $exception) {
-                    Notification::make()->danger()->title('Document remains saved; signature not applied')
+                    Notification::make()->danger()->title('Filing remains saved; signature not applied')
                         ->body(collect($exception->errors())->flatten()->implode(' '))->send();
                     throw $exception;
                 }

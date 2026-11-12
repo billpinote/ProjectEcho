@@ -1126,6 +1126,13 @@ class FlightsTable
     private static function recordActions(?string $resourceClass): array
     {
         $actions = [
+            Action::make('editFiling')
+                ->label('Edit Flight Plan')->icon('heroicon-o-pencil-square')
+                ->url(fn (Flight $record): string => auth()->user()?->isDispatch()
+                    ? \App\Filament\Panels\Dispatch\Resources\Flights\FlightResource::getUrl('edit', ['record' => $record], panel: 'dispatch')
+                    : \App\Filament\Panels\Pilot\Resources\Flights\FlightResource::getUrl('edit', ['record' => $record], panel: 'pilot'))
+                ->visible(fn (Flight $record): bool => (auth()->user()?->isPilot() || auth()->user()?->isDispatch())
+                    && auth()->user()->can('update', $record)),
             Action::make('manifest')
                 ->label('Flight Manifest')
                 ->icon('heroicon-o-clipboard-document-list')
@@ -1187,7 +1194,8 @@ class FlightsTable
                 ->color('gray')
                 ->requiresConfirmation()
                 ->action(function (Flight $record): void {
-                    abort_unless($record->pic_authorization_status === 'declined'
+                    abort_unless(Auth::user()?->is_active && Auth::user()->can('view', $record)
+                        && $record->pic_authorization_status === 'declined'
                         && (int) $record->prepared_by_user_id === (int) Auth::id(), 403);
                     $record->archivePicDecline();
                     FlightPlanEvent::record($record, FlightPlanEvent::TYPE_ARCHIVED, Auth::user());

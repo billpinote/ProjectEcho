@@ -8,9 +8,11 @@ use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Services\FlightPlanQrRenderer;
 use App\Domain\FlightPlans\Services\FlightPlanSubmissionService;
+use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
+use App\Filament\Panels\Dispatch\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\FlightResource as PilotFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Http\Controllers\Controller;
@@ -81,8 +83,16 @@ class FlightPlanController extends Controller
         $this->browser->ensureFlightUserAccess();
         abort_unless(Auth::user()?->can('view', $flight) ?? false, 403);
 
-        $events = $flight->events()->orderBy('created_at')->orderBy('id')->get();
         $flight->loadMissing(['manifest.persons', 'filingAuthorizations.pilotSignature']);
+        $eventsQuery = $flight->events()->orderBy('created_at')->orderBy('id');
+        if (Auth::user()->isPilot() && ($flight->manifest === null || ! Auth::user()->can('view', $flight->manifest))) {
+            $eventsQuery->whereNotIn('event_type', [
+                FlightPlanEvent::TYPE_MANIFEST_CREATED,
+                FlightPlanEvent::TYPE_MANIFEST_UPDATED,
+                FlightPlanEvent::TYPE_MANIFEST_DELETED,
+            ]);
+        }
+        $events = $eventsQuery->get();
         $packages = $flight->filingAuthorizations->sortBy('id')->keyBy('id');
         $linkedPackages = $events->map(fn ($event) => $event->new_values['filing_authorization_id'] ?? null)->filter();
         $filing = app(FilingAuthorizationService::class);
@@ -91,7 +101,7 @@ class FlightPlanController extends Controller
             'creationRecorded' => $events->contains('event_type', FlightPlanEvent::TYPE_CREATED),
             'activityEvents' => $events->toBase()->concat($packages->except($linkedPackages->all()))
                 ->sortBy(fn ($entry) => ($entry->created_at ?? $entry->requested_at)?->getTimestamp() ?? 0),
-            'currentDocumentPackages' => $packages->isEmpty() ? [] : [
+            'currentDocumentPackages' => $packages->isEmpty() || ! $flight->isPicAuthorizationCurrent() ? [] : [
                 'flight_plan' => $filing->currentForDocument($flight, 'flight_plan', requireSignature: false, loaded: true)?->id,
                 'passenger_cargo_manifest' => $filing->currentForDocument($flight, 'passenger_cargo_manifest', requireSignature: false, loaded: true)?->id,
             ],
@@ -100,18 +110,9 @@ class FlightPlanController extends Controller
         $isAvsec = Auth::user()->isAvsec();
         $clearance = app(AvsecVerificationService::class);
 
-        if (! $isAvsec && $flight->requiresPicAuthorization() && ! $flight->isPicAuthorizationCurrent()) {
-            return view('flightplan.pic-authorization-required', [
-                'noticeHeading' => 'PIC Authorization Pending',
-                'noticeMessage' => 'This flight plan is not yet available for operational review. PIC authorization must be completed first.',
-                ...$activity,
-                'selfFilingReviewUrl' => Auth::user()->isPilot()
-                    && (int) $flight->prepared_by_user_id === (int) Auth::id()
-                    && (int) $flight->pilot_in_command_user_id === (int) Auth::id()
-                    && ! $flight->hasBeenAccepted() && ! $flight->isPicAuthorizationDeclined()
-                    ? route('filing.review-self', $flight) : null,
-            ]);
-        }
+        $awaitingPic = ! $flight->isPicAuthorizationDeclined()
+            && in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true)
+            && ($flight->status === FlightPlanStatus::AwaitingPic || ! $flight->canSubmitToAtc());
 
         if (Auth::user()?->can('accept', $flight) && $flight->status === FlightPlanStatus::Pending && ! $flight->isPendingExpired()) {
             $flight->markAsReviewed();
@@ -123,6 +124,9 @@ class FlightPlanController extends Controller
 
         return view('flightplan.pdf', [
             ...$activity,
+            'awaitingPic' => $awaitingPic,
+            'selfFilingReviewUrl' => app(PicAuthorizationService::class)->canReviewFiling(Auth::user(), $flight)
+                ? route('filing.review-self', $flight) : null,
             'showAvsecActions' => $isAvsec,
             'avsecStatus' => $isAvsec ? FlightStatusDisplay::avsecBadge($flight) : null,
             'avsecDenial' => $isAvsec ? $clearance->denialFor($flight) : null,
@@ -137,8 +141,9 @@ class FlightPlanController extends Controller
                 ? route('flights.manifest.pdf', $flight)
                 : null,
             'manifestReviewUnavailableReason' => $flight->manifest === null ? 'Manifest missing' : 'Manifest unavailable',
-            'showReviewActions' => Auth::user()?->canReviewFlightPlans()
-                && $flight->status === FlightPlanStatus::Pending
+            'showReviewActions' => ! $isAvsec
+                && ($awaitingPic || Auth::user()?->canReviewFlightPlans())
+                && in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true)
                 && ! $flight->isPendingExpired(),
             'backActionUrl' => $backActionUrl,
             'backActionLabel' => 'Back to Dashboard',
@@ -146,9 +151,9 @@ class FlightPlanController extends Controller
             'acceptActionUrl' => route('flights.accept', $flight),
             'canAcceptFlightPlan' => $canAcceptFlightPlan,
             'canRejectFlightPlan' => $canRejectFlightPlan,
-            'acceptUnavailableReason' => $canRejectFlightPlan && ! $canAcceptFlightPlan
+            'acceptUnavailableReason' => $awaitingPic ? 'PIC authorization must be completed before operational actions are available.' : ($canRejectFlightPlan && ! $canAcceptFlightPlan
                 && $clearance->currentState($flight) === AvsecClearanceState::Denied
-                ? 'ATMO acceptance requires AVSEC approval. This flight plan remains available for review or rejection.' : null,
+                ? 'ATMO acceptance requires AVSEC approval. This flight plan remains available for review or rejection.' : null),
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->browser->resolveAtcWiresign(),
             'picDeclineDetails' => $flight->pic_authorization_status === 'declined',
@@ -158,7 +163,9 @@ class FlightPlanController extends Controller
                 : $backActionUrl,
             'correctResubmitUrl' => $flight->pic_authorization_status === 'declined'
                 && (int) $flight->prepared_by_user_id === (int) Auth::id()
-                ? PilotFlightResource::getUrl('create', ['correct_from' => $flight->getKey()], panel: 'pilot')
+                ? (Auth::user()->isDispatch()
+                    ? FlightResource::getUrl('create', ['correct_from' => $flight->getKey()], panel: 'dispatch')
+                    : PilotFlightResource::getUrl('create', ['correct_from' => $flight->getKey()], panel: 'pilot'))
                 : null,
         ]);
     }

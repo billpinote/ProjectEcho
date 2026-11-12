@@ -13,10 +13,8 @@ use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
-use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\Pages\CreateFlight;
 use App\Models\Flight;
-use App\Models\FlightPlanEvent;
 use App\Models\Operator;
 use App\Models\PilotSignature;
 use App\Models\User;
@@ -25,6 +23,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -48,110 +47,84 @@ class SelfFiledAuthorizationTest extends TestCase
         $page = Livewire::actingAs($pilot)->test(CreateFlight::class)->fillForm($this->data())
             ->call('create')->assertActionMounted('authorizeFiling');
         $action = $page->instance()->getMountedAction();
-        $this->assertSame('Authorize Flight Filing', $action->getModalHeading());
-        $this->assertStringContainsString('Documents included: Flight plan.', $action->getModalDescription());
+        $this->assertSame('Create Flight Plan', $action->getModalHeading());
+        $this->assertStringContainsString('No PIC signature is applied', $action->getModalDescription());
         $this->assertDatabaseCount('flights', 0);
         $this->assertDatabaseCount('filing_authorizations', 0);
         $page->call('unmountAction')->assertFormSet(['aircraft_identification' => 'RPC123']);
         $this->assertDatabaseCount('flights', 0);
     }
 
-    public function test_confirmed_submission_preserves_signature_evidence_and_signed_pdf(): void
+    public function test_confirmed_creation_saves_manifest_required_draft_without_signing(): void
+    {
+        $pilot = $this->pilot();
+        $this->signature($pilot);
+        Livewire::actingAs($pilot)->test(CreateFlight::class)->fillForm($this->data())
+            ->call('create')->callMountedAction()->assertHasNoErrors()->assertRedirect();
+        $flight = Flight::query()->sole();
+        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
+        $this->assertSame('Manifest Required', $flight->documentSignatureStatus());
+        $this->assertFalse($flight->isPicAuthorizationCurrent());
+        $this->assertDatabaseCount('filing_authorizations', 0);
+        $this->get(route('flights.view', $flight))->assertOk()->assertDontSee('alt="Authorized PIC signature"', false);
+        $this->get(route('flights.pdf.download', $flight))->assertOk();
+        $this->assertSame(0, $flight->events()->where('event_type', 'pic_authorized')->count());
+    }
+
+    public function test_manifest_submission_requires_one_explicit_complete_package_authorization(): void
     {
         $pilot = $this->pilot();
         $signature = $this->signature($pilot);
-        Livewire::actingAs($pilot)->test(CreateFlight::class)->fillForm($this->data())
-            ->call('create')->assertActionMounted('authorizeFiling')->callMountedAction()
-            ->assertHasNoErrors()->assertRedirect();
-        $flight = Flight::query()->sole();
-        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
-        $this->assertSame('Manifest needed', $flight->documentSignatureStatus());
-        $this->assertTrue($flight->isPicAuthorizationCurrent());
-        $this->assertSame('SELF', $flight->pic_authorization_method);
+        $flight = $this->draft($pilot);
+        $this->saveManifestFixture($flight, $pilot);
+        $this->assertTrue(Flight::query()->currentForPilot()->whereKey($flight)->exists());
+        $this->assertFalse($flight->fresh()->canSubmitToAtc());
+        $this->assertDatabaseCount('filing_authorizations', 0);
+        Livewire::actingAs($pilot)->withQueryParams(['confirm_signature' => 1])
+            ->test(EditFlightManifest::class, ['flight' => $flight])->assertActionMounted('signFiling')
+            ->callMountedAction()->assertHasNoErrors();
+        $flight->refresh();
+        $this->assertSame(FlightPlanStatus::Pending, $flight->status);
+        $this->assertTrue($flight->canSubmitToAtc());
         $package = $flight->filingAuthorizations()->sole();
         $this->assertSame($signature->id, $package->pilot_signature_id);
-        $this->assertSame($signature->version, $package->signature_version);
-        $this->assertSame($signature->sha256, $package->signature_sha256);
-        $this->assertSame('password_session', $package->authentication['method']);
-        $signed = base64_decode($package->pdf_documents['flight_plan']['bytes']);
-        $unsigned = app(FilingDocumentRegistry::class)->render('flight_plan', $package->authorized_documents, null);
-        $this->assertGreaterThan(substr_count($unsigned, '/Subtype /Image'), substr_count($signed, '/Subtype /Image'));
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Authorized PIC signature');
-        $this->get(route('flights.pdf.download', $flight))->assertOk();
-        $this->assertSame([], Storage::disk('public')->allFiles());
-        $this->assertSame(0, $flight->events()->where('event_type', 'submitted_to_atc')->count());
+        $this->assertCount(2, $package->pdf_documents);
     }
 
-    public function test_manifest_submission_keeps_a_self_filed_flight_visible_until_explicit_reauthorization(): void
+    public function test_missing_and_pending_signatures_allow_drafts_but_cannot_authorize(): void
     {
         $pilot = $this->pilot();
-        $signature = $this->signature($pilot);
         Livewire::actingAs($pilot)->test(CreateFlight::class)->fillForm($this->data())
-            ->call('create')->assertActionMounted('authorizeFiling')->callMountedAction()
-            ->assertHasNoErrors()->assertRedirect();
+            ->call('create')->callMountedAction()->assertHasNoErrors();
         $flight = Flight::query()->sole();
-        $package = $flight->filingAuthorizations()->sole();
-        $preserved = $package->pdf_documents;
-        $this->assertTrue(Flight::query()->currentForPilot()->whereKey($flight->id)->exists());
-
-        $response = $this->put(route('flights.manifest.update', $flight), [
-            'aircraft_owner_name' => 'TEST OWNER', 'aircraft_owner_contact_number' => '1234567',
-            'home_base_hangar' => 'RPUS', 'coa_expiry_date' => now()->addYear()->toDateString(),
-            'total_cargo_weight' => '0.000',
-            'persons' => [['full_name' => $pilot->fullName(), 'nationality' => 'PH', 'classification' => 'pic']],
-        ])->assertSessionHasNoErrors();
-
-        $flight->refresh();
-        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
-        $this->assertFalse($flight->canSubmitToAtc());
-        $this->assertTrue($flight->manifest()->exists());
-        $this->assertTrue(Flight::query()->currentForPilot()->whereKey($flight->id)->exists());
-        $this->assertFalse(Flight::query()->archivedForPilot()->whereKey($flight->id)->exists());
-        $this->assertFalse(AwaitingAuthorizationFlightResource::getEloquentQuery()->whereKey($flight->id)->exists());
-        $response->assertRedirectContains('confirm_signature=1');
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Authorized PIC signature');
-        $this->assertNotNull(app(FilingAuthorizationService::class)->signatureBytes($flight));
-        $this->assertSame(1, $flight->filingAuthorizations()->count());
-
-        Livewire::actingAs($pilot)->withQueryParams(['confirm_signature' => 1])
-            ->test(EditFlightManifest::class, ['flight' => $flight])->assertActionMounted('signManifest')
-            ->callMountedAction()->assertHasNoErrors();
-
-        $this->assertDatabaseCount('flights', 1);
-        $this->assertSame(FlightPlanStatus::Pending, $flight->refresh()->status);
-        $this->assertTrue($flight->isPicAuthorizationCurrent());
-        $this->assertTrue(Flight::query()->currentForPilot()->whereKey($flight->id)->exists());
-        $this->assertFalse(AwaitingAuthorizationFlightResource::getEloquentQuery()->whereKey($flight->id)->exists());
-        $newPackage = $flight->filingAuthorizations()->latest('id')->firstOrFail();
-        $this->assertSame($signature->id, $newPackage->pilot_signature_id);
-        $this->assertCount(1, $newPackage->pdf_documents);
-        $this->assertSame($preserved, $package->fresh()->pdf_documents);
-        $this->get(route('filing.document', ['package' => $package, 'type' => 'flight_plan']))
-            ->assertOk()->assertContent(base64_decode($preserved['flight_plan']['bytes']));
-    }
-
-    public function test_missing_and_pending_signatures_cannot_submit(): void
-    {
-        $pilot = $this->pilot();
-        $page = Livewire::actingAs($pilot)->test(CreateFlight::class)->fillForm($this->data());
-        $page->call('create')->assertHasErrors('data.signature')->assertFormSet(['route' => 'DCT']);
+        $this->saveManifestFixture($flight, $pilot);
+        Livewire::actingAs($pilot)->test(EditFlightManifest::class, ['flight' => $flight])->assertActionDisabled('signFiling');
         PilotSignature::factory()->create(['user_id' => $pilot->id]);
-        $page->call('create')->assertHasErrors('data.signature');
-        $this->assertDatabaseCount('flights', 0);
-    }
-
-    public function test_signature_integrity_is_rechecked_at_confirmation_and_form_is_preserved(): void
-    {
-        $pilot = $this->pilot();
-        $signature = $this->signature($pilot);
-        $page = Livewire::actingAs($pilot)->test(CreateFlight::class)->fillForm($this->data())->call('create');
-        Storage::disk('local')->put($signature->stored_path, 'tampered');
-        $page->callMountedAction()->assertHasErrors('data.signature')->assertFormSet(['route' => 'DCT']);
-        $this->assertDatabaseCount('flights', 0);
+        Livewire::actingAs($pilot)->test(EditFlightManifest::class, ['flight' => $flight])->assertActionDisabled('signFiling');
         $this->assertDatabaseCount('filing_authorizations', 0);
     }
 
-    public function test_form_and_signature_changes_require_new_confirmation(): void
+    public function test_signature_integrity_is_rechecked_at_package_confirmation_and_saved_data_is_preserved(): void
+    {
+        $pilot = $this->pilot();
+        $signature = $this->signature($pilot);
+        $flight = $this->draft($pilot);
+        $this->saveManifestFixture($flight, $pilot);
+        $page = Livewire::actingAs($pilot)->test(EditFlightManifest::class, ['flight' => $flight])->mountAction('signFiling');
+        Storage::disk('local')->put($signature->stored_path, 'tampered');
+        try {
+            app(PicAuthorizationService::class)->authorizeSelfFiling($flight, $pilot,
+                AuthenticationEvidence::fromSession(Auth::guard()), $signature->id);
+            $this->fail('Tampered signature was applied.');
+        } catch (ValidationException) {
+            $this->assertFalse($flight->fresh()->canSubmitToAtc());
+        }
+        $this->assertNotNull($flight->manifest()->first());
+        $this->assertDatabaseCount('filing_authorizations', 0);
+        $this->assertFalse($flight->fresh()->canSubmitToAtc());
+    }
+
+    public function test_form_changes_require_new_confirmation_without_signing_at_creation(): void
     {
         $pilot = $this->pilot();
         $this->signature($pilot);
@@ -160,8 +133,9 @@ class SelfFiledAuthorizationTest extends TestCase
         $this->assertDatabaseCount('flights', 0);
         $page->call('unmountAction')->call('create');
         $this->signature($pilot, 2);
-        $page->callMountedAction()->assertHasErrors('data.signature');
-        $this->assertDatabaseCount('flights', 0);
+        $page->callMountedAction()->assertHasNoErrors();
+        $this->assertDatabaseCount('flights', 1);
+        $this->assertDatabaseCount('filing_authorizations', 0);
     }
 
     public function test_replayed_submission_does_not_create_duplicate_flights_or_authorizations(): void
@@ -171,13 +145,13 @@ class SelfFiledAuthorizationTest extends TestCase
         $this->actingAs($pilot);
         $evidence = AuthenticationEvidence::fromSession(Auth::guard());
         $service = app(FlightPlanSubmissionService::class);
-        $first = $service->submitSelfAuthorized($this->data(), $pilot, $evidence, $signature->id, 'test-submission');
-        $second = $service->submitSelfAuthorized($this->data(), $pilot, $evidence, $signature->id, 'test-submission');
+        $first = $service->submitSelfPrepared($this->data(), $pilot, $evidence, 'test-submission');
+        $second = $service->submitSelfPrepared($this->data(), $pilot, $evidence, 'test-submission');
         $this->assertSame($first->id, $second->id);
         $this->assertDatabaseCount('flights', 1);
-        $this->assertDatabaseCount('filing_authorizations', 1);
+        $this->assertDatabaseCount('filing_authorizations', 0);
         $this->expectException(ValidationException::class);
-        $service->submitSelfAuthorized([...$this->data(), 'route' => 'CHANGED'], $pilot, $evidence, $signature->id, 'test-submission');
+        $service->submitSelfPrepared([...$this->data(), 'route' => 'CHANGED'], $pilot, $evidence, 'test-submission');
     }
 
     public function test_profile_change_after_review_prevents_submission(): void
@@ -220,14 +194,11 @@ class SelfFiledAuthorizationTest extends TestCase
             'persons' => [['full_name' => $pilot->fullName(), 'nationality' => 'PH', 'classification' => 'pic']],
         ]);
         $registry = app(FilingDocumentRegistry::class);
-        $fingerprint = $registry::documentFingerprint($registry->snapshots($flight), 'flight_plan');
+        $fingerprint = $registry::fingerprint($registry->snapshots($flight));
         app(PicAuthorizationService::class)->authorizeSelfFiling($flight, $pilot,
             AuthenticationEvidence::fromSession(Auth::guard()), $signature->id, $fingerprint);
-        $manifestFingerprint = FilingDocumentRegistry::documentFingerprint($registry->snapshots($flight), 'passenger_cargo_manifest');
-        app(PicAuthorizationService::class)->authorizeSelfFiling($flight, $pilot,
-            AuthenticationEvidence::fromSession(Auth::guard()), $signature->id, $manifestFingerprint, 'passenger_cargo_manifest');
         $package = $flight->filingAuthorizations()->latest('id')->firstOrFail();
-        $this->assertCount(1, $package->pdf_documents);
+        $this->assertCount(2, $package->pdf_documents);
         foreach ($package->pdf_documents as $type => $pdf) {
             $unsigned = $registry->render($type, $package->authorized_documents, null);
             $this->assertGreaterThan(substr_count($unsigned, '/Subtype /Image'), substr_count(base64_decode($pdf['bytes']), '/Subtype /Image'));
@@ -246,28 +217,48 @@ class SelfFiledAuthorizationTest extends TestCase
             $this->fail('A stale document review was authorized.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('signature', $exception->errors());
-            $this->assertSame(2, $flight->filingAuthorizations()->count());
+            $this->assertSame(1, $flight->filingAuthorizations()->count());
         }
         $this->get(route('filing.document', ['package' => $package, 'type' => 'passenger_cargo_manifest']))
             ->assertOk()->assertContent(base64_decode($preserved['passenger_cargo_manifest']['bytes']));
     }
 
-    public function test_pdf_render_failure_rolls_back_flight_package_and_events(): void
+    public function test_pdf_render_failure_rolls_back_signature_decision_but_preserves_saved_filing(): void
     {
         $pilot = $this->pilot();
         $signature = $this->signature($pilot);
-        $this->actingAs($pilot);
+        $flight = $this->draft($pilot);
+        $this->saveManifestFixture($flight, $pilot);
+        $events = $flight->events()->count();
         $this->mock(FlightPlanPdfService::class)->shouldReceive('renderSnapshot')->andThrow(new \RuntimeException('Synthetic PDF failure'));
         try {
-            app(FlightPlanSubmissionService::class)->submitSelfAuthorized($this->data(), $pilot,
-                AuthenticationEvidence::fromSession(Auth::guard()), $signature->id, 'failed-pdf');
+            app(PicAuthorizationService::class)->authorizeSelfFiling($flight, $pilot,
+                AuthenticationEvidence::fromSession(Auth::guard()), $signature->id);
             $this->fail('Expected renderer failure.');
         } catch (\RuntimeException $exception) {
             $this->assertSame('Synthetic PDF failure', $exception->getMessage());
-            $this->assertDatabaseCount('flights', 0);
+            $this->assertDatabaseCount('flights', 1);
             $this->assertDatabaseCount('filing_authorizations', 0);
-            $this->assertDatabaseCount((new FlightPlanEvent)->getTable(), 0);
+            $this->assertSame($events, $flight->events()->count());
+            $this->assertNull($flight->fresh()->pic_authorized_at);
         }
+    }
+
+    private function draft(User $pilot): Flight
+    {
+        $this->actingAs($pilot);
+
+        return app(FlightPlanSubmissionService::class)->submitSelfPrepared($this->data(), $pilot,
+            AuthenticationEvidence::fromSession(Auth::guard()), (string) Str::uuid());
+    }
+
+    private function saveManifestFixture(Flight $flight, User $pilot): void
+    {
+        app(FlightManifestService::class)->save($flight, $pilot, [
+            'aircraft_owner_name' => 'Owner', 'aircraft_owner_contact_number' => '1234567', 'home_base_hangar' => 'RPUS',
+            'coa_expiry_date' => now()->addYear()->toDateString(), 'total_cargo_weight' => 0,
+            'persons' => [['full_name' => $flight->pilot_in_command, 'nationality' => 'PH', 'classification' => 'pic']],
+        ]);
     }
 
     private function pilot(): User

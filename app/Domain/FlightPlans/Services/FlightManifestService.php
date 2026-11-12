@@ -85,7 +85,7 @@ class FlightManifestService
     {
         $manifest = $loaded ? $flight->manifest : $flight->manifest()->with('persons')->first();
         if ($manifest === null) {
-            throw ValidationException::withMessages(['manifest' => 'Prepare and complete the linked flight manifest before ATMO acceptance.']);
+            throw ValidationException::withMessages(['manifest' => 'Prepare and complete the linked flight manifest before PIC authorization.']);
         }
 
         try {
@@ -97,9 +97,9 @@ class FlightManifestService
                 'aircraft_identification' => ['required', 'string'],
                 'type_of_aircraft' => ['required', 'string'],
                 'date_of_flight' => ['required', 'date'],
-                'pilot_in_command' => ['required', 'string'],
-                'pilot_license_no' => ['required', 'string'],
-                'license_expiry_date' => ['required', 'date'],
+                'pilot_in_command' => [$flight->pilot_in_command_user_id !== null ? 'required' : 'nullable', 'string'],
+                'pilot_license_no' => [$flight->pilot_in_command_user_id !== null ? 'required' : 'nullable', 'string'],
+                'license_expiry_date' => [$flight->pilot_in_command_user_id !== null ? 'required' : 'nullable', 'date'],
             ])->validate();
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages([
@@ -109,7 +109,7 @@ class FlightManifestService
 
         $pic = $manifest->persons->first();
         if ($pic?->classification !== 'pic'
-            || $this->personName($pic->full_name) !== $this->personName($flight->pilot_in_command)
+            || ($flight->pilot_in_command_user_id !== null && $this->personName($pic->full_name) !== $this->personName($flight->pilot_in_command))
             || $manifest->persons->where('classification', 'pic')->count() !== 1) {
             throw ValidationException::withMessages(['manifest' => 'List the current flight-plan PIC once, as the first manifest person.']);
         }

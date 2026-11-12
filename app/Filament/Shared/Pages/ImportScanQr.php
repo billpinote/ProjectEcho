@@ -44,6 +44,8 @@ class ImportScanQr extends Page
 
     public ?string $picAuthorizationHandoffToken = null;
 
+    public ?string $recoveryUrl = null;
+
     public function isPicAuthorizationPage(): bool
     {
         return false;
@@ -132,6 +134,7 @@ class ImportScanQr extends Page
     public function startOver(): void
     {
         $this->payload = '';
+        $this->recoveryUrl = null;
         $this->lastProcessedPayload = null;
         $this->matchedFlight = null;
         $this->picAuthorizationHandoffToken = null;
@@ -158,6 +161,7 @@ class ImportScanQr extends Page
 
     protected function lookupPayload(string $payload, bool $notifyOnSuccess, bool $notifyOnFailure): void
     {
+        $this->recoveryUrl = null;
         $parsedPayload = $this->qrPayloads()->parsePayload($payload);
 
         if ($parsedPayload === null) {
@@ -222,7 +226,7 @@ class ImportScanQr extends Page
             if ($this->scannedPreviewPurpose() === 'pic_authorization'
                 && $flight !== null
                 && ! $flight->isPicAuthorizationDeclined()
-                && ! $flight->canSubmitToAtc()) {
+                && app(PicAuthorizationService::class)->needsAuthorization($flight)) {
                 $handoffToken = app(PicAuthorizationService::class)
                     ->createAuthorizationHandoff($flight);
                 session()->put('scanned_flight_plan_previews.'.$handoffToken, session()->get('scanned_flight_plan_previews.'.$previewToken));
@@ -347,6 +351,11 @@ class ImportScanQr extends Page
 
             return true;
         } catch (ValidationException $exception) {
+            $parsed = $this->qrPayloads()->parsePayload($payload);
+            $flight = $parsed !== null ? Flight::find((int) $parsed['flight_id']) : null;
+            if ($flight !== null && app(PicAuthorizationService::class)->canReviewFiling(Auth::user(), $flight)) {
+                $this->recoveryUrl = route('filing.review-self', $flight);
+            }
             foreach ($exception->errors() as $field => $messages) {
                 foreach ($messages as $message) {
                     $this->addError($field, $message);

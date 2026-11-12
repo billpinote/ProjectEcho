@@ -194,7 +194,7 @@ class PilotDashboardTest extends TestCase
             ->assertSeeText('Current Flights')
             ->assertSeeText('Recent Flights')
             ->assertSeeText('ACPT01')
-            ->assertSeeText('Approved')
+            ->assertSeeText('Filed Successfully')
             ->assertSeeText('ACTV01')
             ->assertSeeText('Preparing for Departure')
             ->assertDontSeeText('THRD01')

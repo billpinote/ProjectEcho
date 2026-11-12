@@ -8,6 +8,7 @@ use App\Domain\FlightPlans\Services\AvsecVerificationService;
 use App\Domain\FlightPlans\Services\FilingAuthorizationService;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\FlightPlans\Support\FlightAccess;
+use App\Domain\FlightPlans\Support\FlightStatusDisplay;
 use App\Domain\Users\Enums\UserRole;
 use Carbon\CarbonInterface;
 use Database\Factories\FlightFactory;
@@ -462,7 +463,7 @@ class Flight extends Model
             $query
                 ->pendingActive()
                 ->orWhere(fn (Builder $query): Builder => $query->where('status', FlightPlanStatus::AwaitingPic)
-                    ->whereNotNull('pilot_in_command_user_id')->whereHas('filingAuthorizations')
+                    ->whereNotNull('pilot_in_command_user_id')
                     ->where(fn (Builder $query): Builder => $query->whereNull('pic_authorization_status')->orWhere('pic_authorization_status', '!=', 'declined')))
                 ->orWhere(fn (Builder $query): Builder => $query->ready())
                 ->orWhere(fn (Builder $query): Builder => $query->active())
@@ -491,8 +492,7 @@ class Flight extends Model
     {
         return $query
             ->whereNot(fn (Builder $query) => $query->whereNotNull('prepared_by_user_id')
-                ->whereNotNull('pilot_in_command_user_id')->whereColumn('prepared_by_user_id', 'pilot_in_command_user_id')
-                ->whereHas('filingAuthorizations'))
+                ->whereNotNull('pilot_in_command_user_id')->whereColumn('prepared_by_user_id', 'pilot_in_command_user_id'))
             ->where(function (Builder $query): void {
                 $query
                     ->whereHas('preparedBy', fn (Builder $query): Builder => $query->where('role', UserRole::OperatorStaff->value))
@@ -644,7 +644,7 @@ class Flight extends Model
         $packages = app(FilingAuthorizationService::class);
         $package = $packages->latestFor($this);
 
-        return $package === null ? $current : $packages->currentForDocument($this, 'flight_plan', false) !== null;
+        return $package === null ? $current : ($this->status !== FlightPlanStatus::AwaitingPic && $packages->isReadyForAtmo($this));
     }
 
     public function canSubmitToAtc(): bool
@@ -654,22 +654,7 @@ class Flight extends Model
 
     public function documentSignatureStatus(): string
     {
-        $packages = app(FilingAuthorizationService::class);
-        if ($packages->currentForDocument($this, 'flight_plan') === null) {
-            return 'Flight plan signature needed';
-        }
-        if (! $this->manifest()->exists()) {
-            return 'Manifest needed';
-        }
-        if ($packages->currentForDocument($this, 'passenger_cargo_manifest') === null) {
-            return 'Manifest signature needed';
-        }
-
-        if (AvsecVerificationService::requiredFor($this) && ! $this->isAvsecFrozen()) {
-            return 'Pending AVSEC confirmation';
-        }
-
-        return 'Pending ATMO Acceptance';
+        return FlightStatusDisplay::badge($this, UserRole::Pilot)['label'];
     }
 
     public function invalidatePicAuthorization(): void

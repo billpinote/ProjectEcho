@@ -25,7 +25,7 @@ class FlightWorkflowService
 
     public function pendingStage(Flight $flight): string
     {
-        if (! $flight->exists || $flight->status !== FlightPlanStatus::Pending || $flight->isPendingExpired()
+        if (! $flight->exists || ! in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true) || $flight->isPendingExpired()
             || $flight->isPicAuthorizationDeclined() || $flight->pic_authorization_archived_at !== null) {
             return FlightStatusDisplay::PENDING;
         }
@@ -33,14 +33,16 @@ class FlightWorkflowService
         if (! array_key_exists('atc_acceptance_exists', $flight->getAttributes())) {
             $flight->loadExists(['events as atc_acceptance_exists' => fn (Builder $query) => $query->where('event_type', FlightPlanEvent::TYPE_ATC_ACCEPTED)]);
         }
-        if ($flight->accepted_by_user_id !== null || $flight->atc_acceptance_exists
-            || ! $this->authorizations->isReadyForAtmo($flight, loaded: true)) {
+        if ($flight->accepted_by_user_id !== null || $flight->atc_acceptance_exists) {
             return FlightStatusDisplay::PENDING;
         }
         try {
             $this->manifests->assertComplete($flight, loaded: true);
         } catch (ValidationException) {
-            return FlightStatusDisplay::PENDING;
+            return FlightStatusDisplay::MANIFEST_REQUIRED;
+        }
+        if ($flight->status === FlightPlanStatus::AwaitingPic || ! $this->authorizations->isReadyForAtmo($flight, loaded: true)) {
+            return FlightStatusDisplay::AWAITING_PIC;
         }
         if (! AvsecVerificationService::requiredFor($flight)) {
             return FlightStatusDisplay::PENDING_ATMO;

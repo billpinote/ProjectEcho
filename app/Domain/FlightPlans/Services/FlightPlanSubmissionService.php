@@ -22,11 +22,11 @@ class FlightPlanSubmissionService
     ) {}
 
     /** @param array<string, mixed> $data */
-    public function submitSelfAuthorized(array $data, User $pic, AuthenticationEvidence $evidence, int $signatureId, string $submissionId, array $reviewedDocumentTypes = ['flight_plan']): Flight
+    public function submitSelfPrepared(array $data, User $pic, AuthenticationEvidence $evidence, string $submissionId): Flight
     {
         $evidence->assertActor($pic);
 
-        return DB::transaction(function () use ($data, $pic, $evidence, $signatureId, $submissionId, $reviewedDocumentTypes): Flight {
+        return DB::transaction(function () use ($data, $pic, $submissionId): Flight {
             // Serialize retries from the same pilot, including requests with stale Livewire state.
             $pic = User::query()->lockForUpdate()->findOrFail($pic->id);
             $profile = $pic->pilotProfile()->lockForUpdate()->first();
@@ -65,14 +65,11 @@ class FlightPlanSubmissionService
             $data['pilot_in_command_user_id'] = $pic->id;
             $data['status'] = FlightPlanStatus::AwaitingPic;
             $flight = Flight::create($data)->refresh();
-            if (array_keys(app(FilingDocumentRegistry::class)->snapshots($flight)) !== $reviewedDocumentTypes) {
-                throw ValidationException::withMessages(['signature' => 'The included filing documents changed. Review and confirm the complete document set again.']);
-            }
             $this->mutations->recordSubmission($flight, $pic, [
                 'self_submission_id' => $submissionId, 'submission_fingerprint' => $fingerprint,
             ]);
 
-            return app(PicAuthorizationService::class)->authorizeSelfFiling($flight, $pic, $evidence, $signatureId);
+            return $flight;
         });
     }
 
@@ -83,7 +80,7 @@ class FlightPlanSubmissionService
     {
         $preparerContext = FlightPlanPreparerContext::for($user, $flightData);
         if ($preparerContext->preparerActsAsPic()) {
-            throw ValidationException::withMessages(['signature' => 'Use Authorize & Submit to confirm your signature and submit your own flight filing.']);
+            throw ValidationException::withMessages(['signature' => 'Create your flight plan, complete its manifest, then authorize and sign the complete filing.']);
         }
         $flightData = $preparerContext->applyToFlightData($flightData);
 

@@ -64,13 +64,22 @@ class FlightPlanScanController extends Controller
         }
 
         $flight = $matchedFlight['flight'];
+        if ($flight !== null && $request->user() !== null) {
+            abort_unless($request->user()->can('view', $flight), 403);
+        }
         $preview = $matchedFlight['preview'];
+        if ($flight !== null && ! Auth::check() && ! $this->browser->sessionCanAccessFlight($request, $flight)) {
+            abort_unless($preview !== null, 403);
+            $matchedFlight['status'] = 'verified_qr_only';
+            $matchedFlight['status_label'] = 'Valid QR. Needs ATC Review.';
+            $matchedFlight['status_color'] = 'info';
+        }
         $matchedFlight['can_open'] = $flight === null
             ? ! Auth::check()
             : (Auth::check()
                 ? (Auth::user()?->can('view', $flight) ?? false)
                 : $this->browser->sessionCanAccessFlight($request, $flight));
-        $matchedFlight['view_url'] = $preview !== null
+        $matchedFlight['view_url'] = $preview !== null && ($flight === null || ! Auth::check())
             ? route('flightplan.scan-qr.preview', ['token' => $this->browser->storeScannedFlightPlanPreview($request, $preview)])
             : route('flights.view', $flight);
         unset($matchedFlight['flight'], $matchedFlight['preview']);
@@ -88,7 +97,7 @@ class FlightPlanScanController extends Controller
         $validated = $request->validated();
 
         $parsedPayload = $this->payloads->parsePayload((string) $validated['payload']);
-        if (in_array($request->user()?->role, [UserRole::Atmo, UserRole::Avsec], true)) {
+        if ($request->user() !== null) {
             $flight = Flight::find((int) ($parsedPayload['flight_id'] ?? 0));
             abort_unless($flight !== null && $request->user()->can('view', $flight), 403);
         }
@@ -128,6 +137,10 @@ class FlightPlanScanController extends Controller
         if (isset($preview['flight_id']) && is_numeric($preview['flight_id'])) {
             $flight = Flight::find((int) $preview['flight_id']);
 
+            if ($flight !== null && ! Auth::check() && ! $this->browser->sessionCanAccessFlight($request, $flight)) {
+                $flight = null;
+            }
+
             if ($flight !== null && Auth::check()) {
                 $user = Auth::user();
                 $canView = $user?->can('view', $flight) ?? false;
@@ -136,6 +149,10 @@ class FlightPlanScanController extends Controller
                     && FlightAccess::canAccessPicAuthorization($user, $flight);
 
                 abort_unless($canView || $canReadDeclinedPicScan, 403);
+
+                if ($canView) {
+                    return redirect()->route('flights.view', $flight);
+                }
             }
         }
 

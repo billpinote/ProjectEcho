@@ -20,30 +20,63 @@
         </section>
     @else
         <a href="{{ route('manifests.blank') }}" class="text-sm font-semibold text-echo-primary">Download blank CAAP manifest</a>
-        <div class="flex flex-col gap-3">
-            @forelse($flights as $flight)
-                @php
-                    $canPrepare = auth()->user()->can('create', [\App\Models\FlightManifest::class, $flight]);
-                @endphp
-                <article class="flex flex-col justify-between gap-4 rounded-xl border border-echo-border bg-echo-card p-5 sm:flex-row sm:items-center">
-                    <div>
-                        <h2 class="text-lg font-semibold">{{ $flight->aircraft_identification }} <span class="text-sm font-normal text-echo-text-secondary">Flight #{{ $flight->id }}</span></h2>
-                        <p class="mt-1 text-sm">{{ $flight->departure_aerodrome }} &rarr; {{ $flight->destination_aerodrome }} · {{ $flight->date_of_flight }}</p>
-                        <p class="mt-1 text-sm text-echo-text-secondary">{{ $flight->status?->label() }} · {{ $flight->manifest ? ($flight->hasBeenAccepted() ? 'Manifest locked' : 'Manifest saved') : 'No linked manifest' }}</p>
-                    </div>
-                    @if($flight->manifest || $canPrepare)
-                        <a href="{{ route('flights.manifest.edit', $flight) }}" class="rounded-lg border border-echo-primary px-4 py-3 text-center text-sm font-semibold text-echo-primary hover:bg-echo-background">{{ $canPrepare ? ($flight->manifest ? 'Edit manifest' : 'Prepare manifest') : 'View manifest' }}</a>
-                    @else
-                        <p class="max-w-sm text-sm text-echo-text-secondary">{{ $flight->hasBeenAccepted() ? 'This flight was already accepted without a manifest. Create a new flight plan to prepare one.' : 'Manifest preparation unavailable for this filing.' }}</p>
-                    @endif
-                </article>
-            @empty
-                <section class="rounded-xl border border-echo-border bg-echo-card p-6">
-                    <h2 class="text-lg font-semibold">No flight plans available</h2>
-                    <p class="mt-2 text-sm text-echo-text-secondary">You need an Echo flight plan before preparing a saved manifest.</p>
-                </section>
-            @endforelse
+        @if($nativeManifestTable ?? false)
+            {{ $this->table }}
+        @else
+        <div class="overflow-x-auto rounded-xl border border-echo-border bg-echo-card">
+            <table aria-label="Flight manifests" class="w-full table-auto whitespace-nowrap text-left text-echo-table font-medium">
+                <thead class="border-b border-echo-border text-echo-label uppercase tracking-wide text-echo-text-secondary">
+                    <tr>
+                        @foreach(['Callsign' => 'w-px', 'DOF' => 'w-px', 'PTD' => 'w-px', 'PIC' => '', 'Prepared By' => '', 'Status' => 'w-px'] as $heading => $width)
+                            <th scope="col" class="{{ $width }} whitespace-nowrap px-3 py-2.5 font-semibold">{{ $heading }}</th>
+                        @endforeach
+                        <th scope="col" class="w-px px-3 py-2.5 text-right font-semibold">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-echo-border">
+                    @forelse($flights as $flight)
+                        @php
+                            $manifest = $flight->manifest;
+                            $canPrepare = auth()->user()->can('create', [\App\Models\FlightManifest::class, $flight]);
+                            $canEdit = $manifest ? auth()->user()->can('update', $manifest) : $canPrepare;
+                            $canView = $manifest && auth()->user()->can('view', $manifest);
+                            $status = \App\Domain\FlightPlans\Support\FlightStatusDisplay::badge($flight, auth()->user()->role);
+                            $statusClass = match ($status['color']) {
+                                'warning' => 'echo-status-pending',
+                                'success' => 'echo-status-accepted',
+                                'info' => 'echo-status-active',
+                                'danger' => 'echo-status-rejected',
+                                default => 'echo-status-completed',
+                            };
+                            $preparedBy = $manifest
+                                ? $manifest->creator?->preparedByNameSnapshot()
+                                : ($flight->prepared_by_name ?: ($flight->preparedBy ?? $flight->filedBy)?->preparedByNameSnapshot());
+                        @endphp
+                        <tr class="align-middle">
+                            <td class="whitespace-nowrap px-3 py-2.5 font-semibold">{{ $flight->aircraft_identification }}</td>
+                            <td class="whitespace-nowrap px-3 py-2.5">{{ $flight->date_of_flight ? \Carbon\Carbon::parse($flight->date_of_flight)->format('d M Y') : '—' }}</td>
+                            <td class="whitespace-nowrap px-3 py-2.5">{{ filled($flight->proposed_time) ? \App\Domain\FlightPlans\Rules\UtcFourDigitTime::formatForDisplay($flight->proposed_time).'Z' : '—' }}</td>
+                            <td class="max-w-28 truncate px-3 py-2.5 xl:max-w-40" title="{{ $flight->pilot_in_command }}">{{ $flight->pilot_in_command ?: '—' }}</td>
+                            <td class="max-w-32 truncate px-3 py-2.5 xl:max-w-44" title="{{ $preparedBy }}">{{ $preparedBy ?: '—' }}</td>
+                            <td class="whitespace-nowrap px-3 py-2.5"><span class="echo-status-badge {{ $statusClass }}">{{ $status['label'] }}</span></td>
+                            <td class="whitespace-nowrap px-3 py-2.5 text-right">
+                                @if($canView || $canPrepare)
+                                    <a href="{{ route('flights.manifest.edit', $flight) }}" class="inline-flex items-center rounded-lg border border-echo-primary px-3 py-1.5 font-semibold text-echo-primary hover:bg-echo-background">{{ $canEdit ? ($manifest ? 'Edit manifest' : 'Prepare manifest') : 'View manifest' }}</a>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="p-6">
+                                <h2 class="text-lg font-semibold">No flight plans available</h2>
+                                <p class="mt-2 text-echo-text-secondary">You need an Echo flight plan before preparing a saved manifest.</p>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
         {{ $flights->links() }}
+        @endif
     @endguest
 

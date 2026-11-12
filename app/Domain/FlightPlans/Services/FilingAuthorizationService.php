@@ -25,8 +25,9 @@ class FilingAuthorizationService
 
     public function request(Flight $flight, ?array $signedDocumentTypes = null): FilingAuthorization
     {
+        $flight = Flight::query()->lockForUpdate()->findOrFail($flight->id);
         $flight->assertAvsecEditable();
-        $documents = $this->documents->snapshots($flight);
+        $documents = $this->documents->snapshots($flight, false);
         $package = new FilingAuthorization;
         $package->forceFill([
             'flight_id' => $flight->getKey(), 'flight_revision' => (int) ($flight->revision_number ?? 1),
@@ -83,7 +84,7 @@ class FilingAuthorizationService
         User::query()->lockForUpdate()->findOrFail($pic->getKey());
         $signature = $pic->approvedSignature()->lockForUpdate()->first();
         if ($signature === null || $signature->status !== 'approved' || (int) $signature->user_id !== (int) $pic->getKey()) {
-            throw ValidationException::withMessages(['signature' => 'No approved signature is available. Submit a signature for verification, or authorize this filing without an electronic signature.']);
+            throw ValidationException::withMessages(['signature' => 'No approved signature is available. Submit a signature for verification before authorizing this complete filing.']);
         }
         $this->signatures->verifiedBytes($signature);
 
@@ -100,6 +101,9 @@ class FilingAuthorizationService
 
     public function signatureBytes(Flight $flight, string $type = 'flight_plan'): ?string
     {
+        if (! $flight->hasBeenAccepted() && ! $flight->isAvsecFrozen() && ! $this->isReadyForAtmo($flight)) {
+            return null;
+        }
         $package = $this->currentForDocument($flight, $type);
 
         return $package === null ? null : $this->historicalSignatureBytes($package);
@@ -151,14 +155,28 @@ class FilingAuthorizationService
             return false;
         }
 
-        return $this->currentForDocument($flight, 'flight_plan', loaded: true) !== null
-            && $this->currentForDocument($flight, 'passenger_cargo_manifest', loaded: true) !== null;
+        $plan = $this->currentForDocument($flight, 'flight_plan', loaded: true);
+        $manifest = $this->currentForDocument($flight, 'passenger_cargo_manifest', loaded: true);
+        if ($plan === null || $manifest === null) {
+            return false;
+        }
+
+        // Preserve already locked historical filings; new decisions cover one complete package.
+        $attributes = $flight->getAttributes();
+        $historicallyLocked = $loaded
+            ? ($flight->accepted_by_user_id !== null
+                || in_array($flight->status, [FlightPlanStatus::Accepted, FlightPlanStatus::Active, FlightPlanStatus::Completed], true)
+                || (bool) ($attributes['atc_acceptance_exists'] ?? false)
+                || ($flight->relationLoaded('avsecVerification') && $flight->avsecVerification !== null))
+            : ($flight->hasBeenAccepted() || $flight->isAvsecFrozen());
+
+        return $historicallyLocked || ($plan->id === $manifest->id && (int) $plan->flight_revision === (int) $flight->revision_number);
     }
 
     public function readyIds(Builder $query): array
     {
         return (clone $query)->whereHas('filingAuthorizations', fn (Builder $query) => $query->where('status', 'authorized')->whereNotNull('pilot_signature_id'))
-            ->with(['manifest.persons', 'filingAuthorizations' => fn ($query) => $query->select([
+            ->with(['manifest.persons', 'avsecVerification', 'filingAuthorizations' => fn ($query) => $query->select([
                 'id', 'flight_id', 'status', 'pic_user_id', 'pilot_signature_id', 'signature_version', 'signature_sha256',
                 'signed_document_types', 'authorized_documents',
             ]), 'filingAuthorizations.pilotSignature'])->get()
@@ -213,7 +231,7 @@ class FilingAuthorizationService
                         'pic_authorization_token' => null, 'pic_authorization_token_expires_at' => null,
                         'status' => FlightPlanStatus::AwaitingPic, 'reviewed_at' => null,
                     ]);
-                    if ($flightChanged) {
+                    if ($flightChanged || $manifestChanged) {
                         $locked->forceFill(['pic_authorized_by_user_id' => null, 'pic_authorized_at' => null,
                             'pic_authorized_revision' => null, 'pic_authorization_method' => null, 'pic_authorization_status' => null]);
                     }

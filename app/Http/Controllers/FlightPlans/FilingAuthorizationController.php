@@ -23,8 +23,8 @@ class FilingAuthorizationController extends Controller
 
     public function reviewSelf(Request $request, Flight $flight): RedirectResponse
     {
-        $this->guardSelf($request, $flight);
-        $token = $this->pic->createAuthorizationHandoff($flight, selfPrepared: true);
+        $selfPrepared = $this->guardSelf($request, $flight);
+        $token = $this->pic->createAuthorizationHandoff($flight, selfPrepared: $selfPrepared);
 
         return redirect()->route('flightplan.pic-authorization.preview', ['token' => $token]);
     }
@@ -33,10 +33,10 @@ class FilingAuthorizationController extends Controller
     {
         $flight = $this->pic->resolveAuthorizationHandoff($token);
         abort_unless($flight !== null, 403);
-        $this->guardSelf($request, $flight);
-        $data = $request->validate(['apply_signature' => ['required', 'boolean']]);
+        $selfPrepared = $this->guardSelf($request, $flight);
+        $request->validate(['apply_signature' => ['required', 'accepted']]);
         $this->pic->authorizeFromHandoff($token, $request->user(), AuthenticationEvidence::fromSession(auth()->guard()),
-            applySignature: (bool) $data['apply_signature'], selfPrepared: true);
+            applySignature: true, selfPrepared: $selfPrepared);
 
         return redirect()->route('flights.view', $flight);
     }
@@ -44,7 +44,7 @@ class FilingAuthorizationController extends Controller
     public function document(Request $request, FilingAuthorization $package, string $type): Response
     {
         $flight = $package->flight;
-        $this->guardPackage($request, $package);
+        $this->guardPackage($request, $package, $type);
         $documents = $package->status === 'authorized' ? $package->authorized_documents : $package->documents;
         abort_unless(isset($documents[$type]), 404);
         abort_unless($package->signed_document_types === null || in_array($type, $package->signed_document_types, true), 404);
@@ -85,11 +85,16 @@ class FilingAuthorizationController extends Controller
         ]);
     }
 
-    private function guardPackage(Request $request, FilingAuthorization $package): void
+    private function guardPackage(Request $request, FilingAuthorization $package, string $type): void
     {
         $actor = $request->user();
         abort_unless($actor?->is_active && $actor->canViewFlightPlans(), 403);
         abort_if($actor->role === UserRole::Atmo && ! $actor->can('view', $package->flight), 403);
+        $manifestIsPrivate = $type === 'passenger_cargo_manifest' && $actor->isPilot()
+            && ($package->flight->manifest === null || ! $actor->can('view', $package->flight->manifest));
+        if (! $manifestIsPrivate && $actor->can('view', $package->flight)) {
+            return;
+        }
         if ($package->status === 'pending') {
             try {
                 $this->pic->guardEligiblePic($actor);
@@ -97,8 +102,7 @@ class FilingAuthorizationController extends Controller
                 abort(403);
             }
         }
-        if ($actor->can('view', $package->flight)
-            || ((int) $package->pic_user_id === (int) $actor->id && FlightAccess::operatorMatches($actor, $package->flight))) {
+        if ((int) $package->pic_user_id === (int) $actor->id && FlightAccess::operatorMatches($actor, $package->flight)) {
             return;
         }
         $handoff = $this->pic->resolveAuthorizationHandoff((string) $request->query('token', ''));
@@ -108,11 +112,12 @@ class FilingAuthorizationController extends Controller
         $this->pic->guardEligiblePic($actor);
     }
 
-    private function guardSelf(Request $request, Flight $flight): void
+    private function guardSelf(Request $request, Flight $flight): bool
     {
         $actor = $request->user();
-        abort_unless($actor?->is_active && $actor->isPilot() && $actor->can('view', $flight)
-            && (int) $flight->prepared_by_user_id === (int) $actor->id
-            && (int) $flight->pilot_in_command_user_id === (int) $actor->id, 403);
+        abort_unless($actor !== null && $this->pic->canReviewFiling($actor, $flight), 403);
+
+        return (int) $flight->prepared_by_user_id === (int) $actor->id
+            && (int) $flight->pilot_in_command_user_id === (int) $actor->id;
     }
 }

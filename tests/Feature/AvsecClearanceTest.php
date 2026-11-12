@@ -133,7 +133,7 @@ class AvsecClearanceTest extends TestCase
         $this->assertSame($manifest->accepted_pdf_sha256, hash('sha256', $manifestPdf->getContent()));
         $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
         $preview = $this->actingAs($atmo)->get(route('flights.view', $flight))->assertOk();
-        $this->assertTopPreviewPill($preview, 'AVSEC Approved', 'success');
+        $this->assertTopPreviewPill($preview, 'For ATMO Signature', 'gray');
     }
 
     public function test_cards_use_owner_fallback_and_do_not_invent_cargo_units(): void
@@ -206,7 +206,7 @@ class AvsecClearanceTest extends TestCase
         return [['missing'], ['incomplete'], ['missing_pdf']];
     }
 
-    public function test_avsec_can_inspect_unauthorized_plan_without_changing_pilot_or_atmo_access(): void
+    public function test_avsec_pilot_and_atmo_can_inspect_unsigned_plan_without_operational_authority(): void
     {
         $flight = Flight::factory()->create(['status' => FlightPlanStatus::AwaitingPic, 'pic_authorization_status' => 'pending']);
         $flight->forceFill(['prepared_by_user_id' => $flight->filed_by_user_id])->saveQuietly();
@@ -219,22 +219,22 @@ class AvsecClearanceTest extends TestCase
         $this->assertTopPreviewPill($preview, 'Manifest Required', 'warning');
         $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->fresh()->status);
         $this->assertFalse($officer->can('accept', $flight));
-        $atmo = User::factory()->create(['role' => UserRole::Atmo]);
-        $this->actingAs($atmo)->get(route('flights.view', $flight))->assertForbidden();
-        $this->actingAs($flight->filedBy)->get(route('flights.view', $flight))->assertOk()->assertViewIs('flightplan.pic-authorization-required');
+        $atmo = User::factory()->create(['role' => UserRole::Atmo, 'station' => 'RPUS']);
+        $this->actingAs($atmo)->get(route('flights.view', $flight))->assertOk()->assertViewHas('canAcceptFlightPlan', false);
+        $this->actingAs($flight->filedBy)->get(route('flights.view', $flight))->assertOk()->assertViewIs('flightplan.pdf')->assertSeeText('Manifest Required');
     }
 
     public function test_signed_documents_are_available_before_atmo_acceptance(): void
     {
         $flight = $this->readyFlight();
         $this->officer();
-        $this->assertSame('Pending Clearance', FlightStatusDisplay::badge($flight, UserRole::Avsec)['label']);
+        $this->assertSame('For AVSEC Clearance', FlightStatusDisplay::badge($flight, UserRole::Avsec)['label']);
         $preview = $this->get(route('flights.view', $flight))->assertOk()->assertViewHas('canDecideClearance', true)
-            ->assertSee('Pending Clearance')->assertSee('Review Manifest')->assertSee(route('flights.manifest.pdf', $flight), false)
+            ->assertSee('For AVSEC Clearance')->assertSee('Review Manifest')->assertSee(route('flights.manifest.pdf', $flight), false)
             ->assertSee('data-avsec-status-color="warning"', false)
             ->assertSee(AvsecVerificationService::CONFIRMATION)->assertDontSee('Accept Flight Plan')->assertDontSee('Reject Flight Plan')
             ->assertSee('echo-avsec-toolbar', false);
-        $this->assertTopPreviewPill($preview, 'Pending Clearance', 'warning');
+        $this->assertTopPreviewPill($preview, 'For AVSEC Clearance', 'warning');
         $this->get(route('flights.manifest.pdf', $flight))->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
     }
@@ -261,7 +261,7 @@ class AvsecClearanceTest extends TestCase
         $preview = $this->get(route('flights.view', $flight))->assertOk()->assertSee($expected)->assertViewHas('canDecideClearance', false)
             ->assertSee('data-avsec-status-color="'.$color.'"', false)
             ->assertSee('color: '.FilamentColor::getColor($color)[600], false);
-        $this->assertTopPreviewPill($preview, $expected, $color);
+        $this->assertTopPreviewPill($preview, $decision === 'grant' ? 'For ATMO Signature' : $expected, $decision === 'grant' ? 'gray' : $color);
         if ($decision === 'deny') {
             $this->assertSame('Offline clearance denied', $event->reason);
             $this->assertFalse(app(AvsecVerificationService::class)->validFor($flight));
@@ -351,6 +351,6 @@ class AvsecClearanceTest extends TestCase
         }
         $this->assertSame(0, $flight->avsecDenials()->count());
         $this->assertFalse($flight->avsecVerification()->exists());
-        $this->assertSame('Pending Clearance', FlightStatusDisplay::avsecBadge($flight->fresh())['label']);
+        $this->assertSame('For AVSEC Clearance', FlightStatusDisplay::avsecBadge($flight->fresh())['label']);
     }
 }

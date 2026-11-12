@@ -31,6 +31,7 @@ class FlightOperatorIsolationTest extends TestCase
         $leadingFlight = $this->flight($leadingEdge, [
             'aircraft_identification' => 'LEAD01',
             'status' => FlightPlanStatus::Accepted,
+            'prepared_by_user_id' => $dispatch->id,
         ]);
         $alphaFlight = $this->flight($alpha, [
             'aircraft_identification' => 'ALPHA01',

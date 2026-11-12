@@ -346,11 +346,11 @@ class FlightOperationsWorkflowTest extends TestCase
         $this->actingAs($this->user(UserRole::Atmo, ['station' => 'RPLL']))->get($url)->assertForbidden();
     }
 
-    public function test_atmo_preview_and_acceptance_are_denied_when_manifest_is_missing(): void
+    public function test_atmo_preview_is_allowed_but_acceptance_is_denied_when_manifest_is_missing(): void
     {
         $flight = $this->flight();
         $atmo = $this->user(UserRole::Atmo, ['station' => 'RPUS']);
-        $this->actingAs($atmo)->get(route('flights.view', $flight))->assertForbidden();
+        $this->actingAs($atmo)->get(route('flights.view', $flight))->assertOk()->assertViewHas('canAcceptFlightPlan', false);
         $this->get(route('flights.manifest.pdf', $flight))->assertNotFound();
         $this->post(route('flights.accept', $flight))->assertForbidden();
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
@@ -388,6 +388,7 @@ class FlightOperationsWorkflowTest extends TestCase
         $flight = $this->flight([
             'status' => FlightPlanStatus::Pending,
             'operator_id' => $operator->id,
+            'prepared_by_user_id' => $dispatch->id,
         ]);
 
         $this->completeManifestFor($flight);

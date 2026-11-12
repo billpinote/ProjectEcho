@@ -17,29 +17,33 @@ class FlightPlanMutationService
 {
     public function reject(Flight $flight, User $actor, string $wiresign, string $reason): void
     {
-        if (! $actor->can('reject', $flight)) {
-            throw new AuthorizationException;
-        }
-        $flight->forceFill([
-            'status' => FlightPlanStatus::Rejected,
-            'accepted_by_user_id' => null,
-            'accepted_by_wiresign' => null,
-            'rejected_by_wiresign' => $wiresign,
-            'rejection_reason' => trim($reason),
-            'received_by' => null,
-            'received_date' => null,
-            'received_time' => null,
-            'received_facility' => null,
-        ])->save();
+        DB::transaction(function () use ($flight, $actor, $wiresign, $reason): void {
+            $flight = Flight::query()->lockForUpdate()->findOrFail($flight->id);
+            $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
+            if (! $actor->can('reject', $flight)) {
+                throw new AuthorizationException;
+            }
+            $flight->forceFill([
+                'status' => FlightPlanStatus::Rejected,
+                'accepted_by_user_id' => null,
+                'accepted_by_wiresign' => null,
+                'rejected_by_wiresign' => $wiresign,
+                'rejection_reason' => trim($reason),
+                'received_by' => null,
+                'received_date' => null,
+                'received_time' => null,
+                'received_facility' => null,
+            ])->save();
 
-        FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_ATC_REJECTED, $actor, null, null, $flight->rejection_reason);
-
+            FlightPlanEvent::record($flight, FlightPlanEvent::TYPE_ATC_REJECTED, $actor, null, null, $flight->rejection_reason);
+        });
     }
 
     public function accept(Flight $flight, User $actor, string $wiresign): Flight
     {
         return DB::transaction(function () use ($flight, $actor, $wiresign): Flight {
             $flight = Flight::query()->lockForUpdate()->findOrFail($flight->getKey());
+            $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
             if (! $actor->canReviewFlightPlans() || ! FlightAccess::canView($actor, $flight)) {
                 throw new AuthorizationException;
             }
@@ -120,7 +124,11 @@ class FlightPlanMutationService
         $normalizedTime = UtcFourDigitTime::normalizeForStorage($newProposedTime);
 
         return DB::transaction(function () use ($actor, $flight, $normalizedTime): Flight {
-            $flight->refresh();
+            $flight = Flight::query()->lockForUpdate()->findOrFail($flight->id);
+            $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
+            if (! $actor->can('delay', $flight)) {
+                throw new AuthorizationException;
+            }
 
             if (! $flight->canBeDelayedByPilot()) {
                 throw ValidationException::withMessages([
@@ -164,7 +172,11 @@ class FlightPlanMutationService
         }
 
         return DB::transaction(function () use ($actor, $flight, $reason): Flight {
-            $flight->refresh();
+            $flight = Flight::query()->lockForUpdate()->findOrFail($flight->id);
+            $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
+            if (! $actor->can('cancel', $flight)) {
+                throw new AuthorizationException;
+            }
 
             if (! $flight->canBeCancelledByPilot()) {
                 throw ValidationException::withMessages([

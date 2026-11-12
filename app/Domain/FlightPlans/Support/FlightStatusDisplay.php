@@ -13,7 +13,11 @@ use Illuminate\Support\Facades\Auth;
 
 final class FlightStatusDisplay
 {
+    public const MANIFEST_REQUIRED = 'manifest_required';
+
     public const AWAITING_PIC = 'awaiting_pic';
+
+    public const ACCEPTANCE_NOTICE = 'Your flight plan has been accepted. Contact San Fernando ATMO for startup clearance before starting your engine.';
 
     public const PIC_DECLINED = 'pic_declined';
 
@@ -64,11 +68,7 @@ final class FlightStatusDisplay
             return self::EXPIRED;
         }
 
-        if ($flight->status === FlightPlanStatus::AwaitingPic) {
-            return self::AWAITING_PIC;
-        }
-
-        if ($flight->status === FlightPlanStatus::Pending) {
+        if (in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true)) {
             return app(FlightWorkflowService::class)->pendingStage($flight);
         }
 
@@ -106,27 +106,15 @@ final class FlightStatusDisplay
      */
     public static function badge(Flight $flight, UserRole|string|null $viewerRole = null): array
     {
-        if (self::resolveViewerRole($viewerRole) === UserRole::Avsec) {
-            return self::avsecBadge($flight);
-        }
-
         $status = self::status($flight);
 
         if ($flight->exists && AvsecVerificationService::requiredFor($flight)
             && in_array($status, [self::PENDING, self::AWAITING_AVSEC, self::PENDING_ATMO], true)) {
             $flight->loadMissing(['manifest.persons', 'filingAuthorizations.pilotSignature', 'avsecVerification', 'avsecDenials']);
             $clearance = app(AvsecVerificationService::class)->currentState($flight, loaded: true);
-            if ($clearance !== AvsecClearanceState::Awaiting || $status === self::AWAITING_AVSEC) {
+            if ($clearance === AvsecClearanceState::Denied) {
                 return self::clearanceBadge($clearance, self::resolveViewerRole($viewerRole));
             }
-        }
-
-        if (self::resolveViewerRole($viewerRole) === UserRole::Pilot
-            && in_array($status, [self::PENDING, self::AWAITING_PIC], true)
-            && ! $flight->isPicAuthorizationDeclined()) {
-            return ['key' => 'document_signatures', 'label' => $flight->documentSignatureStatus(),
-                'color' => 'warning', 'icon' => 'heroicon-o-document-text', 'outlined' => false,
-                'tooltip' => 'Both current documents must be signed before ATMO review.'];
         }
 
         return [
@@ -148,10 +136,11 @@ final class FlightStatusDisplay
         if ($clearance !== AvsecClearanceState::Awaiting) {
             return self::clearanceBadge($clearance, UserRole::Avsec);
         }
-        [$key, $label, $color, $icon, $tooltip] = match (true) {
-            ! $service->manifestAvailable($flight) => ['manifest_required', 'Manifest Required', 'warning', 'heroicon-o-document-text', 'Pilot or Dispatch must complete the required manifest.'],
-            default => ['pending_clearance', 'Pending Clearance', 'warning', 'heroicon-o-clock', 'Review both supporting documents. Current Pilot signatures are required before recording clearance.'],
-        };
+        $key = self::status($flight);
+        $label = self::label($key, UserRole::Avsec);
+        $color = self::color($key);
+        $icon = self::icon($key);
+        $tooltip = self::tooltip($key, UserRole::Avsec);
 
         return [
             'key' => $key, 'label' => $label, 'color' => $color,
@@ -197,16 +186,17 @@ final class FlightStatusDisplay
     public static function label(string $status, UserRole|string|null $viewerRole = null): string
     {
         if (in_array($status, [self::AWAITING_AVSEC, self::PENDING_ATMO], true)) {
-            return $status === self::AWAITING_AVSEC ? AvsecClearanceState::Awaiting->label(self::resolveViewerRole($viewerRole)) : 'Pending ATMO';
+            return $status === self::AWAITING_AVSEC ? 'For AVSEC Clearance' : 'For ATMO Signature';
         }
         $role = self::resolveViewerRole($viewerRole);
 
         if ($role === UserRole::Pilot) {
             return match ($status) {
-                self::AWAITING_PIC => 'Awaiting PIC',
+                self::MANIFEST_REQUIRED => 'Manifest Required',
+                self::AWAITING_PIC => 'For PIC Signature',
                 self::PIC_DECLINED => 'PIC Declined',
                 self::PENDING => 'Awaiting Approval',
-                self::ACCEPTED => 'Approved',
+                self::ACCEPTED => 'Filed Successfully',
                 self::STARTED => 'Preparing for Departure',
                 self::AIRBORNE => 'In Flight',
                 self::LANDED => 'Landed',
@@ -219,7 +209,8 @@ final class FlightStatusDisplay
         }
 
         return match ($status) {
-            self::AWAITING_PIC => 'Awaiting PIC',
+            self::MANIFEST_REQUIRED => 'Manifest Required',
+            self::AWAITING_PIC => 'For PIC Signature',
             self::PIC_DECLINED => 'PIC Declined',
             self::PENDING => 'Pending',
             self::ACCEPTED => 'Accepted',
@@ -246,6 +237,7 @@ final class FlightStatusDisplay
         return match ($status) {
             self::AWAITING_AVSEC => 'warning',
             self::PENDING_ATMO => 'gray',
+            self::MANIFEST_REQUIRED => 'warning',
             self::AWAITING_PIC => 'gray',
             self::PIC_DECLINED => 'danger',
             self::PENDING => 'gray',
@@ -266,6 +258,7 @@ final class FlightStatusDisplay
         return match ($status) {
             self::AWAITING_AVSEC => 'heroicon-o-shield-check',
             self::PENDING_ATMO => 'heroicon-o-clock',
+            self::MANIFEST_REQUIRED => 'heroicon-o-document-text',
             self::AWAITING_PIC => 'heroicon-o-user-circle',
             self::PIC_DECLINED => 'heroicon-o-exclamation-triangle',
             self::PENDING => 'heroicon-o-clock',
@@ -301,7 +294,7 @@ final class FlightStatusDisplay
                 self::AWAITING_PIC => 'This flight plan is waiting for Pilot-in-Command authorization.',
                 self::PIC_DECLINED => 'This version was declined by the Pilot-in-Command. Correct and resubmit it.',
                 self::PENDING => 'Your flight plan is waiting for ATC review.',
-                self::ACCEPTED => 'Your flight plan has been approved.',
+                self::ACCEPTED => self::ACCEPTANCE_NOTICE,
                 self::STARTED => 'Startup or block-off has been recorded.',
                 self::AIRBORNE => 'The aircraft is currently airborne.',
                 self::LANDED => 'Touchdown has been recorded. Shutdown or block-on is still pending.',

@@ -377,7 +377,7 @@
         }
 
         .echo-review-button-primary:hover { background: #1d4ed8; }
-        .echo-avsec-preview .echo-review-button:disabled { opacity: .55; cursor: not-allowed; }
+        .echo-review-button:disabled { opacity: .55; cursor: not-allowed; }
         .echo-avsec-summary { width: min(794px, calc(100% - 32px)); margin: 16px auto; padding: 16px; box-sizing: border-box; border-radius: 12px; background: #fff; font-size: 14px; line-height: 1.5; }
         .echo-avsec-summary h2 { margin: 0 0 8px; font-size: 20px; }
         .echo-avsec-summary p { margin: 6px 0; }
@@ -475,15 +475,13 @@
                 @continue($filingPackage->signed_document_types !== null && !in_array($type, $filingPackage->signed_document_types, true))
                 <p><a href="{{ route('filing.document', ['package' => $filingPackage, 'type' => $type, 'token' => $filingToken]) }}" target="_blank" rel="noopener noreferrer">{{ str($type)->headline() }} — revision {{ $document['revision'] }}</a></p>
             @endforeach
-            @if($selfFilingAuthorization ?? false)
+            @if($canAuthorizeFiling ?? $selfFilingAuthorization ?? false)
                 <form method="POST" action="{{ route('filing.authorize-self', ['token' => $filingToken]) }}">
                     @csrf
                     <p>Explicitly authorize this complete filing. Electronic signing uses your currently approved signature version.</p>
-                    <button name="apply_signature" value="0">Authorize without signature image</button>
-                    @if($hasApprovedPilotSignature ?? false)
-                        <button name="apply_signature" value="1">Authorize and apply verified signature</button>
-                    @else
-                        <p>No approved signature is available. Submit one for verification in your profile, or authorize without an electronic signature.</p>
+                    <button name="apply_signature" value="1" @disabled(($authorizationUnavailableReason ?? null) !== null)>Authorize &amp; Sign Filing</button>
+                    @if($authorizationUnavailableReason ?? null)
+                        <p role="status">{{ $authorizationUnavailableReason }}</p>
                     @endif
                     @error('signature')<p role="alert">{{ $message }}</p>@enderror
                     @error('payload')<p role="alert">{{ $message }}</p>@enderror
@@ -530,6 +528,7 @@
             $usesClearancePalette = $flight->exists && (
                 (auth()->user()?->isAvsec() ?? false)
                 || \App\Domain\FlightPlans\Enums\AvsecClearanceState::tryFrom($previewBadge['key']) !== null
+                || in_array($previewBadge['key'], ['manifest_required', 'awaiting_pic', 'pending_atmo'], true)
             );
             $previewPalette = $usesClearancePalette
                 ? \Filament\Support\Facades\FilamentColor::getColor($previewBadge['color'])
@@ -571,10 +570,20 @@
             </div>
         @endif
 
+        @if(isset($isPreview) && $flight->exists && auth()->user()?->isPilot() && \App\Domain\FlightPlans\Support\FlightStatusDisplay::status($flight) === \App\Domain\FlightPlans\Support\FlightStatusDisplay::ACCEPTED)
+            <div class="echo-preview-delay-banner" role="status">{{ \App\Domain\FlightPlans\Support\FlightStatusDisplay::ACCEPTANCE_NOTICE }}</div>
+        @endif
+
         @if($reviewCompleted)
             <div class="echo-review-completion" role="status" data-review-completion>
                 <div>{{ $flight->status === \App\Domain\FlightPlans\Enums\FlightPlanStatus::Accepted ? 'Flight plan accepted successfully.' : 'Flight plan rejected successfully.' }}</div>
                 <button class="echo-review-button echo-review-button-neutral echo-review-completion-close" type="button" data-close-review-tab>Close This Tab</button>
+            </div>
+        @endif
+
+        @if(($awaitingPic ?? false) && ($selfFilingReviewUrl ?? null))
+            <div class="echo-review-page">
+                <a href="{{ $selfFilingReviewUrl }}" class="echo-review-button echo-review-button-neutral">Review current filing</a>
             </div>
         @endif
 
@@ -1372,7 +1381,7 @@
         @if($showReviewActions ?? false)
         <div class="echo-review-document-spacer" aria-hidden="true"></div>
         <div class="echo-review-toolbar" aria-label="Flight plan review actions">
-            <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; Close Review</button>
+            <button class="echo-review-button echo-review-button-neutral" type="button" data-close-review-tab>&larr; {{ ($awaitingPic ?? false) ? 'Close Preview' : 'Close Review' }}</button>
             <div class="echo-review-toolbar-actions">
                 @if($manifestReviewUrl ?? null)
                     <a class="echo-review-button echo-review-button-neutral echo-review-manifest-action" href="{{ $manifestReviewUrl }}" target="_blank" rel="noopener noreferrer">Review Flight Manifest</a>
@@ -1381,11 +1390,13 @@
                 @endif
                 @if($canRejectFlightPlan ?? false)
                 <button class="echo-review-button echo-review-button-danger" type="button" data-open-review-modal="reject-flight-plan">Reject</button>
+                @else
+                <button class="echo-review-button echo-review-button-neutral" type="button" disabled aria-disabled="true">Reject</button>
                 @endif
                 @if($canAcceptFlightPlan ?? false)
                 <button class="echo-review-button echo-review-button-primary" type="button" data-open-review-modal="accept-flight-plan">&#10003; Accept Flight Plan</button>
-                @elseif($acceptUnavailableReason ?? null)
-                <button class="echo-review-button echo-review-button-neutral" type="button" disabled aria-describedby="accept-unavailable-reason">Accept Flight Plan</button>
+                @else
+                <button class="echo-review-button echo-review-button-neutral" type="button" disabled aria-describedby="accept-unavailable-reason" aria-disabled="true">Accept Flight Plan</button>
                 @endif
             </div>
             @if($acceptUnavailableReason ?? null)
@@ -1393,6 +1404,7 @@
             @endif
         </div>
 
+        @if($canRejectFlightPlan ?? false)
         <div class="echo-review-modal" id="reject-flight-plan" role="dialog" aria-modal="true" aria-labelledby="reject-flight-plan-title" hidden>
             <form class="echo-review-modal-card" method="POST" action="{{ $rejectActionUrl }}">
                 @csrf
@@ -1409,6 +1421,8 @@
                 </div>
             </form>
         </div>
+
+        @endif
 
         @if($canAcceptFlightPlan ?? false)
         <div class="echo-review-modal" id="accept-flight-plan" role="dialog" aria-modal="true" aria-labelledby="accept-flight-plan-title" hidden>

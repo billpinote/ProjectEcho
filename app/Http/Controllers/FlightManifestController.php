@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\FlightPlans\Services\FlightManifestService;
+use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightManifestData;
 use App\Domain\Users\Enums\UserRole;
 use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
@@ -40,8 +41,8 @@ class FlightManifestController extends Controller
         }
 
         return view('flightplan.manifest-index', [
-            'flights' => $user === null ? null : Flight::query()->visibleTo($user)
-                ->with('manifest')->orderByDesc('id')->paginate(20),
+            'flights' => $user === null ? null : FlightAccess::restrictQueryToVisibleManifestFlights(Flight::query(), $user)
+                ->with(['manifest.creator', 'preparedBy', 'filedBy'])->orderByDesc('id')->paginate(20),
         ]);
     }
 

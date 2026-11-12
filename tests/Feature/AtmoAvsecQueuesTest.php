@@ -60,17 +60,17 @@ class AtmoAvsecQueuesTest extends TestCase
         $this->assertSame('1', AwaitingAvsecFlightResource::getNavigationBadge());
         Livewire::test(ListAwaitingAvsecFlights::class)->assertCanSeeTableRecords([$flight])
             ->assertTableActionDoesNotExist('accept')->assertTableActionDoesNotExist('edit');
-        Livewire::test(ListAllFlights::class)->assertSee('Pending AVSEC')->assertTableColumnVisible('status_presentation');
+        Livewire::test(ListAllFlights::class)->assertSee('For AVSEC Clearance')->assertTableColumnVisible('status_presentation');
         $this->post(route('flights.accept', $flight))->assertForbidden();
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Pending AVSEC')->assertDontSee('data-open-review-modal="accept-flight-plan"', false);
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('For AVSEC Clearance')->assertDontSee('data-open-review-modal="accept-flight-plan"', false);
         $this->assertNull($flight->fresh()->reviewed_at);
         $this->confirmFlightAvsec($flight);
         $this->assertFalse(AwaitingAvsecFlightResource::getEloquentQuery()->whereKey($flight)->exists());
         $this->assertTrue(FlightResource::getEloquentQuery()->whereKey($flight)->exists());
         $this->assertSame(FlightPlanStatus::Pending, $flight->fresh()->status);
         Livewire::test(ListFlights::class)->assertCanSeeTableRecords([$flight]);
-        Livewire::test(ListAllFlights::class)->assertSee('AVSEC Approved');
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('AVSEC Approved')->assertSee('data-open-review-modal="accept-flight-plan"', false);
+        Livewire::test(ListAllFlights::class)->assertSee('For ATMO Signature');
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('For ATMO Signature')->assertSee('data-open-review-modal="accept-flight-plan"', false);
         $this->post(route('flights.accept', $flight))->assertRedirect();
     }
 
@@ -87,7 +87,7 @@ class AtmoAvsecQueuesTest extends TestCase
             $this->assertNotSame(FlightStatusDisplay::AWAITING_AVSEC, FlightStatusDisplay::status($flight->fresh()));
         }
         $unsigned = Flight::factory()->create();
-        $this->assertSame(FlightStatusDisplay::PENDING, FlightStatusDisplay::status($unsigned));
+        $this->assertSame(FlightStatusDisplay::MANIFEST_REQUIRED, FlightStatusDisplay::status($unsigned));
         $this->atmo();
         $this->assertSame(0, AwaitingAvsecFlightResource::getEloquentQuery()->count());
     }
@@ -150,7 +150,7 @@ class AtmoAvsecQueuesTest extends TestCase
         $statuses = $flights->map(fn (Flight $flight) => FlightStatusDisplay::badge($flight, UserRole::Atmo)['label'])->all();
         $queries = DB::getQueryLog();
         DB::disableQueryLog();
-        $this->assertEqualsCanonicalizing(['Pending AVSEC', 'AVSEC Approved'], $statuses);
+        $this->assertEqualsCanonicalizing(['For AVSEC Clearance', 'For ATMO Signature'], $statuses);
         $this->assertSame([], $queries);
     }
 

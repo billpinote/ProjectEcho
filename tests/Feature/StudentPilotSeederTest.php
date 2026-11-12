@@ -3,10 +3,14 @@
 namespace Tests\Feature;
 
 use App\Domain\FlightPlans\Enums\FlightPlanStatus;
+use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Pilots\Enums\PilotQualificationCategory;
 use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
+use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
+use App\Filament\Panels\Pilot\Resources\Flights\Pages\EditFlight;
 use App\Filament\Shared\Resources\Flights\Pages\CreateFlight;
 use App\Models\Flight;
 use App\Models\Operator;
@@ -17,6 +21,7 @@ use Filament\Facades\Filament;
 use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -149,6 +154,30 @@ class StudentPilotSeederTest extends TestCase
         $this->assertSame('2028-12-31', $flight->authorized_representative_expiry_date);
         $this->assertTrue($flight->requiresPicAuthorization());
         $this->assertFalse($flight->canSubmitToAtc());
+
+        $this->get(route('flights.view', $flight))->assertOk()
+            ->assertSee('aria-label="Flight plan status"', false)
+            ->assertSeeText('Manifest Required')
+            ->assertDontSee('<div class="echo-preview-delay-banner" role="status">', false);
+        $this->get(AwaitingAuthorizationFlightResource::getUrl('index', panel: 'pilot'))->assertOk()->assertSeeText('SPL123');
+        $this->get(route('filament.pilot.resources.flights.edit', $flight))->assertOk();
+        Livewire::actingAs($studentPilot)->test(EditFlight::class, ['record' => $flight->id])
+            ->fillForm(['route' => 'DCT TEST'])->call('save')->assertHasNoFormErrors();
+        $this->assertSame('DCT TEST', $flight->fresh()->route);
+
+        $this->put(route('flights.manifest.update', $flight), ['remarks' => 'Student manifest'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->get(EditFlightManifest::getUrl(['flight' => $flight], panel: 'pilot'))->assertOk()->assertSeeText('Save manifest');
+        $this->assertSame($studentPilot->id, $flight->fresh()->manifest->created_by_user_id);
+        $this->put(route('flights.manifest.update', $flight), ['remarks' => 'Updated student manifest'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('Updated student manifest', $flight->fresh()->manifest->remarks);
+        $this->assertFalse($flight->fresh()->isPicAuthorizationCurrent());
+        $this->assertNull($flight->fresh()->pilot_in_command_user_id);
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Only verified PPL, CPL, or ATPL holders may authorize as PIC.');
+        app(PicAuthorizationService::class)->eligibleCredentials($studentPilot, $flight->fresh());
     }
 
     /**

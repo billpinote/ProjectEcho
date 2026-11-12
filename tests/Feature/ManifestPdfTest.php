@@ -135,7 +135,7 @@ class ManifestPdfTest extends TestCase
         $this->get($url)->assertRedirect(route('gateway'));
         $this->actingAs(User::factory()->create(['role' => UserRole::Pilot]))->get($url)->assertForbidden();
         $this->actingAs(User::factory()->create(['role' => UserRole::Pilot, 'is_active' => false]))->get($url)->assertForbidden();
-        $this->actingAs($this->atmo())->get($url)->assertForbidden();
+        $this->actingAs($this->atmo())->get($url)->assertOk();
         $this->signFlightDocuments($flight);
         $this->get($url)->assertOk();
         $this->get(route('flights.manifest.pdf', ['flight' => 999999]))->assertNotFound();

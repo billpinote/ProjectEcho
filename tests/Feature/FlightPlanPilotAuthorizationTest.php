@@ -38,7 +38,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
     public function test_pilot_cannot_open_general_edit_page_for_a_submitted_flight(): void
     {
         $pilot = $this->user(UserRole::Pilot);
-        $flight = $this->flight(['filed_by_user_id' => $pilot->id]);
+        $flight = $this->flight(['filed_by_user_id' => $pilot->id, 'pic_authorization_status' => 'declined']);
 
         $this->assertTrue(Route::has('filament.pilot.resources.flights.edit'));
         $this->assertTrue(Route::has('filament.pilot.resources.my-flight-plans.index'));
@@ -247,7 +247,7 @@ class FlightPlanPilotAuthorizationTest extends TestCase
     public function test_pilot_cannot_forge_a_livewire_update_request_for_a_submitted_flight(): void
     {
         $pilot = $this->user(UserRole::Pilot);
-        $flight = $this->flight(['filed_by_user_id' => $pilot->id]);
+        $flight = $this->flight(['filed_by_user_id' => $pilot->id, 'pic_authorization_status' => 'declined']);
 
         Livewire::actingAs($pilot)
             ->test(EditFlight::class, ['record' => $flight->getKey()])

@@ -13,7 +13,7 @@ class FlightManifestPolicy
 {
     public function view(User $user, FlightManifest $manifest): bool
     {
-        return FlightAccess::canView($user, $manifest->flight);
+        return FlightAccess::canViewManifest($user, $manifest);
     }
 
     public function create(User $user, Flight $flight): bool
@@ -21,6 +21,8 @@ class FlightManifestPolicy
         return in_array($user->role, [UserRole::Pilot, UserRole::Dispatch, UserRole::Admin, UserRole::Artisan], true)
             && $user->canCreateFlightPlans()
             && FlightAccess::canView($user, $flight)
+            && (! $user->isDispatch() || FlightAccess::isCreator($user, $flight))
+            && (! $user->isPilot() || FlightAccess::isCreator($user, $flight))
             && ! $flight->hasBeenAccepted()
             && ! $flight->isAvsecFrozen()
             && ! $flight->isPicAuthorizationDeclined()
@@ -30,7 +32,7 @@ class FlightManifestPolicy
 
     public function update(User $user, FlightManifest $manifest): bool
     {
-        return $this->create($user, $manifest->flight);
+        return $this->view($user, $manifest) && $this->create($user, $manifest->flight);
     }
 
     public function delete(User $user, FlightManifest $manifest): bool

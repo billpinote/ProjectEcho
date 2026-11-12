@@ -204,7 +204,7 @@ class FlightManifestTest extends TestCase
         $this->assertSame($before, $flight->fresh()->getAttributes());
         $this->assertSame($eventsBefore, $flight->events()->count());
         $this->assertSame([], Storage::disk('public')->allFiles());
-        $this->get(route('flights.view', $flight))->assertForbidden();
+        $this->get(route('flights.view', $flight))->assertOk()->assertViewHas('canAcceptFlightPlan', false);
     }
 
     public static function incompleteManifests(): array
@@ -320,6 +320,7 @@ class FlightManifestTest extends TestCase
         $operator = Operator::factory()->create();
         $flight = Flight::factory()->create(['operator_id' => $operator->id]);
         $dispatch = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $operator->id]);
+        $flight->update(['prepared_by_user_id' => $dispatch->id, 'filed_by_user_id' => $dispatch->id]);
         $manifest = app(FlightManifestService::class)->save($flight, $dispatch, []);
         $this->assertTrue($dispatch->can('update', $manifest));
         $dispatch->update(['operator_id' => Operator::factory()->create()->id]);

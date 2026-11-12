@@ -5,7 +5,6 @@ namespace App\Filament\Shared\Resources\Flights\Pages;
 use App\Auth\AuthenticationEvidence;
 use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Services\FlightPlanSubmissionService;
-use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\FlightPlans\Support\FlightAccess;
@@ -40,14 +39,7 @@ class CreateFlight extends CreateRecord
     public ?string $reviewedFormFingerprint = null;
 
     #[Locked]
-    public ?int $reviewedSignatureId = null;
-
-    #[Locked]
     public bool $fromSessionPreview = false;
-
-    /** @var list<string> */
-    #[Locked]
-    public array $reviewedDocumentTypes = [];
 
     private bool $confirmedSelfFiling = false;
 
@@ -135,21 +127,14 @@ class CreateFlight extends CreateRecord
         return Action::make('authorizeFiling')
             ->visible(fn (): bool => $this->isSelfFiling())
             ->requiresConfirmation()
-            ->modalHeading('Authorize Flight Filing')
-            ->modalDescription(fn (): string => 'You are about to authorize and submit this flight plan and its attached documents using your verified pilot signature. Documents included: '.collect($this->reviewedDocumentTypes)->map(fn (string $type): string => str($type)->replace('_', ' ')->ucfirst()->toString())->implode(', ').'.')
-            ->modalSubmitActionLabel('Authorize & Submit')
+            ->modalHeading('Create Flight Plan')
+            ->modalDescription('Save the flight plan, complete its manifest, then review and authorize the complete filing package. No PIC signature is applied at this step.')
+            ->modalSubmitActionLabel('Create Flight Plan')
             ->modalCancelActionLabel('Cancel')
             ->mountUsing(function (): void {
                 $this->authorizeAccess();
                 $data = $this->mutateFormDataBeforeCreate($this->form->getState());
-                try {
-                    $signature = app(PicAuthorizationService::class)->selfFilingSignature(auth()->user()->fresh());
-                } catch (ValidationException $exception) {
-                    $this->reportAuthorizationFailure($exception);
-                }
-                $this->reviewedSignatureId = $signature->id;
                 $this->reviewedFormFingerprint = FilingDocumentRegistry::fingerprint($data);
-                $this->reviewedDocumentTypes = array_keys(app(FilingDocumentRegistry::class)->snapshots(new Flight($data)));
             })
             ->action(function (): void {
                 if (! $this->isSelfFiling()) {
@@ -224,7 +209,7 @@ class CreateFlight extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         if ($this->isSelfFiling()) {
-            if (! $this->confirmedSelfFiling || $this->reviewedSignatureId === null
+            if (! $this->confirmedSelfFiling
                 || $this->reviewedFormFingerprint === null
                 || ! hash_equals($this->reviewedFormFingerprint, FilingDocumentRegistry::fingerprint($data))) {
                 $this->reportAuthorizationFailure(ValidationException::withMessages([
@@ -232,8 +217,8 @@ class CreateFlight extends CreateRecord
                 ]));
             }
             try {
-                return app(FlightPlanSubmissionService::class)->submitSelfAuthorized($data, auth()->user(),
-                    AuthenticationEvidence::fromSession(Filament::auth()), $this->reviewedSignatureId, $this->selfSubmissionId, $this->reviewedDocumentTypes);
+                return app(FlightPlanSubmissionService::class)->submitSelfPrepared($data, auth()->user(),
+                    AuthenticationEvidence::fromSession(Filament::auth()), $this->selfSubmissionId);
             } catch (ValidationException $exception) {
                 $this->reportAuthorizationFailure($exception);
             }
@@ -262,6 +247,10 @@ class CreateFlight extends CreateRecord
             }
 
             return MyCurrentFlightResource::getUrl('index', panel: 'pilot');
+        }
+
+        if (auth()->user()?->isDispatch() || auth()->user()?->isOperatorStaff()) {
+            return \App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource::getUrl('index', panel: 'dispatch');
         }
 
         return parent::getRedirectUrl();

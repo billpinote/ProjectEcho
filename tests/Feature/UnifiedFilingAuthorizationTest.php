@@ -48,6 +48,13 @@ class UnifiedFilingAuthorizationTest extends TestCase
     public function test_one_signed_decision_preserves_every_included_document(string $kind): void
     {
         [$flight, $pilot, $preparer] = $this->filing();
+        if ($kind === 'flight') {
+            $flight->manifest()->delete();
+            $this->signature($pilot);
+            $this->expectException(ValidationException::class);
+            $service = app(PicAuthorizationService::class);
+            $service->authorizeFromHandoff($service->createAuthorizationHandoff($flight), $pilot);
+        }
         if ($kind !== 'flight') {
             $this->manifest($flight, $pilot, $preparer, $kind === 'cargo');
         }
@@ -86,15 +93,11 @@ class UnifiedFilingAuthorizationTest extends TestCase
         return ['flight only' => ['flight'], 'passengers' => ['passengers'], 'cargo' => ['cargo']];
     }
 
-    public function test_unsigned_authorization_remains_available_without_an_approved_signature(): void
+    public function test_unsigned_authorization_is_rejected_without_an_approved_signature(): void
     {
         [$flight, $pilot] = $this->filing();
+        $this->expectException(ValidationException::class);
         $this->authorize($flight, $pilot, false);
-        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
-        $this->assertNull($flight->filingAuthorizations()->sole()->pilot_signature_id);
-        $this->assertNull(app(FilingAuthorizationService::class)->signatureBytes($flight));
-        $this->get(route('flights.view', $flight))->assertOk()
-            ->assertSee('Not applied')->assertSee('Current document authorization');
     }
 
     public function test_pending_signature_cannot_be_applied_and_handoff_is_not_consumed(): void
@@ -191,11 +194,11 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $this->signature($pilot);
         $this->authorize($flight, $pilot, true);
         $manifest->update(['cargo_quantity' => '3 boxes']);
-        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertFalse($flight->refresh()->isPicAuthorizationCurrent());
         $this->assertFalse($flight->canSubmitToAtc());
         $this->authorize($flight, $pilot, true);
         $manifest->persons()->first()->update(['nationality' => 'US']);
-        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertFalse($flight->refresh()->isPicAuthorizationCurrent());
         $this->assertFalse($flight->canSubmitToAtc());
         $this->assertCount(2, $flight->filingAuthorizations()->get());
     }
@@ -203,6 +206,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
     public function test_a_manifest_added_after_review_is_not_silently_authorized(): void
     {
         [$flight, $pilot, $preparer] = $this->filing();
+        $flight->manifest()->delete();
         $service = app(PicAuthorizationService::class);
         $token = $service->createAuthorizationHandoff($flight);
         $this->manifest($flight, $pilot, $preparer, false);
@@ -214,9 +218,9 @@ class UnifiedFilingAuthorizationTest extends TestCase
     {
         [$flight, $pilot, $preparer] = $this->filing();
         $manifest = $this->manifest($flight, $pilot, $preparer, false);
-        $this->authorize($flight, $pilot, false);
+        $this->authorize($flight, $pilot, true);
         $manifest->newQuery()->whereKey($manifest->id)->update(['remarks' => 'Changed externally']);
-        $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
+        $this->assertFalse($flight->refresh()->isPicAuthorizationCurrent());
         $this->assertFalse($flight->canSubmitToAtc());
     }
 
@@ -247,7 +251,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
     public function test_unrelated_user_cannot_read_package_or_private_pdf(): void
     {
         [$flight, $pilot] = $this->filing();
-        $this->authorize($flight, $pilot, false);
+        $this->authorize($flight, $pilot, true);
         $package = $flight->filingAuthorizations()->sole();
         $unrelated = User::factory()->create(['role' => UserRole::Pilot]);
         $this->actingAs($unrelated)->get(route('filing.document', ['package' => $package, 'type' => 'flight_plan']))->assertForbidden();
@@ -257,12 +261,12 @@ class UnifiedFilingAuthorizationTest extends TestCase
     public function test_self_filing_signature_requires_a_separate_explicit_action(): void
     {
         [$flight, $pilot] = $this->filing();
-        $flight->update(['prepared_by_user_id' => $pilot->id, 'pilot_in_command_user_id' => $pilot->id]);
+        $flight->update(['prepared_by_user_id' => $pilot->id, 'pilot_in_command_user_id' => $pilot->id, 'pilot_in_command' => strtoupper($pilot->fullName())]);
         $this->signature($pilot);
         $this->actingAs($pilot);
         $this->assertNull(app(FilingAuthorizationService::class)->signatureBytes($flight));
         $this->get(route('filing.review-self', $flight))->assertRedirect();
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Review and authorize this filing');
+        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Review current filing');
         $service = app(PicAuthorizationService::class);
         $token = $service->createAuthorizationHandoff($flight->refresh(), selfPrepared: true);
         $this->post(route('filing.authorize-self', ['token' => $token]), ['apply_signature' => 1])->assertRedirect(route('flights.view', $flight));
@@ -279,7 +283,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
     {
         [$flight, $pilot, $preparer] = $this->filing();
         $manifest = $this->manifest($flight, $pilot, $preparer, false);
-        $this->authorize($flight, $pilot, false);
+        $this->authorize($flight, $pilot, true);
         $revision = $flight->refresh()->revision_number;
         $this->manifest($flight, $pilot, $preparer, false);
         $this->assertTrue($flight->refresh()->isPicAuthorizationCurrent());
@@ -290,6 +294,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
     {
         [$flight, $pilot, $preparer] = $this->filing();
         $this->manifest($flight, $pilot, $preparer, false);
+        $this->signature($pilot);
         $service = app(PicAuthorizationService::class);
         $token = $service->createAuthorizationHandoff($flight);
         $this->mock(ManifestPdfService::class)
@@ -318,7 +323,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
     public function test_decided_package_cannot_be_rewritten_or_deleted(): void
     {
         [$flight, $pilot] = $this->filing();
-        $this->authorize($flight, $pilot, false);
+        $this->authorize($flight, $pilot, true);
         $package = $flight->filingAuthorizations()->sole();
         try {
             $package->forceFill(['reason' => 'Rewrite history'])->save();
@@ -415,6 +420,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
                 throw new \LogicException('An unreviewed renderer must not run.');
             },
         );
+        $this->signature($pilot);
         $service = app(PicAuthorizationService::class);
         $token = $service->createAuthorizationHandoff($flight);
         try {
@@ -443,6 +449,8 @@ class UnifiedFilingAuthorizationTest extends TestCase
             'date_of_flight' => now()->addDay()->toDateString(), 'persons_on_board' => 1,
         ])->refresh();
 
+        $this->manifest($flight, $pilot, $preparer, false);
+
         return [$flight, $pilot, $preparer];
     }
 
@@ -469,6 +477,9 @@ class UnifiedFilingAuthorizationTest extends TestCase
     private function authorize(Flight $flight, User $pilot, bool $signed): void
     {
         $this->actingAs($pilot);
+        if ($signed && ! $pilot->approvedSignature()->exists()) {
+            $this->signature($pilot);
+        }
         $service = app(PicAuthorizationService::class);
         $token = $service->createAuthorizationHandoff($flight->refresh());
         $service->authorizeFromHandoff($token, $pilot, AuthenticationEvidence::fromSession(Auth::guard('web')), $signed);

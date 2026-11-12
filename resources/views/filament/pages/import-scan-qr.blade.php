@@ -1,4 +1,7 @@
 <x-filament-panels::page>
+    @if($recoveryUrl)
+        <p role="status">This QR cannot authorize the current revision. <a href="{{ $recoveryUrl }}" class="underline">Review the current filing and recover authorization</a>.</p>
+    @endif
     @php
         $statusBadgeClass = match ($matchedFlight['status_color'] ?? 'gray') {
             'warning' => 'echo-status-pending',
@@ -542,14 +545,9 @@
                                         <p><a href="{{ $document['url'] }}" target="_blank" rel="noopener noreferrer">Review {{ $document['label'] }}</a></p>
                                     @endforeach
                                 </div>
-                                <button type="button" wire:click="authorizeAsPic" wire:loading.attr="disabled" class="echo-button echo-button-accent" style="margin-top: 1rem;">
-                                    Authorize as PIC
-                                </button>
-                                <p class="mt-2 text-sm">Authorize as PIC records your decision without applying a signature image.</p>
-                                @if($this->hasApprovedSignature())
-                                    <button type="button" wire:click="authorizeAndSignAsPic" wire:loading.attr="disabled" class="echo-button echo-button-accent mt-3">Authorize filing and apply verified signature</button>
-                                @else
-                                    <p class="mt-2 text-sm">No approved signature is available. You can authorize without an electronic signature, or submit your signature for verification in your profile.</p>
+                                <button type="button" wire:click="authorizeAndSignAsPic" wire:loading.attr="disabled" @disabled($this->authorizationUnavailableReason() !== null) class="echo-button echo-button-accent mt-3">Authorize &amp; Sign Filing</button>
+                                @if($this->authorizationUnavailableReason())
+                                    <p role="status">{{ $this->authorizationUnavailableReason() }}</p>
                                 @endif
                                 @error('signature')<p role="alert">{{ $message }}</p>@enderror
                                 @error('payload')<p role="alert">{{ $message }}</p>@enderror

@@ -213,7 +213,7 @@ class AvsecDashboardTest extends TestCase
         $cleared = $this->readyFlight(['date_of_flight' => '2030-01-01']);
         $this->confirmFlightAvsec($cleared);
         $this->officer();
-        $allFlights = Livewire::test(AllFlights::class)->assertTableColumnStateSet('avsec_status', 'Pending Clearance', $awaiting)
+        $allFlights = Livewire::test(AllFlights::class)->assertTableColumnStateSet('avsec_status', 'For AVSEC Clearance', $awaiting)
             ->assertTableColumnStateSet('avsec_status', 'Clearance Granted', $cleared)->assertDontSee('Frozen');
         $statusColumn = $allFlights->instance()->getTable()->getColumn('avsec_status')->record($cleared->fresh());
         $this->assertSame('success', $statusColumn->getColor('Clearance Granted'));
@@ -238,14 +238,14 @@ class AvsecDashboardTest extends TestCase
         $flight = $this->readyFlight();
         $this->officer();
         $page = Livewire::test(ListFiledRpusDepartures::class)
-            ->assertTableColumnStateSet('avsec_status', 'Pending Clearance', $flight)->assertDontSee('Frozen')
+            ->assertTableColumnStateSet('avsec_status', 'For AVSEC Clearance', $flight)->assertDontSee('Frozen')
             ->assertSee('All dates and PTD are UTC (Z).', escape: false)
             ->assertSee(route('flights.view', $flight), false);
         $table = $page->instance()->getTable();
         $this->assertSame(['CALLSIGN', 'DATE', 'PTD', 'Pilot', 'AVSEC STATUS'], array_values(array_map(fn ($column) => $column->getLabel(), $table->getColumns())));
         $this->assertSame(route('flights.view', $flight), $table->getRecordUrl($flight));
         $this->assertTrue($table->shouldOpenRecordUrlInNewTab($flight));
-        $this->assertSame('warning', $table->getColumn('avsec_status')->record($flight)->getColor('Pending Clearance'));
+        $this->assertSame('warning', $table->getColumn('avsec_status')->record($flight)->getColor('For AVSEC Clearance'));
         $this->assertFalse($flight->isAvsecFrozen());
     }
 
