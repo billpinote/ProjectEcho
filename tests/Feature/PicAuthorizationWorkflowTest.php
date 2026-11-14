@@ -456,11 +456,13 @@ class PicAuthorizationWorkflowTest extends TestCase
             $flight = $this->awaitingFlight($pilot);
             $payload = $this->payload($flight);
 
-            $flight->forceFill([
+            $qrFlight = clone $flight;
+            $qrFlight->forceFill([
                 $field => $field === 'date_of_flight'
                     ? now('Asia/Manila')->addDays(2)->toDateString()
                     : $flight->{$field}.'-CHANGED',
-            ])->save();
+            ]);
+            $payload = $this->payload($qrFlight);
 
             try {
                 app(PicAuthorizationService::class)->authorizeFromPayload($payload, $pilot);
@@ -634,7 +636,7 @@ class PicAuthorizationWorkflowTest extends TestCase
             ->assertSee('FLIGHT PLAN', false)
             ->assertDontSeeText('PIC Authorization Pending');
 
-        $flight->update(['route' => 'CHANGED']);
+        $flight->manifest()->firstOrFail()->update(['remarks' => 'Changed manifest']);
 
         $this->get(route('flights.view', $flight))
             ->assertOk()

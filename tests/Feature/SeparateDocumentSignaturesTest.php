@@ -83,21 +83,22 @@ class SeparateDocumentSignaturesTest extends TestCase
             ->assertOk()->assertContent(base64_decode($preserved['passenger_cargo_manifest']['bytes']));
     }
 
-    public function test_flight_plan_edit_and_revert_requires_new_signature_but_unchanged_manifest_stays_signed(): void
+    public function test_flight_plan_edit_is_rejected_without_invalidating_either_signature(): void
     {
         [$flight, $pilot] = $this->filing();
         $this->saveManifest($flight, $pilot);
         $this->manifestPage($flight, $pilot)->callMountedAction()->assertHasNoErrors();
         $manifest = app(FilingAuthorizationService::class)->currentForDocument($flight, 'passenger_cargo_manifest');
-        $oldRoute = $flight->fresh()->route;
-        $flight->fresh()->update(['route' => 'CHANGED']);
-        $flight->fresh()->update(['route' => $oldRoute]);
-        $this->assertNull(app(FilingAuthorizationService::class)->currentForDocument($flight, 'flight_plan'));
+        $plan = app(FilingAuthorizationService::class)->currentForDocument($flight, 'flight_plan');
+        try {
+            $flight->fresh()->update(['route' => 'CHANGED']);
+            $this->fail('Submitted contents were edited.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('flight', $exception->errors());
+        }
+        $this->assertSame($plan->id, app(FilingAuthorizationService::class)->currentForDocument($flight->fresh(), 'flight_plan')->id);
         $this->assertSame($manifest->id, app(FilingAuthorizationService::class)->currentForDocument($flight, 'passenger_cargo_manifest')->id);
-        $this->assertFalse($flight->canSubmitToAtc());
-        Livewire::actingAs($pilot)->withQueryParams(['confirm_flight_plan' => 1])->test(EditFlightManifest::class, ['flight' => $flight->fresh()])
-            ->assertActionMounted('signFiling')->callMountedAction()->assertHasNoErrors();
-        $this->assertTrue($flight->fresh()->canSubmitToAtc());
+        $this->assertTrue($flight->canSubmitToAtc());
     }
 
     public function test_stale_manifest_confirmation_preserves_latest_saved_version(): void
@@ -163,9 +164,7 @@ class SeparateDocumentSignaturesTest extends TestCase
 
     public function test_representative_qr_authorizes_current_documents_and_later_manifest_edit_hides_flight(): void
     {
-        [$flight, $pilot] = $this->filing(false);
-        $dispatch = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $pilot->operator_id]);
-        $flight->update(['prepared_by_user_id' => $dispatch->id, 'filed_by_user_id' => $dispatch->id]);
+        [$flight, $pilot, $dispatch] = $this->filing(false, true);
         $this->saveManifest($flight, $dispatch);
         $this->actingAs($pilot);
         $service = app(PicAuthorizationService::class);
@@ -210,7 +209,7 @@ class SeparateDocumentSignaturesTest extends TestCase
         $this->saveManifest($flight, $pilot);
         $this->manifestPage($flight, $pilot)->callMountedAction()->assertHasNoErrors();
         $replacement = $this->signature($pilot, 2);
-        $flight->refresh()->update(['route' => 'NEW SIGNED REVISION']);
+        $this->saveManifest($flight, $pilot, ['remarks' => 'New package revision']);
         app(PicAuthorizationService::class)->authorizeSelfFiling($flight, $pilot,
             AuthenticationEvidence::fromSession(Auth::guard()), $replacement->id);
         $this->assertTrue($flight->fresh()->canSubmitToAtc());
@@ -226,16 +225,15 @@ class SeparateDocumentSignaturesTest extends TestCase
         $this->assertSame(FlightStatusDisplay::EXPIRED, FlightStatusDisplay::badge($flight, UserRole::Pilot)['key']);
     }
 
-    public function test_manifest_revision_does_not_make_a_flight_plan_confirmation_stale(): void
+    public function test_manifest_revision_makes_complete_package_confirmation_stale(): void
     {
         [$flight, $pilot] = $this->filing();
         $this->saveManifest($flight, $pilot);
-        $flight->update(['route' => 'NEW ROUTE']);
         $page = Livewire::actingAs($pilot)->withQueryParams(['confirm_flight_plan' => 1])
             ->test(EditFlightManifest::class, ['flight' => $flight->fresh()]);
         $this->saveManifest($flight, $pilot, ['remarks' => 'Separate manifest revision']);
         $page->callMountedAction()->assertHasErrors('signature');
-        $this->assertNull(app(FilingAuthorizationService::class)->currentForDocument($flight, 'flight_plan'));
+        $this->assertNotNull(app(FilingAuthorizationService::class)->currentForDocument($flight, 'flight_plan'));
         $this->assertSame('For PIC Signature', $flight->fresh()->documentSignatureStatus());
     }
 
@@ -252,7 +250,7 @@ class SeparateDocumentSignaturesTest extends TestCase
         $this->assertFalse($flight->fresh()->canSubmitToAtc());
     }
 
-    public function test_no_op_manifest_save_preserves_signatures_but_shared_rendered_fields_require_both_again(): void
+    public function test_no_op_manifest_save_and_rejected_flight_edit_preserve_both_signatures(): void
     {
         [$flight, $pilot] = $this->filing();
         $this->saveManifest($flight, $pilot);
@@ -261,18 +259,21 @@ class SeparateDocumentSignaturesTest extends TestCase
         $this->saveManifest($flight, $pilot);
         $this->assertTrue($flight->fresh()->canSubmitToAtc());
         $this->assertSame($revision, $flight->fresh()->revision_number);
-        $flight->update(['aircraft_identification' => 'RPCNEW']);
+        try {
+            $flight->update(['aircraft_identification' => 'RPCNEW']);
+            $this->fail('Submitted aircraft identification was edited.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('flight', $exception->errors());
+        }
         $packages = app(FilingAuthorizationService::class);
-        $this->assertNull($packages->currentForDocument($flight, 'flight_plan'));
-        $this->assertNull($packages->currentForDocument($flight, 'passenger_cargo_manifest'));
-        $this->assertFalse($flight->fresh()->canSubmitToAtc());
+        $this->assertNotNull($packages->currentForDocument($flight->refresh(), 'flight_plan'));
+        $this->assertNotNull($packages->currentForDocument($flight, 'passenger_cargo_manifest'));
+        $this->assertTrue($flight->canSubmitToAtc());
     }
 
     public function test_legacy_signed_packages_remain_current_without_rewriting_historical_evidence(): void
     {
-        [$flight, $pilot] = $this->filing(false);
-        $dispatch = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $pilot->operator_id]);
-        $flight->update(['prepared_by_user_id' => $dispatch->id, 'filed_by_user_id' => $dispatch->id]);
+        [$flight, $pilot, $dispatch] = $this->filing(false, true);
         $this->saveManifest($flight, $dispatch);
         $this->actingAs($pilot);
         $service = app(PicAuthorizationService::class);
@@ -296,14 +297,15 @@ class SeparateDocumentSignaturesTest extends TestCase
         $this->assertSame($original->pdf_documents, $legacy->pdf_documents);
     }
 
-    private function filing(bool $sign = true): array
+    private function filing(bool $sign = true, bool $representative = false): array
     {
         $pilot = User::factory()->create(['role' => UserRole::Pilot, 'operator_id' => Operator::factory()->create()->id]);
         $pilot->pilotProfile()->create(['license_type' => PilotLicenseType::CommercialPilot, 'license_number' => 'TEST-123',
             'ratings' => 'C172', 'license_expiry_date' => now()->addYears(2)->toDateString()]);
         $signature = $this->signature($pilot);
+        $preparer = $representative ? User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $pilot->operator_id]) : $pilot;
         $flight = Flight::factory()->create(['status' => FlightPlanStatus::AwaitingPic,
-            'operator_id' => $pilot->operator_id, 'prepared_by_user_id' => $pilot->id, 'filed_by_user_id' => $pilot->id,
+            'operator_id' => $pilot->operator_id, 'prepared_by_user_id' => $preparer->id, 'filed_by_user_id' => $preparer->id,
             'pilot_in_command_user_id' => $pilot->id, 'pilot_id' => $pilot->id,
             'pilot_in_command' => strtoupper($pilot->fullName()), 'persons_on_board' => 1])->refresh();
         $this->actingAs($pilot);
@@ -314,7 +316,7 @@ class SeparateDocumentSignaturesTest extends TestCase
             $packages->decide($package, $flight, $pilot, true, null, $signature);
         }
 
-        return [$flight->fresh(), $pilot];
+        return [$flight->fresh(), $pilot, $preparer];
     }
 
     private function saveManifest(Flight $flight, User $actor, array $extra = []): void

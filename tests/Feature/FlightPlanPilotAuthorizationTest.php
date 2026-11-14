@@ -637,17 +637,20 @@ class FlightPlanPilotAuthorizationTest extends TestCase
         }
     }
 
-    public function test_admin_and_artisan_retain_general_edit_access_through_real_operational_panel(): void
+    public function test_admin_and_artisan_can_view_but_cannot_edit_through_operational_panel(): void
     {
         $flight = $this->flight();
         $admin = $this->user(UserRole::Admin);
         $artisan = $this->user(UserRole::Artisan);
 
-        $this->assertTrue($admin->can('update', $flight));
+        $this->assertFalse($admin->can('update', $flight));
+        $this->assertFalse($artisan->can('update', $flight));
+        $this->assertTrue($admin->can('view', $flight));
+        $this->assertTrue($artisan->can('view', $flight));
 
         $this->actingAs($artisan)
             ->get(route('filament.atmo.resources.all-flight-plans.edit', ['record' => $flight]))
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_historical_flights_with_null_filed_by_user_id_are_not_claimable_by_pilots(): void

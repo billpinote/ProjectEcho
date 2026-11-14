@@ -292,7 +292,7 @@ final class FlightStatusDisplay
         if ($role === UserRole::Pilot) {
             return match ($status) {
                 self::AWAITING_PIC => 'This flight plan is waiting for Pilot-in-Command authorization.',
-                self::PIC_DECLINED => 'This version was declined by the Pilot-in-Command. Correct and resubmit it.',
+                self::PIC_DECLINED => 'This filing was declined by the Pilot-in-Command. Its submitted contents are read-only.',
                 self::PENDING => 'Your flight plan is waiting for ATC review.',
                 self::ACCEPTED => self::ACCEPTANCE_NOTICE,
                 self::STARTED => 'Startup or block-off has been recorded.',

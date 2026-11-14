@@ -454,13 +454,6 @@ class FlightOperationsWorkflowTest extends TestCase
 
     private function completeManifestFor(Flight $flight): void
     {
-        $flight->update([
-            'type_of_aircraft' => 'C172',
-            'pilot_in_command' => 'Test Pilot',
-            'pilot_license_no' => 'PPL-12345',
-            'license_expiry_date' => now()->addYear()->toDateString(),
-            'persons_on_board' => 1,
-        ]);
         $manifest = FlightManifest::factory()->for($flight)->create();
         $manifest->persons()->create([
             'sequence_number' => 1, 'full_name' => 'Test Pilot',
@@ -482,6 +475,11 @@ class FlightOperationsWorkflowTest extends TestCase
             'departure_aerodrome' => 'RPUS',
             'destination_aerodrome' => 'RPLL',
             'route' => 'DCT',
+            'type_of_aircraft' => 'C172',
+            'pilot_in_command' => 'Test Pilot',
+            'pilot_license_no' => 'PPL-12345',
+            'license_expiry_date' => now()->addYear()->toDateString(),
+            'persons_on_board' => 1,
             ...$attributes,
         ]);
     }

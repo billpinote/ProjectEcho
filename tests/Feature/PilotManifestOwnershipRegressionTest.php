@@ -64,9 +64,8 @@ class PilotManifestOwnershipRegressionTest extends TestCase
         $this->assertFalse(FlightAccess::restrictQueryToVisibleManifestFlights(Flight::query(), $pilot)->whereKey($flight)->exists());
 
         $owner = User::factory()->create(['role' => UserRole::Pilot, 'operator_id' => Operator::factory()]);
-        $private = $this->filing($owner, 'PRIVATE123');
+        $private = $this->filing($owner, 'PRIVATE123', ['pilot_in_command_user_id' => $pilot->id]);
         $pilot->update(['operator_id' => $owner->operator_id]);
-        $private->update(['pilot_in_command_user_id' => $pilot->id]);
         $this->assertTrue($pilot->can('view', $private));
         $this->assertFalse($pilot->can('view', $private->manifest));
         $this->assertFalse($pilot->can('update', $private->manifest));
@@ -106,8 +105,8 @@ class PilotManifestOwnershipRegressionTest extends TestCase
     public function test_manifest_listing_has_seven_columns_with_a_separate_action_and_optional_placeholders(): void
     {
         $pilot = User::factory()->create(['role' => UserRole::Pilot, 'first_name' => 'Ethan', 'last_name' => 'Villanueva', 'middle_name' => null, 'suffix' => null]);
-        $flight = $this->filing($pilot, 'COLUMNS123');
-        $flight->update(['prepared_by_name' => 'DIFFERENT FLIGHT PREPARER', 'pilot_in_command' => 'CERTIFIED PIC', 'proposed_time' => '0035']);
+        $flight = $this->filing($pilot, 'COLUMNS123', ['prepared_by_name' => 'DIFFERENT FLIGHT PREPARER',
+            'pilot_in_command' => 'CERTIFIED PIC', 'proposed_time' => '0035']);
         $response = $this->actingAs($pilot)->get(ListFlightManifests::getUrl(panel: 'pilot'))->assertOk()
             ->assertSeeInOrder(['Callsign', 'DOF', 'PTD', 'PIC', 'Prepared By', 'Status', 'Actions'])
             ->assertSeeText('CERTIFIED PIC')->assertSeeText('ETHAN VILLANUEVA')
@@ -143,11 +142,12 @@ class PilotManifestOwnershipRegressionTest extends TestCase
         $this->assertSame(2, substr_count($response->getContent(), '>—</td>'));
     }
 
-    private function filing(User $creator, string $callsign): Flight
+    private function filing(User $creator, string $callsign, array $attributes = []): Flight
     {
         $flight = Flight::factory()->create([
             'filed_by_user_id' => $creator->id, 'prepared_by_user_id' => $creator->id,
             'operator_id' => $creator->operator_id, 'aircraft_identification' => $callsign,
+            ...$attributes,
         ]);
         app(FlightManifestService::class)->save($flight, $creator, ['remarks' => 'Private manifest for '.$callsign]);
 

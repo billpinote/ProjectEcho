@@ -40,17 +40,7 @@ class FlightPolicy
      */
     public function update(User $user, Flight $flight): bool
     {
-        return $user->is_active
-            && ($user->hasFullFlightAccess()
-                || (in_array($user->role, [UserRole::Pilot, UserRole::Dispatch], true)
-                    && (FlightAccess::operatorMatches($user, $flight) || ($user->operator_id === null && $flight->operator_id === null))
-                    && in_array($flight->status, [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending], true)
-                    && FlightAccess::isCreator($user, $flight)))
-            && FlightAccess::canView($user, $flight)
-            && ($user->role !== UserRole::Atmo || ($flight->status === FlightPlanStatus::Pending && $flight->canSubmitToAtc()))
-            && ! $flight->hasBeenAccepted()
-            && ! $flight->isAvsecFrozen()
-            && $flight->pic_authorization_status !== 'declined';
+        return ! $flight->exists && $this->create($user);
     }
 
     /**

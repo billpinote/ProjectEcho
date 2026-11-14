@@ -153,10 +153,10 @@ class FlightManifestTest extends TestCase
         $this->assertSame('pic', $manifest->persons->first()->classification);
         $this->assertSame('Passenger 1', $manifest->persons[1]->full_name);
         $this->assertTrue(app(FlightManifestService::class)->comparison($manifest)['matches']);
-        $flight->update(['persons_on_board' => 31]);
+        $manifest->persons->last()->delete();
         $this->assertFalse(app(FlightManifestService::class)->comparison($manifest->fresh())['matches']);
-        $this->assertSame(30, $manifest->persons()->count());
-        $this->assertSame(31, $flight->fresh()->persons_on_board);
+        $this->assertSame(29, $manifest->persons()->count());
+        $this->assertSame(30, $flight->fresh()->persons_on_board);
     }
 
     public function test_mapping_uses_filed_credentials_and_does_not_treat_operator_as_home_base(): void
@@ -176,7 +176,7 @@ class FlightManifestTest extends TestCase
     public function test_acceptance_blocks_missing_or_incomplete_manifests_without_side_effects(string $case): void
     {
         Storage::fake('public');
-        $flight = Flight::factory()->create();
+        $flight = Flight::factory()->create(['persons_on_board' => $case === 'pob' ? 2 : 1]);
         if ($case !== 'missing') {
             if ($case === 'empty') {
                 $manifest = new FlightManifest;
@@ -188,8 +188,6 @@ class FlightManifestTest extends TestCase
             }
             if ($case === 'nationality') {
                 $manifest->persons->first()->update(['nationality' => null]);
-            } elseif ($case === 'pob') {
-                $flight->update(['persons_on_board' => 2]);
             } elseif ($case === 'pic') {
                 $manifest->persons->first()->update(['full_name' => 'Different PIC']);
             } elseif ($case === 'cargo') {
@@ -318,9 +316,9 @@ class FlightManifestTest extends TestCase
     public function test_dispatch_manifest_access_is_scoped_to_its_operator(): void
     {
         $operator = Operator::factory()->create();
-        $flight = Flight::factory()->create(['operator_id' => $operator->id]);
         $dispatch = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $operator->id]);
-        $flight->update(['prepared_by_user_id' => $dispatch->id, 'filed_by_user_id' => $dispatch->id]);
+        $flight = Flight::factory()->create(['operator_id' => $operator->id,
+            'prepared_by_user_id' => $dispatch->id, 'filed_by_user_id' => $dispatch->id]);
         $manifest = app(FlightManifestService::class)->save($flight, $dispatch, []);
         $this->assertTrue($dispatch->can('update', $manifest));
         $dispatch->update(['operator_id' => Operator::factory()->create()->id]);

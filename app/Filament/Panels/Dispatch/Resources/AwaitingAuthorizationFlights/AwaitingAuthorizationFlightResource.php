@@ -2,6 +2,7 @@
 
 namespace App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights;
 
+use App\Domain\FlightPlans\Enums\FlightPlanStatus;
 use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\Pages\ListAwaitingAuthorizationFlights;
 use App\Filament\Shared\Resources\Flights\FlightResource;
 use Filament\Support\Icons\Heroicon;
@@ -43,5 +44,19 @@ class AwaitingAuthorizationFlightResource extends FlightResource
         return [
             'index' => ListAwaitingAuthorizationFlights::route('/'),
         ];
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $count = static::getEloquentQuery()->whereIn('status', [FlightPlanStatus::AwaitingPic, FlightPlanStatus::Pending])
+            ->where(fn (Builder $query) => $query->whereNull('pic_authorization_status')
+                ->orWhere('pic_authorization_status', '!=', 'declined'))->count();
+
+        return $count > 0 ? "New {$count}" : null;
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Outstanding PIC filing authorizations';
     }
 }

@@ -21,6 +21,9 @@ class FilingAuthorizationService
     /** @var array<int, bool> */
     private array $mutating = [];
 
+    /** @var array<int, bool> */
+    private array $recordingDecisions = [];
+
     public function __construct(private FilingDocumentRegistry $documents, private PilotSignatureService $signatures) {}
 
     public function request(Flight $flight, ?array $signedDocumentTypes = null): FilingAuthorization
@@ -258,10 +261,17 @@ class FilingAuthorizationService
     {
         $id = (int) $flight->getKey();
         $this->mutating[$id] = true;
+        $this->recordingDecisions[$id] = true;
         try {
             return $decision();
         } finally {
             unset($this->mutating[$id]);
+            unset($this->recordingDecisions[$id]);
         }
+    }
+
+    public function isRecordingDecision(Flight $flight): bool
+    {
+        return isset($this->recordingDecisions[(int) $flight->getKey()]);
     }
 }

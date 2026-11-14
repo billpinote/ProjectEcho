@@ -36,7 +36,8 @@ trait SignsFlightDocuments
         if ($pilot === null || ! $pilot->isPilot()) {
             $pilot = User::factory()->create(['role' => UserRole::Pilot]);
         }
-        $flight->forceFill(['pilot_in_command_user_id' => $pilot->id])->saveQuietly();
+        app(FilingAuthorizationService::class)->recordingDecision($flight,
+            fn () => $flight->forceFill(['pilot_in_command_user_id' => $pilot->id])->saveQuietly());
         $signature = PilotSignature::factory()->create(['user_id' => $pilot->id, 'status' => 'approved']);
         $packages = app(FilingAuthorizationService::class);
         $package = $packages->request($flight);

@@ -7,7 +7,6 @@ use App\Domain\FlightPlans\Services\FlightPlanMutationService;
 use App\Domain\FlightPlans\Services\FlightPlanSubmissionService;
 use App\Domain\FlightPlans\Support\AuthenticatedOperatorFlightData;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
-use App\Domain\FlightPlans\Support\FlightAccess;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\PilotFlightPlanCredentials;
@@ -43,9 +42,6 @@ class CreateFlight extends CreateRecord
 
     private bool $confirmedSelfFiling = false;
 
-    #[Locked]
-    public ?int $correctionSourceId = null;
-
     protected static string $resource = FlightResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
@@ -71,26 +67,7 @@ class CreateFlight extends CreateRecord
             $this->fromSessionPreview = true;
         }
 
-        $sourceId = request()->integer('correct_from');
-        if ($sourceId <= 0) {
-            return;
-        }
-
-        $source = Flight::query()->find($sourceId);
-        abort_unless($source !== null
-            && $source->pic_authorization_status === 'declined'
-            && (int) $source->prepared_by_user_id === (int) auth()->id()
-            && FlightAccess::canView(auth()->user(), $source), 403);
-
-        $excluded = ['id', 'created_at', 'updated_at', 'status', 'revision_number', 'revision_of_id',
-            'pic_authorized_by_user_id', 'pic_authorized_at', 'pic_authorization_method',
-            'pic_authorization_token', 'pic_authorization_token_expires_at', 'pic_authorized_revision',
-            'pic_authorization_status', 'pic_authorization_declined_by_user_id',
-            'pic_authorization_declined_at', 'pic_authorization_decline_reason', 'accepted_by_user_id',
-            'accepted_by_wiresign', 'rejected_by_wiresign', 'rejection_reason', 'reviewed_at'];
-        $this->form->fill(collect($source->getAttributes())->except($excluded)->all());
-        $this->correctionSourceId = (int) $source->getKey();
-        $this->data['revision_of_id'] = $source->getKey();
+        abort_if(request()->has('correct_from'), 403, 'Submitted flight plans cannot be corrected and resubmitted.');
     }
 
     public static function authorizeResourceAccess(): void
@@ -193,15 +170,7 @@ class CreateFlight extends CreateRecord
             $data = PilotFlightPlanCredentials::applySnapshot($data, $user);
         }
 
-        $sourceId = $this->correctionSourceId ?? 0;
-        $source = $sourceId > 0 ? Flight::query()->find($sourceId) : null;
-        if ($source !== null) {
-            abort_unless($source->pic_authorization_status === 'declined'
-                && (int) $source->prepared_by_user_id === (int) auth()->id(), 403);
-            $data['revision_of_id'] = $source->getKey();
-            $data['revision_number'] = (int) ($source->revision_number ?? 1) + 1;
-            $data['pic_authorization_status'] = 'pending';
-        }
+        unset($data['revision_of_id'], $data['revision_number']);
 
         return FlightResource::normalizeFormData($data);
     }

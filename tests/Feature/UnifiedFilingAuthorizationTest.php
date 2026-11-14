@@ -14,6 +14,7 @@ use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FilingDocumentRegistry;
 use App\Domain\Pilots\Enums\PilotLicenseType;
 use App\Domain\Users\Enums\UserRole;
+use App\Filament\Panels\Dispatch\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\Pages\CreateFlight;
 use App\Models\FilingAuthorization;
 use App\Models\Flight;
@@ -162,27 +163,22 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $this->assertSame(Storage::disk('local')->get($first->stored_path), app(FilingAuthorizationService::class)->signatureBytes($flight->refresh()));
     }
 
-    public function test_material_flight_edit_invalidates_current_signature_but_preserves_history(): void
+    public function test_material_flight_edit_is_rejected_and_preserves_signed_history(): void
     {
         [$flight, $pilot] = $this->filing();
-        $this->signature($pilot);
         $this->authorize($flight, $pilot, true);
         $package = $flight->filingAuthorizations()->sole();
         $original = $package->pdf_documents;
         $revision = $flight->refresh()->revision_number;
-        $flight->update(['route' => 'DCT NEWROUTE']);
-
-        $this->assertSame($revision + 1, $flight->refresh()->revision_number);
-        $this->assertFalse($flight->isPicAuthorizationCurrent());
-        $this->assertFalse($flight->canSubmitToAtc());
-        $this->assertNull(app(FilingAuthorizationService::class)->signatureBytes($flight));
+        try {
+            $flight->update(['route' => 'DCT NEWROUTE']);
+            $this->fail('Submitted contents were edited.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('flight', $exception->errors());
+        }
+        $this->assertSame($revision, $flight->refresh()->revision_number);
+        $this->assertTrue($flight->canSubmitToAtc());
         $this->assertSame($original, $package->fresh()->pdf_documents);
-        $this->get(route('filing.history', $flight))->assertRedirect(route('flights.view', $flight).'#flight-plan-activity');
-        $this->get(route('flights.view', $flight))->assertOk()
-            ->assertSeeInOrder(['Flight Plan Activity', 'PIC authorized', 'Authorization record #'.$package->id])
-            ->assertSee('Historical authorization evidence')
-            ->assertSee('Flight plan changed. Pilot approval needed again.')
-            ->assertDontSee('Filing authorization history');
         $this->get(route('filing.document', ['package' => $package, 'type' => 'flight_plan']))
             ->assertOk()->assertContent(base64_decode($original['flight_plan']['bytes']));
     }
@@ -260,13 +256,12 @@ class UnifiedFilingAuthorizationTest extends TestCase
 
     public function test_self_filing_signature_requires_a_separate_explicit_action(): void
     {
-        [$flight, $pilot] = $this->filing();
-        $flight->update(['prepared_by_user_id' => $pilot->id, 'pilot_in_command_user_id' => $pilot->id, 'pilot_in_command' => strtoupper($pilot->fullName())]);
+        [$flight, $pilot] = $this->filing(selfPrepared: true);
         $this->signature($pilot);
         $this->actingAs($pilot);
         $this->assertNull(app(FilingAuthorizationService::class)->signatureBytes($flight));
         $this->get(route('filing.review-self', $flight))->assertRedirect();
-        $this->get(route('flights.view', $flight))->assertOk()->assertSee('Review current filing');
+        $this->get(route('flights.view', $flight))->assertOk()->assertDontSee('Review current filing');
         $service = app(PicAuthorizationService::class);
         $token = $service->createAuthorizationHandoff($flight->refresh(), selfPrepared: true);
         $this->post(route('filing.authorize-self', ['token' => $token]), ['apply_signature' => 1])->assertRedirect(route('flights.view', $flight));
@@ -320,6 +315,47 @@ class UnifiedFilingAuthorizationTest extends TestCase
         );
     }
 
+    public function test_dispatch_authorization_badge_counts_outstanding_packages_instead_of_unreviewed_atmo_filings(): void
+    {
+        [$flight, $pilot, $preparer] = $this->filing();
+        $resource = AwaitingAuthorizationFlightResource::class;
+        $this->actingAs($preparer);
+        $this->assertSame('New 1', $resource::getNavigationBadge());
+        $this->signature($pilot);
+        $this->assertSame('New 1', $resource::getNavigationBadge());
+        $this->authorize($flight, $pilot, true);
+        $this->actingAs($preparer);
+        $this->assertNull($flight->fresh()->reviewed_at);
+        $this->assertTrue($flight->canSubmitToAtc());
+        $this->assertNull($resource::getNavigationBadge());
+        $this->assertFalse($resource::getEloquentQuery()->whereKey($flight)->exists());
+
+        // A later manifest change requires a new package decision; the flight plan stays signed.
+        $plan = app(FilingAuthorizationService::class)->currentForDocument($flight, 'flight_plan');
+        app(FlightManifestService::class)->save($flight, $preparer, ['remarks' => 'Changed cargo instructions']);
+        $this->assertNotNull(app(FilingAuthorizationService::class)->currentForDocument($flight->fresh(), 'flight_plan'));
+        $this->assertSame($plan->id, app(FilingAuthorizationService::class)->currentForDocument($flight, 'flight_plan')->id);
+        $this->assertNull(app(FilingAuthorizationService::class)->currentForDocument($flight, 'passenger_cargo_manifest'));
+        $this->assertSame('New 1', $resource::getNavigationBadge());
+        $this->authorize($flight, $pilot, true);
+        $this->actingAs($preparer);
+        $this->assertNull($resource::getNavigationBadge());
+
+        [$other] = $this->filing();
+        $this->actingAs($preparer);
+        $this->assertNull($resource::getNavigationBadge());
+        $this->assertFalse($resource::getEloquentQuery()->whereKey($other)->exists());
+    }
+
+    public function test_declined_authorization_does_not_count_as_an_outstanding_request(): void
+    {
+        [$flight, $pilot, $preparer] = $this->filing();
+        $service = app(PicAuthorizationService::class);
+        $service->declineFromHandoff($service->createAuthorizationHandoff($flight), $pilot, 'Replacement required');
+        $this->actingAs($preparer);
+        $this->assertNull(AwaitingAuthorizationFlightResource::getNavigationBadge());
+    }
+
     public function test_decided_package_cannot_be_rewritten_or_deleted(): void
     {
         [$flight, $pilot] = $this->filing();
@@ -335,7 +371,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
         FilingAuthorization::query()->whereKey($package->id)->delete();
     }
 
-    public function test_correct_and_resubmit_creates_a_new_unsigned_filing(): void
+    public function test_correct_and_resubmit_is_rejected_without_changing_declined_history(): void
     {
         [$flight, $pilot, $preparer] = $this->filing();
         $preparer->update(['role' => UserRole::Pilot]);
@@ -343,21 +379,8 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $service->declineFromHandoff($service->createAuthorizationHandoff($flight), $pilot, 'Correct route.');
         Filament::setCurrentPanel(Filament::getPanel('pilot'));
         Livewire::actingAs($preparer)->withQueryParams(['correct_from' => $flight->id])
-            ->test(CreateFlight::class)
-            ->fillForm([
-                'filing_capacity' => 'for_another_pic', 'date_of_flight' => $flight->date_of_flight,
-                'aircraft_identification' => 'RPC123', 'flight_rules' => 'I', 'type_of_flight' => 'S',
-                'number' => '1', 'type_of_aircraft' => 'C172', 'wake_turbulence_cat' => 'L',
-                'equipment_10a' => 'S', 'equipment_10b' => 'C', 'departure_aerodrome' => 'RPUS',
-                'destination_aerodrome' => 'RPLL', 'proposed_time' => '1430', 'cruising_speed' => 'N0100',
-                'level' => 'F100', 'route' => 'DCT', 'total_eet' => '0100', 'endurance' => '0300',
-                'persons_on_board' => '1', 'other_information' => 'DOF/'.str_replace('-', '', $flight->date_of_flight),
-                'dinghies_enabled' => false, 'authorized_representative_enabled' => true,
-            ])->call('create')->assertHasNoFormErrors();
-        $corrected = Flight::query()->where('revision_of_id', $flight->id)->sole();
-        $this->assertTrue($corrected->requiresPicAuthorization());
-        $this->assertFalse($corrected->isPicAuthorizationCurrent());
-        $this->assertSame(0, $corrected->filingAuthorizations()->count());
+            ->test(CreateFlight::class)->assertForbidden();
+        $this->assertSame(0, $flight->revisions()->count());
         $this->assertSame('declined', $flight->filingAuthorizations()->sole()->status);
     }
 
@@ -433,7 +456,7 @@ class UnifiedFilingAuthorizationTest extends TestCase
         }
     }
 
-    private function filing(): array
+    private function filing(bool $selfPrepared = false): array
     {
         $operator = Operator::factory()->create();
         $pilot = User::factory()->create(['role' => UserRole::Pilot, 'operator_id' => $operator->id]);
@@ -444,12 +467,12 @@ class UnifiedFilingAuthorizationTest extends TestCase
         $preparer = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $operator->id]);
         $flight = Flight::factory()->create([
             'status' => FlightPlanStatus::AwaitingPic, 'operator_id' => $operator->id,
-            'prepared_by_user_id' => $preparer->id, 'filed_by_user_id' => $preparer->id,
-            'pilot_in_command_user_id' => null, 'pilot_in_command' => null,
+            'prepared_by_user_id' => $selfPrepared ? $pilot->id : $preparer->id, 'filed_by_user_id' => $selfPrepared ? $pilot->id : $preparer->id,
+            'pilot_in_command_user_id' => $selfPrepared ? $pilot->id : null, 'pilot_in_command' => $selfPrepared ? strtoupper($pilot->fullName()) : null,
             'date_of_flight' => now()->addDay()->toDateString(), 'persons_on_board' => 1,
         ])->refresh();
 
-        $this->manifest($flight, $pilot, $preparer, false);
+        $this->manifest($flight, $pilot, $selfPrepared ? $pilot : $preparer, false);
 
         return [$flight, $pilot, $preparer];
     }

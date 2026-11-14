@@ -107,7 +107,9 @@ class AvsecVerificationTest extends TestCase
         $flight = $this->readyFlight();
         $payload = $this->payload($flight);
         if ($kind === 'stale') {
-            $flight->update(['route' => 'DCT CHANGED']);
+            $copy = clone $flight;
+            $copy->route = 'DCT CHANGED';
+            $payload = app(FlightPlanQrPayloadService::class)->buildPayload($copy);
         } elseif ($kind === 'revision') {
             $flight->forceFill(['revision_number' => $flight->revision_number + 1])->saveQuietly();
         } elseif ($kind === 'snapshot') {
@@ -138,9 +140,10 @@ class AvsecVerificationTest extends TestCase
         } elseif ($kind === 'manifest_unsigned') {
             $flight->manifest->update(['cargo_type' => 'CHANGED']);
         } elseif ($kind === 'unsigned') {
-            $flight->update(['route' => 'CHANGED']);
+            $packages = app(FilingAuthorizationService::class);
+            $packages->decide($packages->request($flight, ['flight_plan']), $flight, $flight->pilotInCommandUser, true, null, null);
         } elseif ($kind === 'expired') {
-            $flight->update(['date_of_flight' => now()->subDay()->toDateString()]);
+            $this->travel(3)->days();
         } elseif ($kind === 'incomplete') {
             $flight->manifest->update(['aircraft_owner_name' => null]);
             $packages = app(FilingAuthorizationService::class);

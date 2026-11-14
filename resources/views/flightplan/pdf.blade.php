@@ -581,7 +581,7 @@
             </div>
         @endif
 
-        @if(($awaitingPic ?? false) && ($selfFilingReviewUrl ?? null))
+        @if(($awaitingPic ?? false) && ($selfFilingReviewUrl ?? null) && ! auth()->user()?->isPilot())
             <div class="echo-review-page">
                 <a href="{{ $selfFilingReviewUrl }}" class="echo-review-button echo-review-button-neutral">Review current filing</a>
             </div>

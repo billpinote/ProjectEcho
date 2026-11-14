@@ -12,7 +12,6 @@ use App\Domain\FlightPlans\Services\PicAuthorizationService;
 use App\Domain\FlightPlans\Support\FlightPlanDataNormalizer;
 use App\Domain\FlightPlans\Support\FlightPlanPreparerContext;
 use App\Domain\FlightPlans\Support\FlightStatusDisplay;
-use App\Filament\Panels\Dispatch\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\FlightResource as PilotFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyArchivedFlights\MyArchivedFlightResource;
 use App\Http\Controllers\Controller;
@@ -161,12 +160,7 @@ class FlightPlanController extends Controller
             'backActionUrl' => ! $isAvsec && $flight->pic_authorization_status === 'declined'
                 ? MyArchivedFlightResource::getUrl('index', panel: 'pilot')
                 : $backActionUrl,
-            'correctResubmitUrl' => $flight->pic_authorization_status === 'declined'
-                && (int) $flight->prepared_by_user_id === (int) Auth::id()
-                ? (Auth::user()->isDispatch()
-                    ? FlightResource::getUrl('create', ['correct_from' => $flight->getKey()], panel: 'dispatch')
-                    : PilotFlightResource::getUrl('create', ['correct_from' => $flight->getKey()], panel: 'pilot'))
-                : null,
+            'correctResubmitUrl' => null,
         ]);
     }
 

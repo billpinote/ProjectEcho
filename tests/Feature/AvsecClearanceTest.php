@@ -208,8 +208,9 @@ class AvsecClearanceTest extends TestCase
 
     public function test_avsec_pilot_and_atmo_can_inspect_unsigned_plan_without_operational_authority(): void
     {
-        $flight = Flight::factory()->create(['status' => FlightPlanStatus::AwaitingPic, 'pic_authorization_status' => 'pending']);
-        $flight->forceFill(['prepared_by_user_id' => $flight->filed_by_user_id])->saveQuietly();
+        $pilot = User::factory()->create(['role' => UserRole::Pilot]);
+        $flight = Flight::factory()->create(['status' => FlightPlanStatus::AwaitingPic, 'pic_authorization_status' => 'pending',
+            'filed_by_user_id' => $pilot->id, 'prepared_by_user_id' => $pilot->id]);
         $officer = $this->officer();
         $preview = $this->get(route('flights.view', $flight))->assertOk()->assertViewIs('flightplan.pdf')
             ->assertViewHas('showAvsecActions', true)->assertViewHas('canDecideClearance', false)
@@ -327,8 +328,7 @@ class AvsecClearanceTest extends TestCase
                 $this->post(route('flights.avsec-clearance', $flight), $this->decision($flight, $decision))->assertForbidden();
             }
         }
-        $other = $this->readyFlight();
-        $other->update(['departure_aerodrome' => 'RPLL']);
+        $other = $this->readyFlight(['departure_aerodrome' => 'RPLL']);
         $this->officer();
         $this->post(route('flights.avsec-clearance', $other), $this->decision($other, 'deny'))->assertForbidden();
         $this->assertSame(0, FlightPlanEvent::where('event_type', FlightPlanEvent::TYPE_AVSEC_DENIED)->count());

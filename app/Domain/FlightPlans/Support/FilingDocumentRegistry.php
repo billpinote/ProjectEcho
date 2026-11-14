@@ -9,7 +9,7 @@ use Closure;
 
 class FilingDocumentRegistry
 {
-    private const PIC_CREDENTIAL_FIELDS = [
+    public const PIC_CREDENTIAL_FIELDS = [
         'pilot_id', 'pilot_in_command_user_id', 'pilot_in_command',
         'pilot_license_no', 'pilot_ratings', 'license_expiry_date',
     ];

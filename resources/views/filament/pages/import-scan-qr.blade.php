@@ -535,7 +535,7 @@
                             @elseif($this->isPicAuthorizationDeclined())
                                 <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #718096; border-radius: 0.75rem; background: #edf2f7;">
                                     <strong>{{ $this->isPicAuthorizationDeclineActor() ? 'You declined this flight plan' : 'PIC authorization declined' }}</strong>
-                                    <p style="margin: 0.4rem 0 0;">This authorization decision is complete. A corrected or resubmitted revision is required before another PIC decision.</p>
+                                    <p style="margin: 0.4rem 0 0;">This authorization decision is complete. Create a new flight plan for changes.</p>
                                 </div>
                             @elseif($this->canAuthorizeMatchedFlight())
                                 <div style="margin-top: 1.25rem; padding: 1rem; border: 2px solid #b7791f; border-radius: 0.75rem; background: #fff8e1;">

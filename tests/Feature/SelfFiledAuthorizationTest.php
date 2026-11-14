@@ -207,7 +207,7 @@ class SelfFiledAuthorizationTest extends TestCase
         $this->signature($pilot, 2);
         $this->assertSame($signature->id, $package->fresh()->pilot_signature_id);
         $this->assertSame($preserved, $package->fresh()->pdf_documents);
-        $flight->refresh()->update(['route' => 'DCT CHANGED']);
+        app(FlightManifestService::class)->save($flight->refresh(), $pilot, ['remarks' => 'Changed manifest']);
         $this->assertFalse($flight->refresh()->isPicAuthorizationCurrent());
         $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
         $this->assertNull(app(FilingAuthorizationService::class)->signatureBytes($flight));

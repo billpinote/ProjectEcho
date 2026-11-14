@@ -1126,13 +1126,6 @@ class FlightsTable
     private static function recordActions(?string $resourceClass): array
     {
         $actions = [
-            Action::make('editFiling')
-                ->label('Edit Flight Plan')->icon('heroicon-o-pencil-square')
-                ->url(fn (Flight $record): string => auth()->user()?->isDispatch()
-                    ? \App\Filament\Panels\Dispatch\Resources\Flights\FlightResource::getUrl('edit', ['record' => $record], panel: 'dispatch')
-                    : \App\Filament\Panels\Pilot\Resources\Flights\FlightResource::getUrl('edit', ['record' => $record], panel: 'pilot'))
-                ->visible(fn (Flight $record): bool => (auth()->user()?->isPilot() || auth()->user()?->isDispatch())
-                    && auth()->user()->can('update', $record)),
             Action::make('manifest')
                 ->label('Flight Manifest')
                 ->icon('heroicon-o-clipboard-document-list')
@@ -1182,12 +1175,6 @@ class FlightsTable
         }
 
         if ($resourceClass === AwaitingAuthorizationFlightResource::class) {
-            $actions[] = Action::make('correctResubmit')
-                ->label('Correct & Resubmit')
-                ->icon('heroicon-o-pencil-square')
-                ->url(fn (Flight $record): string => \App\Filament\Panels\Pilot\Resources\Flights\FlightResource::getUrl('create', ['correct_from' => $record->getKey()], panel: 'pilot'))
-                ->visible(fn (Flight $record): bool => $record->pic_authorization_status === 'declined'
-                    && (int) $record->prepared_by_user_id === (int) Auth::id());
             $actions[] = Action::make('archive')
                 ->label('Archive')
                 ->icon('heroicon-o-archive-box')
@@ -1210,8 +1197,6 @@ class FlightsTable
 
             return self::flightActionsGroup($actions);
         }
-
-        $actions[] = EditAction::make()->label('Edit');
 
         return self::flightActionsGroup($actions);
     }

@@ -84,6 +84,10 @@ PHP;
             $results = array_map(fn (Process $process) => $process->getOutput(), $processes);
             $this->assertEqualsCanonicalizing(['succeeded', 'blocked'], $results);
             $flight->refresh();
+            if ($secondOperation === 'mutate') {
+                $this->assertSame('blocked', $results[1]);
+                $this->assertSame('DCT', $flight->route);
+            }
             $this->assertLessThanOrEqual(1, $flight->avsecVerification()->count());
             if ($flight->isAvsecFrozen()) {
                 $this->assertSame('DCT', $flight->route);
@@ -91,8 +95,6 @@ PHP;
             } elseif ($secondOperation === 'deny') {
                 $this->assertSame(1, $flight->avsecDenials()->count());
                 $this->assertSame('DCT', $flight->route);
-            } else {
-                $this->assertSame('CONCURRENT CORRECTION', $flight->route);
             }
         } finally {
             foreach ($processes as $process) {

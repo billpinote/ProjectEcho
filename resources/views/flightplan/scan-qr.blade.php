@@ -222,7 +222,7 @@
                                 @csrf
                                 <input type="hidden" name="payload" value="{{ $payload }}">
                                 <button type="submit" class="echo-button echo-button-secondary">
-                                    Edit Flight Plan
+                                    Use for New Flight Plan
                                 </button>
                             </form>
 

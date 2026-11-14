@@ -59,6 +59,14 @@ class Flight extends Model
 
         return app(FilingAuthorizationService::class)
             ->mutate($this, function () use ($options): bool {
+                $this->normalizeMinutePrecisionTimes();
+                $protectedFields = app(FilingDocumentRegistry::class)->materialFlightFields();
+                if (app(FilingAuthorizationService::class)->isRecordingDecision($this)) {
+                    $protectedFields = array_diff($protectedFields, FilingDocumentRegistry::PIC_CREDENTIAL_FIELDS);
+                }
+                if ($this->isDirty($protectedFields)) {
+                    throw ValidationException::withMessages(['flight' => 'Submitted flight-plan contents are read-only. Cancel an eligible filing and create a new flight plan for changes.']);
+                }
                 if ($this->isDirty('status') && in_array($this->status, [FlightPlanStatus::Accepted, FlightPlanStatus::Active, FlightPlanStatus::Completed], true)
                     && ! in_array($this->getOriginal('status'), [FlightPlanStatus::Accepted, FlightPlanStatus::Active, FlightPlanStatus::Completed], true)
                     && AvsecVerificationService::requiredFor($this)

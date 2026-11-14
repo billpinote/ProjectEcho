@@ -26,7 +26,6 @@ use App\Models\Operator;
 use App\Models\PilotSignature;
 use App\Models\User;
 use App\Services\ProfileUpdates\ProfileUpdateRequestService;
-use Carbon\CarbonInterface;
 use Filament\Facades\Filament;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -138,35 +137,18 @@ class FlightFilingWorkflowRegressionTest extends TestCase
         $this->assertEquals($original, $legacy->fresh()->getRawOriginal());
     }
 
-    public function test_creator_livewire_edit_preserves_trusted_context_and_invalidates_signature(): void
+    public function test_creator_and_peer_cannot_edit_a_submitted_filing(): void
     {
         [$flight, $pic, $creator] = $this->filing(true);
         $this->manifest($flight, $pic, $creator);
         $this->sign($flight, $pic);
-        $revision = $flight->fresh()->revision_number;
+        $original = $flight->fresh()->getRawOriginal();
         Filament::setCurrentPanel('dispatch');
-        $date = $flight->date_of_flight;
-        $date = $date instanceof CarbonInterface ? $date->format('Y-m-d') : substr((string) $date, 0, 10);
-        Livewire::actingAs($creator)->test(EditFlight::class, ['record' => $flight->id])->assertOk()
-            ->fillForm(['date_of_flight' => $date, 'aircraft_identification' => 'RPC123',
-                'flight_rules' => 'V', 'type_of_flight' => 'G', 'number' => '1', 'type_of_aircraft' => 'C172',
-                'wake_turbulence_cat' => 'L', 'equipment_10a' => 'S', 'equipment_10b' => 'C',
-                'departure_aerodrome' => 'RPUS', 'destination_aerodrome' => 'RPLL', 'proposed_time' => '1430',
-                'cruising_speed' => 'N0100', 'level' => 'VFR', 'route' => 'UPDATED', 'total_eet' => '0100',
-                'endurance' => '0300', 'persons_on_board' => '1', 'other_information' => 'DOF/'.str_replace('-', '', $date),
-                'dinghies_enabled' => false, 'pilot_in_command' => 'FORGED PIC', 'pilot_license_no' => 'FORGED'])
-            ->call('save')->assertHasNoFormErrors();
-        $flight->refresh();
-        $this->assertSame('UPDATED', $flight->route);
-        $this->assertSame($pic->id, $flight->pilot_in_command_user_id);
-        $this->assertSame(strtoupper($pic->fullName()), $flight->pilot_in_command);
-        $this->assertSame($creator->operator_id, $flight->operator_id);
-        $this->assertSame($creator->id, $flight->prepared_by_user_id);
-        $this->assertGreaterThan($revision, $flight->revision_number);
-        $this->assertFalse($flight->isPicAuthorizationCurrent());
-        $this->assertSame(FlightPlanStatus::AwaitingPic, $flight->status);
+        Livewire::actingAs($creator)->test(EditFlight::class, ['record' => $flight->id])->assertForbidden();
         $peer = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $creator->operator_id]);
         Livewire::actingAs($peer)->test(EditFlight::class, ['record' => $flight->id])->assertForbidden();
+        $this->assertSame($original, $flight->fresh()->getRawOriginal());
+        $this->assertTrue($flight->fresh()->canSubmitToAtc());
     }
 
     public function test_rejection_audit_failure_rolls_back_the_status_transition(): void
@@ -449,13 +431,13 @@ class FlightFilingWorkflowRegressionTest extends TestCase
             ->assertSeeText('Filed Successfully')->assertSeeText(FlightStatusDisplay::ACCEPTANCE_NOTICE);
     }
 
-    public function test_dispatch_creator_edit_other_dispatch_read_only_and_operator_isolation(): void
+    public function test_dispatch_can_edit_only_its_manifest_and_preserves_operator_isolation(): void
     {
         [$flight, $pic, $creator] = $this->filing(true);
         $manifest = $this->manifest($flight, $pic, $creator);
         $peer = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => $creator->operator_id]);
         $other = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => Operator::factory()->create()->id]);
-        $this->assertTrue($creator->can('update', $flight));
+        $this->assertFalse($creator->can('update', $flight));
         $this->assertTrue($creator->can('update', $manifest));
         $this->assertTrue($peer->can('view', $manifest));
         $this->assertFalse($peer->can('update', $manifest));
