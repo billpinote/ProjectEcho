@@ -57,7 +57,7 @@ class AccessGatewayLogoutFlowTest extends TestCase
     }
 
     #[DataProvider('panelLogoutProvider')]
-    public function test_filament_logout_redirects_to_signed_out_and_ends_session(string $panel, UserRole $role): void
+    public function test_filament_logout_redirects_home_and_ends_session(string $panel, UserRole $role): void
     {
         $user = $this->user($role, [
             'station' => $role === UserRole::Atmo ? 'RPUS' : null,
@@ -65,7 +65,7 @@ class AccessGatewayLogoutFlowTest extends TestCase
 
         $this->actingAs($user)
             ->post(route("filament.{$panel}.auth.logout"))
-            ->assertRedirect(route('signed-out'))
+            ->assertRedirect(route('gateway'))
             ->assertStatus(302);
 
         $this->assertGuest();

@@ -19,7 +19,6 @@
             <a href="{{ route('gateway') }}" class="mt-5 inline-block rounded-lg bg-echo-primary px-4 py-3 text-sm font-semibold text-white">Sign in</a>
         </section>
     @else
-        <a href="{{ route('manifests.blank') }}" class="text-sm font-semibold text-echo-primary">Download blank CAAP manifest</a>
         @if($nativeManifestTable ?? false)
             {{ $this->table }}
         @else

@@ -69,14 +69,7 @@ abstract class ListFlightManifests extends Page implements HasTable
             ])
             ->recordActions([
                 ActionGroup::make([
-                    Action::make('manifest')
-                        ->label(fn (Flight $record): string => $record->manifest === null ? 'Prepare manifest'
-                            : (auth()->user()->can('update', $record->manifest) ? 'Edit manifest' : 'View manifest'))
-                        ->icon('heroicon-o-clipboard-document-list')
-                        ->url(fn (Flight $record): string => route('flights.manifest.edit', $record))
-                        ->visible(fn (Flight $record): bool => auth()->user()->can('create', [FlightManifest::class, $record])
-                            || ($record->manifest !== null && auth()->user()->can('view', $record->manifest)))
-                        ->grouped(),
+                    $this->manifestAction(),
                 ])
                     ->label('Actions')
                     ->icon('heroicon-o-squares-2x2')
@@ -96,6 +89,18 @@ abstract class ListFlightManifests extends Page implements HasTable
             ->defaultPaginationPageOption(20)
             ->emptyStateHeading('No flight plans available')
             ->emptyStateDescription('You need an Echo flight plan before preparing a saved manifest.');
+    }
+
+    protected function manifestAction(): Action
+    {
+        return Action::make('manifest')
+            ->label(fn (Flight $record): string => $record->manifest === null ? 'Prepare manifest'
+                : (auth()->user()->can('update', $record->manifest) ? 'Edit manifest' : 'View manifest'))
+            ->icon('heroicon-o-clipboard-document-list')
+            ->url(fn (Flight $record): string => route('flights.manifest.edit', $record))
+            ->visible(fn (Flight $record): bool => auth()->user()->can('create', [FlightManifest::class, $record])
+                || ($record->manifest !== null && auth()->user()->can('view', $record->manifest)))
+            ->grouped();
     }
 
     protected function getViewData(): array

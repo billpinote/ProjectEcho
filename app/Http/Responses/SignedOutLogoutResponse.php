@@ -9,6 +9,6 @@ class SignedOutLogoutResponse implements LogoutResponse
 {
     public function toResponse($request): RedirectResponse
     {
-        return redirect()->route('signed-out');
+        return redirect()->route('gateway');
     }
 }

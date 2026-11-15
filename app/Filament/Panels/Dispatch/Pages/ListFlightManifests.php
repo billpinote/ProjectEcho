@@ -6,6 +6,7 @@ use App\Filament\Panels\Dispatch\Resources\Flights\FlightResource;
 use App\Filament\Shared\Pages\ListFlightManifests as SharedListFlightManifests;
 use App\Models\Flight;
 use App\Models\FlightManifest;
+use Filament\Actions\Action;
 use Filament\Tables\Table;
 
 class ListFlightManifests extends SharedListFlightManifests
@@ -15,7 +16,19 @@ class ListFlightManifests extends SharedListFlightManifests
         return parent::table($table)
             ->recordUrl(fn (Flight $record): ?string => auth()->user()->can('create', [FlightManifest::class, $record])
                 || ($record->manifest !== null && auth()->user()->can('view', $record->manifest))
-                    ? route('flights.manifest.edit', $record) : null);
+                    ? route('flights.manifest.edit', $record) : null)
+            ->openRecordUrlInNewTab(false);
+    }
+
+    protected function manifestAction(): Action
+    {
+        return Action::make('view')
+            ->label('View Flight Plan')
+            ->icon('heroicon-o-eye')
+            ->url(fn (Flight $record): string => route('flights.view', $record))
+            ->openUrlInNewTab()
+            ->visible(fn (Flight $record): bool => auth()->user()->can('view', $record))
+            ->grouped();
     }
 
     protected function createFlightUrl(): string

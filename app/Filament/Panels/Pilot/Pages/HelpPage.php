@@ -2,22 +2,9 @@
 
 namespace App\Filament\Panels\Pilot\Pages;
 
-use Filament\Pages\Page;
+use App\Filament\Shared\Pages\Account\HelpPage as SharedHelpPage;
 
-class HelpPage extends Page
+class HelpPage extends SharedHelpPage
 {
-    protected static ?string $title = 'Help';
-
-    protected static bool $shouldRegisterNavigation = false;
-
-    protected static ?string $slug = 'help';
-
-    protected string $view = 'filament.pages.profile-placeholder';
-
-    protected function getViewData(): array
-    {
-        return [
-            'message' => 'Help resources are coming soon.',
-        ];
-    }
+    protected static string $accountPanel = 'pilot';
 }

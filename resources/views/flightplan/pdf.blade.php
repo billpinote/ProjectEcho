@@ -1396,7 +1396,7 @@
                 @if($canAcceptFlightPlan ?? false)
                 <button class="echo-review-button echo-review-button-primary" type="button" data-open-review-modal="accept-flight-plan">&#10003; Accept Flight Plan</button>
                 @else
-                <button class="echo-review-button echo-review-button-neutral" type="button" disabled aria-describedby="accept-unavailable-reason" aria-disabled="true">Accept Flight Plan</button>
+                <button class="echo-review-button echo-review-button-neutral" type="button" disabled @if($acceptUnavailableReason ?? null)aria-describedby="accept-unavailable-reason"@endif aria-disabled="true">Accept Flight Plan</button>
                 @endif
             </div>
             @if($acceptUnavailableReason ?? null)

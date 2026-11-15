@@ -11,7 +11,9 @@ use App\Filament\Panels\Pilot\Pages\ListFlightManifests;
 use App\Models\Flight;
 use App\Models\Operator;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class FlightManifestPageTest extends TestCase
@@ -34,7 +36,8 @@ class FlightManifestPageTest extends TestCase
         $flight = Flight::factory()->create(['aircraft_identification' => 'RPCOWN']);
         Flight::factory()->create(['aircraft_identification' => 'RPCOTHER']);
         $this->actingAs($flight->filedBy)->get(ListFlightManifests::getUrl(panel: 'pilot'))->assertOk()->assertSee('fi-sidebar', false)
-            ->assertSeeText('RPCOWN')->assertDontSeeText('RPCOTHER')->assertSeeText('Prepare manifest');
+            ->assertSeeText('RPCOWN')->assertDontSeeText('RPCOTHER')->assertSeeText('Prepare manifest')
+            ->assertDontSee(route('manifests.blank'), false);
         $this->get(route('manifests.index'))->assertRedirect(ListFlightManifests::getUrl(panel: 'pilot'));
         $response = $this->get('/pilot');
         $response->assertSeeInOrder(['Dashboard', 'Create Flight Plan', 'Flight Manifests']);
@@ -213,7 +216,8 @@ class FlightManifestPageTest extends TestCase
             $listUrl = \App\Filament\Panels\Dispatch\Pages\ListFlightManifests::getUrl(panel: 'dispatch');
             $editUrl = \App\Filament\Panels\Dispatch\Pages\EditFlightManifest::getUrl(['flight' => $flight], panel: 'dispatch');
             $this->actingAs($user)->get(route('manifests.index'))->assertRedirect($listUrl);
-            $this->get($listUrl)->assertOk()->assertSee('fi-sidebar', false)->assertSeeText($flight->aircraft_identification);
+            $this->get($listUrl)->assertOk()->assertSee('fi-sidebar', false)->assertSeeText($flight->aircraft_identification)
+                ->assertDontSee(route('manifests.blank'), false);
             if ($role === UserRole::OperatorStaff) {
                 $this->get(route('flights.manifest.edit', $flight))->assertForbidden();
                 $this->put(route('flights.manifest.update', $flight), $this->completeData($flight))->assertForbidden();
@@ -221,11 +225,46 @@ class FlightManifestPageTest extends TestCase
                 continue;
             }
             $this->get(route('flights.manifest.edit', $flight))->assertRedirect($editUrl);
-            $this->get($editUrl)->assertOk()->assertSee('fi-sidebar', false)->assertSeeText('Save manifest');
+            $this->get($editUrl)->assertOk()->assertSee('fi-sidebar', false)->assertSeeText('Save manifest')
+                ->assertSeeText('View Flight Plan')->assertDontSeeText('View Manifest')
+                ->assertDontSee(route('manifests.blank'), false);
             $this->put(route('flights.manifest.update', $flight), $this->completeData($flight))
                 ->assertSessionHasNoErrors()->assertRedirect($editUrl);
-            $this->get($editUrl)->assertOk()->assertSeeText('Manifest saved.');
+            $this->get($editUrl)->assertOk()->assertSeeText('Manifest saved.')
+                ->assertSeeInOrder(['View Flight Plan', 'View Manifest'])
+                ->assertSee('href="'.route('flights.manifest.pdf', $flight).'" target="_blank"', false)
+                ->assertDontSeeText('Download PDF')->assertDontSeeText('View / Print PDF')
+                ->assertDontSee(route('manifests.blank'), false);
         }
+    }
+
+    public function test_dispatch_manifest_actions_open_the_flight_plan_while_rows_open_the_manifest(): void
+    {
+        $user = User::factory()->create(['role' => UserRole::Dispatch, 'operator_id' => Operator::factory()->create()->id]);
+        $flight = Flight::factory()->create([
+            'operator_id' => $user->operator_id,
+            'prepared_by_user_id' => $user->id,
+            'filed_by_user_id' => $user->id,
+            'status' => FlightPlanStatus::AwaitingPic,
+        ]);
+        $other = Flight::factory()->create();
+        $this->actingAs($user);
+        Filament::setCurrentPanel(Filament::getPanel('dispatch'));
+
+        $page = Livewire::test(\App\Filament\Panels\Dispatch\Pages\ListFlightManifests::class)
+            ->assertCanSeeTableRecords([$flight])
+            ->assertCanNotSeeTableRecords([$other])
+            ->assertTableActionHasUrl('view', route('flights.view', $flight), $flight)
+            ->assertTableActionShouldOpenUrlInNewTab('view', $flight)
+            ->assertTableActionDoesNotExist('manifest');
+        $this->assertSame(route('flights.manifest.edit', $flight), $page->instance()->getTable()->getRecordUrl($flight));
+        $this->assertFalse($page->instance()->getTable()->shouldOpenRecordUrlInNewTab($flight));
+
+        $this->get(route('flights.view', $flight))->assertOk()
+            ->assertDontSeeText('PIC authorization must be completed before operational actions are available.')
+            ->assertDontSee('data-open-review-modal="accept-flight-plan"', false)
+            ->assertDontSee('data-open-review-modal="reject-flight-plan"', false);
+        $this->post(route('flights.accept', $flight))->assertForbidden();
     }
 
     /** @return array<string, mixed> */

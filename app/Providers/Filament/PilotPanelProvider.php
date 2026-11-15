@@ -5,12 +5,8 @@ namespace App\Providers\Filament;
 use App\Filament\Panels\Pilot\Pages\Dashboard;
 use App\Filament\Panels\Pilot\Pages\EditFlightManifest;
 use App\Filament\Panels\Pilot\Pages\EditMyProfilePage;
-use App\Filament\Panels\Pilot\Pages\HelpPage;
 use App\Filament\Panels\Pilot\Pages\ListFlightManifests;
-use App\Filament\Panels\Pilot\Pages\MyProfilePage;
-use App\Filament\Panels\Pilot\Pages\PreferencesPage;
 use App\Filament\Panels\Pilot\Pages\ScanAuthorizationQr;
-use App\Filament\Panels\Pilot\Pages\SecurityPage;
 use App\Filament\Panels\Pilot\Resources\AwaitingAuthorizationFlights\AwaitingAuthorizationFlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\FlightResource;
 use App\Filament\Panels\Pilot\Resources\Flights\Pages\CreateFlight;
@@ -19,8 +15,6 @@ use App\Filament\Panels\Pilot\Resources\MyCompletedFlights\MyCompletedFlightReso
 use App\Filament\Panels\Pilot\Resources\MyCurrentFlights\MyCurrentFlightResource;
 use App\Filament\Panels\Pilot\Resources\MyFlightPlans\MyFlightPlansResource;
 use App\Providers\Filament\Concerns\ConfiguresEchoPanel;
-use Filament\Facades\Filament;
-use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationBuilder;
 use Filament\Navigation\NavigationItem;
 use Filament\Panel;
@@ -40,11 +34,7 @@ class PilotPanelProvider extends PanelProvider
                 EditFlightManifest::class,
                 ListFlightManifests::class,
                 Dashboard::class,
-                MyProfilePage::class,
                 EditMyProfilePage::class,
-                PreferencesPage::class,
-                SecurityPage::class,
-                HelpPage::class,
                 ScanAuthorizationQr::class,
             ])
             ->resources([
@@ -54,30 +44,6 @@ class PilotPanelProvider extends PanelProvider
                 MyCompletedFlightResource::class,
                 MyArchivedFlightResource::class,
                 AwaitingAuthorizationFlightResource::class,
-            ])
-            ->userMenuItems([
-                'profile' => MenuItem::make()
-                    ->label('View Profile')
-                    ->icon(Heroicon::OutlinedUserCircle)
-                    ->url(fn (): string => MyProfilePage::getUrl(panel: 'pilot'))
-                    ->visible(fn (): bool => Filament::auth()->user()?->isPilot() ?? false)
-                    ->sort(-1),
-                MenuItem::make()
-                    ->label('Preferences')
-                    ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
-                    ->url(fn (): string => PreferencesPage::getUrl(panel: 'pilot'))
-                    ->visible(fn (): bool => Filament::auth()->user()?->isPilot() ?? false)
-                    ->sort(10),
-                MenuItem::make()
-                    ->label('Security')
-                    ->icon(Heroicon::OutlinedShieldCheck)
-                    ->url(fn (): string => SecurityPage::getUrl(panel: 'pilot'))
-                    ->sort(11),
-                MenuItem::make()
-                    ->label('Help')
-                    ->icon(Heroicon::OutlinedQuestionMarkCircle)
-                    ->url(fn (): string => HelpPage::getUrl(panel: 'pilot'))
-                    ->sort(12),
             ])
             ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
                 return $builder

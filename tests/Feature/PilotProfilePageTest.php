@@ -280,6 +280,8 @@ class PilotProfilePageTest extends TestCase
 
     public function test_profile_view_does_not_mark_distant_future_credentials_as_expiring_soon(): void
     {
+        $this->travelTo(Carbon::parse('2026-01-01'));
+
         $pilot = $this->pilot([
             'first_name' => 'Future',
             'last_name' => 'Pilot',
@@ -302,13 +304,13 @@ class PilotProfilePageTest extends TestCase
             ->assertDontSeeText('Expiring soon');
     }
 
-    public function test_artisan_cannot_view_or_edit_pilot_profile_pages(): void
+    public function test_artisan_can_view_own_account_but_cannot_edit_pilot_profile(): void
     {
         $artisan = $this->artisanUser();
 
         $this->actingAs($artisan)
             ->get(MyProfilePage::getUrl(panel: 'pilot'))
-            ->assertForbidden();
+            ->assertOk()->assertSeeText($artisan->email)->assertDontSeeText('Request Profile Update');
 
         $this->actingAs($artisan)
             ->get(EditMyProfilePage::getUrl(panel: 'pilot'))
@@ -790,7 +792,7 @@ class PilotProfilePageTest extends TestCase
         $this->assertContains(HelpPage::getUrl(panel: 'pilot'), $urls);
     }
 
-    public function test_pilot_panel_user_menu_hides_profile_item_for_artisan(): void
+    public function test_pilot_panel_user_menu_includes_own_account_items_for_artisan(): void
     {
         $artisan = $this->artisanUser();
 
@@ -801,10 +803,10 @@ class PilotProfilePageTest extends TestCase
         $labels = array_map(fn ($item): string => (string) $item->getLabel(), $items);
         $urls = array_map(fn ($item): ?string => $item->getUrl(), $items);
 
-        $this->assertNotContains('View Profile', $labels);
-        $this->assertNotContains(MyProfilePage::getUrl(panel: 'pilot'), $urls);
-        $this->assertNotContains('Preferences', $labels);
-        $this->assertNotContains(PreferencesPage::getUrl(panel: 'pilot'), $urls);
+        $this->assertContains('View Profile', $labels);
+        $this->assertContains(MyProfilePage::getUrl(panel: 'pilot'), $urls);
+        $this->assertContains('Preferences', $labels);
+        $this->assertContains(PreferencesPage::getUrl(panel: 'pilot'), $urls);
         $this->assertContains('Security', $labels);
         $this->assertContains('Help', $labels);
     }

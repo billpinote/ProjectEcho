@@ -150,9 +150,9 @@ class FlightPlanController extends Controller
             'acceptActionUrl' => route('flights.accept', $flight),
             'canAcceptFlightPlan' => $canAcceptFlightPlan,
             'canRejectFlightPlan' => $canRejectFlightPlan,
-            'acceptUnavailableReason' => $awaitingPic ? 'PIC authorization must be completed before operational actions are available.' : ($canRejectFlightPlan && ! $canAcceptFlightPlan
+            'acceptUnavailableReason' => ! $awaitingPic && $canRejectFlightPlan && ! $canAcceptFlightPlan
                 && $clearance->currentState($flight) === AvsecClearanceState::Denied
-                ? 'ATMO acceptance requires AVSEC approval. This flight plan remains available for review or rejection.' : null),
+                ? 'ATMO acceptance requires AVSEC approval. This flight plan remains available for review or rejection.' : null,
             'rejectActionUrl' => route('flights.reject', $flight),
             'acceptedByWiresign' => $this->browser->resolveAtcWiresign(),
             'picDeclineDetails' => $flight->pic_authorization_status === 'declined',

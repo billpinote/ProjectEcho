@@ -2,12 +2,15 @@
 
 namespace App\Providers\Filament\Concerns;
 
+use App\Http\Middleware\RedirectExpiredPanelLogout;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
 use Filament\Panel;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -21,10 +24,37 @@ trait ConfiguresEchoPanel
 {
     protected function configureEchoPanel(Panel $panel, string $id, string $path): Panel
     {
+        $accountNamespace = 'App\\Filament\\Panels\\'.ucfirst($id).'\\Pages\\';
+
         return $panel
             ->id($id)
             ->path($path)
             ->login()
+            ->pages(array_map(fn (string $page): string => $accountNamespace.$page, [
+                'MyProfilePage', 'PreferencesPage', 'SecurityPage', 'HelpPage',
+            ]))
+            ->userMenuItems([
+                'profile' => MenuItem::make()
+                    ->label('View Profile')
+                    ->icon(Heroicon::OutlinedUserCircle)
+                    ->url(fn (): string => route('filament.'.$id.'.pages.profile'))
+                    ->sort(-1),
+                MenuItem::make()
+                    ->label('Preferences')
+                    ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
+                    ->url(fn (): string => route('filament.'.$id.'.pages.preferences'))
+                    ->sort(10),
+                MenuItem::make()
+                    ->label('Security')
+                    ->icon(Heroicon::OutlinedShieldCheck)
+                    ->url(fn (): string => route('filament.'.$id.'.pages.security'))
+                    ->sort(11),
+                MenuItem::make()
+                    ->label('Help')
+                    ->icon(Heroicon::OutlinedQuestionMarkCircle)
+                    ->url(fn (): string => route('filament.'.$id.'.pages.help'))
+                    ->sort(12),
+            ])
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
                 'charcoal' => Color::hex('#364152'),
@@ -44,6 +74,7 @@ trait ConfiguresEchoPanel
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                RedirectExpiredPanelLogout::class,
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,
